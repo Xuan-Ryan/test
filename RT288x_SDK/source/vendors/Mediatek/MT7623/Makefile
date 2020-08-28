@@ -1,0 +1,66 @@
+CUR_DIR = $(shell pwd)
+KERNELZ = $(ROOTDIR)/$(LINUXDIR)/arch/arm/boot/zImage
+KERNEL_IMG = $(IMAGEDIR)/kernel_$(TARGET_PRODUCT).bin
+MKBOOTFS = $(CUR_DIR)/mkbootfs
+MKIMAGE = $(CUR_DIR)/mkimage
+MKBOOTIMG = $(CUR_DIR)/mkbootimg
+MINIGZIP = $(CUR_DIR)/minigzip
+IMAGE = $(IMAGEDIR)/$(USER)_uImage
+#LIBGCC = $(shell $(CROSS_COMPILE)gcc -print-file-name=libgcc_s.so.1)
+
+ROMFS_DIRS = \
+	tmp \
+	bin \
+	dev dev/pts \
+	home \
+	etc \
+	etc_ro etc_ro/web etc_ro/ppp etc_ro/ppp/peers etc_ro/ppp/plugins etc_ro/ppp/3g \
+	etc_ro/wlan etc_ro/Wireless etc_ro/xml etc_ro/usb \
+	/etc_ro/lighttpd \
+	etc_ro/linuxigd etc_ro/Wireless/RT2860AP etc_ro/Wireless/RT61AP etc_ro/Wireless/iNIC \
+	lib lib/modules lib/ipsec \
+	mnt \
+	proc \
+	sbin \
+	sys \
+	media \
+	usr usr/bin usr/sbin usr/codepages \
+	var 
+
+clean:
+	
+
+romfs: 
+	[ -d $(ROMFSDIR)/$$i ] || mkdir -p $(ROMFSDIR)
+	for i in $(ROMFS_DIRS); do \
+		[ -d $(ROMFSDIR)/$$i ] || mkdir -p $(ROMFSDIR)/$$i; \
+	done
+
+
+	$(ROMFSINST) /etc_ro/rcS
+	$(ROMFSINST) /etc_ro/inittab
+	$(ROMFSINST) /etc_ro/motd
+	$(ROMFSINST) /etc/fstab
+
+	$(ROMFSINST) /etc_ro/Wireless/RT2860AP/RT2860_default_novlan
+	$(ROMFSINST) /etc_ro/Wireless/RT2860AP/RT2860_default_vlan
+	$(ROMFSINST) /etc_ro/Wireless/iNIC/RT2860AP.dat
+	#for sigma test
+	$(ROMFSINST) -e CONFIG_RALINKAPP_HOTSPOT /etc_ro/Wireless/iNIC/RT2860AP_hotspot.dat
+
+
+romfs.post:: 
+	[ -d $(IMAGEDIR) ] || mkdir -p $(IMAGEDIR)
+#cp $(LIBGCC) $(ROOTDIR)/romfs/lib
+	
+image:
+	#$(MKBOOTFS) $(ROOTDIR)/romfs | $(MINIGZIP) > $(IMAGEDIR)/ramdisk.gzip
+	#$(MKIMAGE) $(IMAGEDIR)/ramdisk.gzip ROOTFS > $(IMAGEDIR)/ramdisk.img
+
+	$(OBJCOPY) -S -O binary -R .note -R .comment $(ROOTDIR)/$(LINUXDIR)/vmlinux /tftpboot/$(USER)_vmlinux.bin 
+
+	touch $(IMAGEDIR)/fake_ramdisk
+	$(MKIMAGE) $(IMAGEDIR)/fake_ramdisk ROOTFS > $(IMAGEDIR)/fake_ramdisk.img
+	$(MKIMAGE) $(KERNELZ) KERNEL > $(KERNEL_IMG)
+	$(MKBOOTIMG) --kernel $(KERNEL_IMG) --ramdisk $(IMAGEDIR)/fake_ramdisk.img --board 1384501662 --output $(IMAGE)
+

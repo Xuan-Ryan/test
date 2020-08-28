@@ -1,0 +1,6 @@
+Copy JVAW53.config to .config
+# cp JVAW54.config .config
+Invoke make to careate configuration
+# make menuconfig
+just exit and save it, and you can compile it now.
+

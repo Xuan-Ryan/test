@@ -1,0 +1,46 @@
+#!/bin/sh
+mount -a
+mkdir -p /var/run
+makedevlinks.sh
+cat /etc_ro/motd > /dev/console
+nvram_daemon&
+#goahead&
+#RX
+#echo 8388608 > /proc/sys/net/core/rmem_max
+#echo 8388608 > /proc/sys/net/core/rmem_default
+#insmod input-core.ko
+#insmod mousedev.ko
+#insmod hid.ko
+#insmod usbhid.ko
+#displayserver 0 &
+#hidrawserver 0 &
+#/home/ds_detect.sh &
+
+#TX
+#echo 8388608 > /proc/sys/net/core/wmem_max
+#echo 8388608 > /proc/sys/net/core/wmem_default
+#insmod rt_udc_pdma.ko
+#insmod g_mass_storage.ko from_bc_uint_destip=0xC802A8C0
+#####brctl delif br0 eth2#####
+mkdir /var/updateFW/
+mkdir /var/ledblinklv/
+checkt6existserver &
+#/home/tx_ds_detect.sh &
+
+#ifconfig apcli0 down
+#echo 4194304 > /sys/module/g_mass_storage/parameters/from_rx_current_bps
+init_system start
+
+iwpriv apcli0 set ApCliAutoConnect=3
+sleep 2
+iwpriv apcli0 set ApCliAutoConnect=1
+
+#for telnet debugging
+telnetd
+
+#for syslogd
+mkdir -p /var/log
+
+#for cpe_app
+ln -s /etc_ro/init.d /etc/init.d
+ln -s /etc_ro/cron /etc/cron
