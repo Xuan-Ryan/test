@@ -4,7 +4,17 @@ echo 'start patch drivers'
 echo ''
 echo 'start patch char device'
 cp drivers/char/ralink_gpio.c ../../../linux-2.6.36.x/drivers/char/ralink_gpio.c
-cp drivers/char/i2s_ctrl.h ../../../linux-2.6.36.x/drivers/char/i2s_ctrl.h
+cp drivers/char/i2s_ctrl.h ../../../linux-2.6.36.x/drivers/char/i2s/i2s_ctrl.h
+echo ''
+echo 'start patch usb gadget'
+cp drivers/usb/gadget/composite.c ../../../linux-2.6.36.x/drivers/usb/gadget/composite.c
+cp drivers/usb/gadget/f_mass_storage.c ../../../linux-2.6.36.x/drivers/usb/gadget/f_mass_storage.c
+cp drivers/usb/gadget/hid.c ../../../linux-2.6.36.x/drivers/usb/gadget/hid.c
+cp drivers/usb/gadget/mass_storage.c ../../../linux-2.6.36.x/drivers/usb/gadget/mass_storage.c
+cp drivers/usb/gadget/rt_udc.h ../../../linux-2.6.36.x/drivers/usb/gadget/rt_udc.h
+cp drivers/usb/gadget/rt_udc_pdma.c ../../../linux-2.6.36.x/drivers/usb/gadget/rt_udc_pdma.c
+cp drivers/usb/gadget/storage_common.c ../../../linux-2.6.36.x/drivers/usb/gadget/storage_common.c
+cp drivers/usb/gadget/include/video.h ../../../linux-2.6.36.x/include/linux/usb/video.h
 #echo 'start patch rlt_wifi'
 #cp drivers/rlt_wifi/ap_cfg.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/ap/ap_cfg.c
 #cp drivers/rlt_wifi/ap_ioctl.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/os/linux/ap_ioctl.c
