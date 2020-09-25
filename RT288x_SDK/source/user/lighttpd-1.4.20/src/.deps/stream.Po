@@ -1,0 +1,118 @@
+stream.o: stream.c \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/types.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/features.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_config.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/cdefs.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/types.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/wordsize.h \
+ /opt/buildroot-gcc463/usr/lib/gcc/mipsel-buildroot-linux-uclibc/4.6.3/include/stddef.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/typesizes.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/pthreadtypes.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/sched.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/time.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/endian.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/endian.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/byteswap.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/byteswap.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/byteswap-common.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/select.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/select.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/sigset.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/time.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/sysmacros.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/stat.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/stat.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sgidefs.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/unistd.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/posix_opt.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/confname.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/getopt.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/fcntl.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/fcntl.h \
+ stream.h buffer.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/stdlib.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/alloca.h \
+ ../config.h /home/UVC/RT288x_SDK/source/lib/include/linux/autoconf.h \
+ settings.h sys-mmap.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/mman.h \
+ /home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/mman.h
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/types.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/features.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_config.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/cdefs.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/types.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/wordsize.h:
+
+/opt/buildroot-gcc463/usr/lib/gcc/mipsel-buildroot-linux-uclibc/4.6.3/include/stddef.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/typesizes.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/pthreadtypes.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/sched.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/time.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/endian.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/endian.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/byteswap.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/byteswap.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/byteswap-common.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/select.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/select.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/sigset.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/time.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/sysmacros.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/stat.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/stat.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sgidefs.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/unistd.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/posix_opt.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/confname.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/getopt.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/fcntl.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/fcntl.h:
+
+stream.h:
+
+buffer.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/stdlib.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/alloca.h:
+
+../config.h:
+
+/home/UVC/RT288x_SDK/source/lib/include/linux/autoconf.h:
+
+settings.h:
+
+sys-mmap.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/mman.h:
+
+/home/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/mman.h:
