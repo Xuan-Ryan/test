@@ -64,9 +64,9 @@ static struct proc_dir_entry *pProcDebugLevel = NULL;
 #define RING_RESET_TIMEOUT  3000                    /* 3 secs */
 #define RX_RESCHEDULE   64
 #define TX_RESCHEDULE   4
-static unsigned dma = 0;
+static unsigned dma = 1;
 module_param (dma, uint, S_IRUGO);
-static unsigned sm = 0;
+static unsigned sm = 1;
 module_param (sm, uint, S_IRUGO);
 static unsigned int TXMAXCAP = 512;
 module_param (TXMAXCAP, uint, S_IRUGO);
@@ -89,6 +89,9 @@ struct tasklet_struct tx_dma_tasklet;
 
 static struct rt_udc_struct controller;
 static struct rt_request *handle_outep(struct rt_ep_struct *rt_ep);
+static void handle_epinirq(struct rt_udc_struct *rt_usb, u8 epinirq);
+static void handle_epoutirq(struct rt_udc_struct *rt_usb, u8 epoutirq);
+
 
 static int debuglevel_read(char *page, char **start, off_t off,int count, int *eof, void *data)
 {
@@ -216,7 +219,7 @@ static void rt_udc_init_ep(struct rt_udc_struct *rt_usb)
 		usb_write(OUT2CON, 0x89);  // OutEP2 : Bulk, 2 subfifos
 		//usb_write(OUT3CON, 0x89);  // OutEP3 : Bulk, 2 subfifos
 		//usb_write(OUT4CON, 0x89);  // OutEP4 : Bulk, 2 subfifos
-#elif defined (CONFIG_RALINK_RT5350))
+#elif defined (CONFIG_RALINK_RT5350)
 		usb_write(IN1CON, 0x89);	// InEP1  : BULK, 2 subfifos
 		usb_write(OUT1CON, 0x89);	// OutEP1 : BULK, 2 subfifos
 #else
@@ -231,7 +234,7 @@ static void rt_udc_init_ep(struct rt_udc_struct *rt_usb)
 		//usb_write(OUT3CON, 0x88);	// OutEP3 : Bulk, 1 subfifo
 		//usb_write(OUT4CON, 0x88);	// OutEP4 : Bulk. 1 subfifo
 
-#elif defined (CONFIG_RALINK_RT5350))
+#elif defined (CONFIG_RALINK_RT5350)
 		usb_write(IN1CON, 0x88);	// InEP1  : BULK  , 1 subfifos
 		usb_write(OUT1CON, 0x88);	// OutEP1 : BULK, 1 subfifos
 #else
@@ -912,12 +915,17 @@ static void handle_dma_txdone(struct rt_udc_struct *rt_usb)
 
 static void handle_dmairq(struct rt_udc_struct *rt_usb, u32 irq)
 {
+	//printk("DMA IRQ____________________________________________________________________________________:0x%x\n",irq);
 	if(irq & RTUSB_RX_DONE_INT0){
+		//printk("DMA IRQ____________________________________________________________________________________111\n");
 		handle_dma_rxdone(rt_usb);
+		//handle_epinirq(rt_usb, 2);
 	}
 
 	if(irq & RTUSB_TX_DONE_INT0){
+		//printk("DMA IRQ____________________________________________________________________________________222\n");
 		handle_dma_txdone(rt_usb);
+		//handle_epoutirq(rt_usb, 1);
 	}
 
 	reg_write(RTUSB_INT_STATUS, irq);
@@ -1044,7 +1052,10 @@ static int copy_data_to_ep(void *src, int length, int ep_num)
         FATAL_ERROR("zlp");
         return -1;
     }
-
+	if(length != req->req.length)
+	{
+		printk("%d,%d,%d\n",length, req->req.length, req->req.actual);
+	}
     if(length > req_bufferspace){
         FATAL_ERROR("buffer overflow");
         return -1;
@@ -1089,7 +1100,10 @@ static void rx_dma_done_do_tasklet(unsigned long arg)
 		// copy data from RXD->buffer to ep queue.
 		rc = copy_data_to_ep((void *)USBRxPackets[rx_dma_owner_idx0], length, ep);
 		if(rc <= 0)
+		{
+			//printk("length:%d\n", length);
 			return;
+		}
 
 		rxd_info = (u32 *)&rx_ring0_cache[rx_dma_owner_idx0].rxd_info4;
 		*rxd_info = 0;
@@ -1288,15 +1302,15 @@ static int rt_ep_enable(struct usb_ep *usb_ep, const struct usb_endpoint_descrip
 	DBG;
 
 	if (!usb_ep || !desc || !EP_NO(rt_ep) || desc->bDescriptorType != USB_DT_ENDPOINT || rt_ep->bEndpointAddress != desc->bEndpointAddress) {
-		D_ERR(rt_usb->dev, "<%s> bad ep or descriptor\n", __func__);
+		printk("<%s> bad ep or descriptor\n", __func__);
 		return -EINVAL;
 	}
 	if (rt_ep->bmAttributes != desc->bmAttributes) {
-		D_ERR(rt_usb->dev, "<%s> %s type mismatch, 0x%x, 0x%x\n", __func__, usb_ep->name, rt_ep->bmAttributes, desc->bmAttributes);
+		printk("<%s> %s type mismatch, 0x%x, 0x%x\n", __func__, usb_ep->name, rt_ep->bmAttributes, desc->bmAttributes);
 		return -EINVAL;
 	}
 	if (!rt_usb->driver || rt_usb->gadget.speed == USB_SPEED_UNKNOWN) {
-		D_ERR(rt_usb->dev, "<%s> bogus device state\n", __func__);
+		printk("<%s> bogus device state\n", __func__);
 		return -ESHUTDOWN;
 	}
 	local_irq_save(flags);
@@ -1405,7 +1419,7 @@ static int rt_ep_queue(struct usb_ep *usb_ep, struct usb_request *req, gfp_t gfp
 	xprintk("<eq> ep%d%s %p %dB\n",  EP_NO(rt_ep), ((!EP_NO(rt_ep) && rt_ep->rt_usb->ep0state == EP0_IN_DATA_PHASE) || (EP_NO(rt_ep) && EP_DIR(rt_ep) == EP_IN  )) ? "IN" : "OUT", &rt_req->req,  req->length);
 
 	if (rt_ep->stopped) {
-		printk("EP%d -> stopped.\n",  EP_NO(rt_ep));
+		printk("EP%d %d -> stopped.\n",  EP_NO(rt_ep), EP_DIR(rt_ep));
 		req->status = -ESHUTDOWN;
 		return -ESHUTDOWN;
 	}
@@ -1505,11 +1519,11 @@ static int rt_ep_set_halt(struct usb_ep *usb_ep, int value)
 			return -EAGAIN;
 	}
 
-	rt_ep_stall(rt_ep, 1);
+	rt_ep_stall(rt_ep, value);
 
 	local_irq_restore(flags);
 
-	D_EPX(rt_ep->rt_usb->dev, "<%s> %s halt\n", __func__, usb_ep->name);
+	D_EPX(rt_ep->rt_usb->dev, "<%s> %s halt %d\n", __func__, usb_ep->name, value);
 	return 0;
 }
 
@@ -1894,18 +1908,23 @@ DBG;
 static void handle_epoutirq(struct rt_udc_struct *rt_usb, u8 epoutirq)
 {
 	u8 irq = 0x0;
-
+	struct rt_request *req;
+	struct rt_ep_struct *rt_ep;
 DBG;
 	if(unlikely(epoutirq == 0x0)){
+		//printk("ep0out done\n");
 		handle_ep0outirq(rt_usb, 0x0);
 		return;
 	}
-
+	rt_ep = &rt_usb->rt_ep[epoutirq];
+	req = list_entry(rt_ep->queue.next, struct rt_request, queue);
 	tasklet_schedule(&rx_tasklet);
 
 	// clear ep interrupt
 	irq |= 1 << epoutirq; 
 	usb_write(OUT07IRQ, irq);
+	printk("ep2out done\n");
+	done(rt_ep, req, 0);
 	return;
 }
 
@@ -1944,10 +1963,12 @@ void handle_highspeed(struct rt_udc_struct *rt_usb)
 #if defined (CONFIG_RALINK_RT3883) || defined (CONFIG_RALINK_RT3352) || defined (CONFIG_RALINK_MT7620) || defined (CONFIG_RALINK_MT7628)
 		usb_write(IN1CON, 0x8D);	// InEP1 : Int, 2 subfifos
 		usb_write(IN2CON, 0x89);	// InEP2 : Bulk, 2 subfifo
+		//usb_write(IN3CON, 0x8D);	// InEP3 : Int, 2 subfifo
+		//usb_write(IN4CON, 0x8D);	// InEP4 : Int. 2 subfifo
 		usb_write(OUT1CON, 0x8D);	// OutEP1 : Int, 2 subfifos
 		usb_write(OUT2CON, 0x89);	// OutEP2 : Bulk, 2 subfifos
-		//usb_write(OUT3CON, 0x89);	// OutEP3 : Bulk, 2 subfifo
-		//usb_write(OUT4CON, 0x89);	// OutEP4 : Bulk. 2 subfifo
+		usb_write(OUT3CON, 0x8D);	// OutEP3 : Bulk, 2 subfifo
+		usb_write(OUT4CON, 0x8D);	// OutEP4 : Bulk. 2 subfifo
 #elif defined (CONFIG_RALINK_RT5350)
 		// Access by CPU
 		usb_write(IN1CON, 0x89);	// InEP1 : Bulk, 2 subfifos
@@ -1960,11 +1981,12 @@ void handle_highspeed(struct rt_udc_struct *rt_usb)
 #if defined (CONFIG_RALINK_RT3883) || defined (CONFIG_RALINK_RT3352) || defined (CONFIG_RALINK_MT7620) || defined (CONFIG_RALINK_MT7628)
 		usb_write(IN1CON, 0x8C);	// InEP1 : Int  , 1 subfifos
 		usb_write(IN2CON, 0x88);	// InEP2 : Bulk, 1 subfifo
-
+		//usb_write(IN3CON, 0x8C);	// InEP3 : Int, 2 subfifo
+		//usb_write(IN4CON, 0x8C);	// InEP4 : Int. 2 subfifo
 		usb_write(OUT1CON, 0x8C);	// OutEP1 : Int, 1 subfifos
 		usb_write(OUT2CON, 0x88);	// OutEP2 : Bulk, 1 subfifos
-		//usb_write(OUT3CON, 0x88);	// OutEP3 : Bulk, 1 subfifo
-		//usb_write(OUT4CON, 0x88);	// OutEP4 : Bulk. 1 subfifo
+		usb_write(OUT3CON, 0x8C);	// OutEP3 : Bulk, 1 subfifo
+		usb_write(OUT4CON, 0x8C);	// OutEP4 : Bulk. 1 subfifo
 #elif defined (CONFIG_RALINK_RT5350)
 		// Access by CPU
 		usb_write(IN1CON, 0x88);	// InEP1 : Bulk  , 1 subfifos
@@ -2027,6 +2049,10 @@ static void handle_reset(struct rt_udc_struct *rt_usb)
 
 static void handle_usbirq(struct rt_udc_struct *rt_usb, u8 usbirq)
 {
+	if(usbirq & 0xFD)
+	{
+		//printk("usbirq0x%x\n",usbirq);
+	}
 	if(usbirq & USB_INTR_SETUP_TOKEN_VALID){
 		// Setup token is arrival.
 		// get setup data and pass it to gadget driver.
@@ -2081,13 +2107,19 @@ irqreturn_t rt_irq_handler(int irq, void *_dev)
 	if(dma){
 		u32 dma_irq = reg_read(RTUSB_INT_STATUS);
 		if(epin07irq & 0x1)				// INEP0
+		{
 			handle_epinirq(rt_usb, 0);
+		}
 
 		if(usbirq)						// HS, Reset, SetupValid
+		{
 			handle_usbirq(rt_usb, usbirq);
+		}
 
 		if(epout07irq & 0x1)			// OUTEP0
+		{
 			handle_epoutirq(rt_usb, 0);
+		}
 
 		if(dma_irq)
 			handle_dmairq(rt_usb, dma_irq);

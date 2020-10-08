@@ -55,6 +55,7 @@
 
 
 #include <asm/unaligned.h>
+#include <linux/usb/video.h>
 
 
 /*
@@ -63,8 +64,8 @@
  * DO NOT REUSE THESE IDs with any other driver!!  Ever!!
  * Instead:  allocate your own, using normal USB-IF procedures.
  */
-#define FSG_VENDOR_ID	0x0525	/* NetChip */
-#define FSG_PRODUCT_ID	0xa4a5	/* Linux-USB File-backed Storage Gadget */
+#define FSG_VENDOR_ID	0x0711	/* NetChip */
+#define FSG_PRODUCT_ID	0xC600	/* Linux-USB File-backed Storage Gadget */
 
 
 /*-------------------------------------------------------------------------*/
@@ -177,14 +178,12 @@ struct fsg_bulk_cb_wrap {
 	__le32	Signature;		/* Contains 'USBC' */
 	u32	Tag;			/* Unique per command id */
 	__le32	DataTransferLength;	/* Size of the data */
-	u8	Flags;			/* Direction in bit 7 */
-	u8	Lun;			/* LUN (normally 0) */
-	u8	Length;			/* Of the CDB, <= MAX_COMMAND_SIZE */
+	u32	Length;			/* Direction in bit 7 */
 	u8	CDB[16];		/* Command Data Block */
 };
 
-#define USB_BULK_CB_WRAP_LEN	31
-#define USB_BULK_CB_SIG		0x43425355	/* Spells out USBC */
+#define USB_BULK_CB_WRAP_LEN	32
+#define USB_BULK_CB_SIG		0x00000000	/* Spells out USBC */
 #define USB_BULK_IN_FLAG	0x80
 
 /* Command Status Wrapper */
@@ -309,7 +308,8 @@ static struct fsg_lun *fsg_lun_from_dev(struct device *dev)
 #define FSG_NUM_BUFFERS	2
 
 /* Default size of buffer length. */
-#define FSG_BUFLEN	((u32)16384)
+#define FSG_BUFLEN	((u32)512)
+#define HID_BUFLEN  ((u32)64)
 
 /* Maximal number of LUNs supported in mass storage function */
 #define FSG_MAX_LUNS	8
@@ -406,11 +406,122 @@ fsg_intf_desc = {
 	.bLength =		sizeof fsg_intf_desc,
 	.bDescriptorType =	USB_DT_INTERFACE,
 
-	.bNumEndpoints =	2,		/* Adjusted during fsg_bind() */
-	.bInterfaceClass =	USB_CLASS_MASS_STORAGE,
-	.bInterfaceSubClass =	USB_SC_SCSI,	/* Adjusted during fsg_bind() */
-	.bInterfaceProtocol =	USB_PR_BULK,	/* Adjusted during fsg_bind() */
-	.iInterface =		FSG_STRING_INTERFACE,
+	.bNumEndpoints =	3,		/* Adjusted during fsg_bind() */
+	.bInterfaceClass =	0xff,//USB_CLASS_MASS_STORAGE,
+	.bInterfaceSubClass =	0x00,//USB_SC_SCSI,	/* Adjusted during fsg_bind() */
+	.bInterfaceProtocol =	0x00,//USB_PR_BULK,	/* Adjusted during fsg_bind() */
+	.iInterface =		0x00,//FSG_STRING_INTERFACE,
+};
+
+static struct usb_interface_descriptor
+hid0_intf_desc = {
+	.bLength =		sizeof hid0_intf_desc,
+	.bDescriptorType =	USB_DT_INTERFACE,
+	.bInterfaceNumber = 1,
+	.bAlternateSetting	= 0,
+	.bNumEndpoints =	1,		/* Adjusted during fsg_bind() */
+	.bInterfaceClass =	3,
+	.bInterfaceSubClass =	1,	/* Adjusted during fsg_bind() */
+	.bInterfaceProtocol =	2,	/* Adjusted during fsg_bind() */
+	.iInterface =		0,
+};
+
+static struct hid_descriptor hidg0_desc = {
+	.bLength			= sizeof hidg_desc,
+	.bDescriptorType		= HID_DT_HID,
+	.bcdHID				= 0x0110,
+	.bCountryCode			= 0x00,
+	.bNumDescriptors		= 0x1,
+	.desc[0].bDescriptorType	= 0x22,
+	.desc[0].wDescriptorLength	= 0x379,
+};
+
+/* High-Speed Support */
+
+static struct usb_endpoint_descriptor hidg0_hs_in_ep_desc = {
+	.bLength		= USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType	= USB_DT_ENDPOINT,
+	.bEndpointAddress	= USB_DIR_IN,// | 0x01,
+	.bmAttributes		= USB_ENDPOINT_XFER_INT,
+	.wMaxPacketSize	= 0x10,
+	.bInterval		= 0x08, /* FIXME: Add this field in the
+				      * HID gadget configuration?
+				      * (struct hidg_func_descriptor)
+				      */
+};
+
+static struct usb_interface_descriptor
+hid1_intf_desc = {
+	.bLength =		sizeof hid1_intf_desc,
+	.bDescriptorType =	USB_DT_INTERFACE,
+	.bInterfaceNumber = 2,
+	.bAlternateSetting	= 0,
+	.bNumEndpoints =	1,		/* Adjusted during fsg_bind() */
+	.bInterfaceClass =	3,
+	.bInterfaceSubClass =	1,	/* Adjusted during fsg_bind() */
+	.bInterfaceProtocol =	1,	/* Adjusted during fsg_bind() */
+	.iInterface =		0,
+};
+
+static struct hid_descriptor hidg1_desc = {
+	.bLength			= sizeof hidg1_desc,
+	.bDescriptorType		= HID_DT_HID,
+	.bcdHID				= 0x0110,
+	.bCountryCode			= 0x00,
+	.bNumDescriptors		= 0x1,
+	.desc[0].bDescriptorType	= 0x22,
+	.desc[0].wDescriptorLength	= 0x3e,
+};
+
+/* High-Speed Support */
+
+static struct usb_endpoint_descriptor hidg1_hs_in_ep_desc = {
+	.bLength		= USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType	= USB_DT_ENDPOINT,
+	.bEndpointAddress	= USB_DIR_IN,// | 0x01,
+	.bmAttributes		= USB_ENDPOINT_XFER_INT,
+	.wMaxPacketSize	= 8,
+	.bInterval		= 1, /* FIXME: Add this field in the
+				      * HID gadget configuration?
+				      * (struct hidg_func_descriptor)
+				      */
+};
+
+static struct usb_interface_descriptor
+hid2_intf_desc = {
+	.bLength =		sizeof hid2_intf_desc,
+	.bDescriptorType =	USB_DT_INTERFACE,
+	.bInterfaceNumber = 3,
+	.bAlternateSetting	= 0,
+	.bNumEndpoints =	1,		/* Adjusted during fsg_bind() */
+	.bInterfaceClass =	3,
+	.bInterfaceSubClass =	0,	/* Adjusted during fsg_bind() */
+	.bInterfaceProtocol =	0,	/* Adjusted during fsg_bind() */
+	.iInterface =		0,
+};
+
+static struct hid_descriptor hidg2_desc = {
+	.bLength			= sizeof hidg2_desc,
+	.bDescriptorType		= HID_DT_HID,
+	.bcdHID				= 0x0110,
+	.bCountryCode			= 0x00,
+	.bNumDescriptors		= 0x1,
+	.desc[0].bDescriptorType	= 0x22,
+	.desc[0].wDescriptorLength	= 0x65,
+};
+
+/* High-Speed Support */
+
+static struct usb_endpoint_descriptor hidg2_hs_in_ep_desc = {
+	.bLength		= USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType	= USB_DT_ENDPOINT,
+	.bEndpointAddress	= USB_DIR_IN,// | 0x01,
+	.bmAttributes		= USB_ENDPOINT_XFER_INT,
+	.wMaxPacketSize	= 8,
+	.bInterval		= 1, /* FIXME: Add this field in the
+				      * HID gadget configuration?
+				      * (struct hidg_func_descriptor)
+				      */
 };
 
 /*
@@ -423,7 +534,7 @@ fsg_fs_bulk_in_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
-	.bEndpointAddress =	USB_DIR_IN,
+	.bEndpointAddress =	USB_DIR_IN | 0x01,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	/* wMaxPacketSize set by autoconfiguration */
 };
@@ -433,7 +544,7 @@ fsg_fs_bulk_out_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
-	.bEndpointAddress =	USB_DIR_OUT,
+	.bEndpointAddress =	USB_DIR_OUT | 0x02,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	/* wMaxPacketSize set by autoconfiguration */
 };
@@ -489,6 +600,7 @@ fsg_hs_bulk_in_desc = {
 	/* bEndpointAddress copied from fs_bulk_in_desc during fsg_bind() */
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	cpu_to_le16(512),
+	//.bInterval =		1,	/* NAK every 1 uframe */
 };
 
 static struct usb_endpoint_descriptor
@@ -523,13 +635,308 @@ fsg_hs_intr_in_desc = {
 
 #endif
 
+#define UVC_INTF_VIDEO_CONTROL			0
+#define UVC_INTF_VIDEO_STREAMING		1
+
+static struct usb_interface_assoc_descriptor M_uvc_iad __initdata = {
+	.bLength		= sizeof(M_uvc_iad),
+	.bDescriptorType	= USB_DT_INTERFACE_ASSOCIATION,
+	.bFirstInterface	= 0,
+	.bInterfaceCount	= 2,
+	.bFunctionClass		= USB_CLASS_VIDEO,
+	.bFunctionSubClass	= UVC_SC_VIDEO_INTERFACE_COLLECTION,
+	.bFunctionProtocol	= 0x00,
+	.iFunction		= 0,
+};
+
+static struct usb_interface_descriptor M_uvc_control_intf __initdata = {
+	.bLength		= USB_DT_INTERFACE_SIZE,
+	.bDescriptorType	= USB_DT_INTERFACE,
+	.bInterfaceNumber	= UVC_INTF_VIDEO_CONTROL,
+	.bAlternateSetting	= 0,
+	.bNumEndpoints		= 1,
+	.bInterfaceClass	= USB_CLASS_VIDEO,
+	.bInterfaceSubClass	= UVC_SC_VIDEOCONTROL,
+	.bInterfaceProtocol	= 0x00,
+	.iInterface		= 0,
+};
+
+DECLARE_UVC_HEADER_DESCRIPTOR(1);
+DECLARE_UVC_INPUT_HEADER_DESCRIPTOR(1, 2);
+DECLARE_UVC_FRAME_MJPEG(1);
+DECLARE_UVC_FRAME_FRAME_BASED(1);
+DECLARE_UVC_EXTENSION_UNIT_DESCRIPTOR(1, 1);
+
+
+static struct UVC_HEADER_DESCRIPTOR(1) M_uvc_control_header = {
+	.bLength		= UVC_DT_HEADER_SIZE(1),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VC_HEADER,
+	.bcdUVC			= cpu_to_le16(0x0110),
+	.wTotalLength		= 0, /* dynamic */
+	.dwClockFrequency	= cpu_to_le32(48000000),
+	.bInCollection		= 1, /* dynamic */
+	.baInterfaceNr[0]	= 1, /* dynamic */
+};
+
+static struct uvc_camera_terminal_descriptor M_uvc_camera_terminal = {
+	.bLength		= UVC_DT_CAMERA_TERMINAL_SIZE(3),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VC_INPUT_TERMINAL,
+	.bTerminalID		= 1,
+	.wTerminalType		= cpu_to_le16(0x0201),
+	.bAssocTerminal		= 0,
+	.iTerminal		= 0,
+	.wObjectiveFocalLengthMin	= cpu_to_le16(0),
+	.wObjectiveFocalLengthMax	= cpu_to_le16(0),
+	.wOcularFocalLength		= cpu_to_le16(0),
+	.bControlSize		= 3,
+	.bmControls[0]		= 0,
+	.bmControls[1]		= 0,
+	.bmControls[2]		= 0,
+};
+
+static struct uvc_processing_unit_descriptor M_uvc_processing = {
+	.bLength		= UVC_DT_PROCESSING_UNIT_SIZE(3),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VC_PROCESSING_UNIT,
+	.bUnitID		= 2,
+	.bSourceID		= 1,
+	.wMaxMultiplier		= 0,
+	.bControlSize		= 3,
+	.bmControls[0]		= 0,
+	.bmControls[1]		= 0,
+	.bmControls[2]		= 0,
+	.iProcessing		= 0,
+	.bmVideoStandards   = 0x09,
+};
+
+static struct UVC_EXTENSION_UNIT_DESCRIPTOR(1, 1) M_uvc_extension = {
+	.bLength = UVC_DT_EXTENSION_UNIT_SIZE(1, 1),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VC_EXTENSION_UNIT,
+	.bUnitID = 3,
+	.guidExtensionCode[0] = 0xFF,
+	.guidExtensionCode[1] = 0xFF,
+	.guidExtensionCode[2] = 0xFF,
+	.guidExtensionCode[3] = 0xFF,
+	.guidExtensionCode[4] = 0xFF,
+	.guidExtensionCode[5] = 0xFF,
+	.guidExtensionCode[6] = 0xFF,
+	.guidExtensionCode[7] = 0xFF,
+	.guidExtensionCode[8] = 0xFF,
+	.guidExtensionCode[9] = 0xFF,
+	.guidExtensionCode[10] = 0xFF,
+	.guidExtensionCode[11] = 0xFF,
+	.guidExtensionCode[12] = 0xFF,
+	.guidExtensionCode[13] = 0xFF,
+	.guidExtensionCode[14] = 0xFF,
+	.guidExtensionCode[15] = 0xFF,
+	.bNumControls = 0x00,
+	.bNrInPins = 0x01,
+	.baSourceID[0] = 0x02,
+	.bControlSize = 0x01,
+	.bmControls[0] = 0x00,
+	.iExtension = 0x00,
+};
+
+static struct uvc_output_terminal_descriptor M_uvc_output_terminal = {
+	.bLength		= UVC_DT_OUTPUT_TERMINAL_SIZE,
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VC_OUTPUT_TERMINAL,
+	.bTerminalID		= 4,
+	.wTerminalType		= cpu_to_le16(0x0101),
+	.bAssocTerminal		= 0,
+	.bSourceID		= 3,
+	.iTerminal		= 0,
+};
+
+static struct uvc_control_endpoint_descriptor M_uvc_control_cs_ep __initdata = {
+	.bLength		= UVC_DT_CONTROL_ENDPOINT_SIZE,
+	.bDescriptorType	= USB_DT_CS_ENDPOINT,
+	.bDescriptorSubType	= UVC_EP_INTERRUPT,
+	.wMaxTransferSize	= cpu_to_le16(16),
+};
+
+static struct usb_interface_descriptor M_uvc_streaming_intf_alt0 __initdata = {
+	.bLength		= USB_DT_INTERFACE_SIZE,
+	.bDescriptorType	= USB_DT_INTERFACE,
+	.bInterfaceNumber	= UVC_INTF_VIDEO_STREAMING,
+	.bAlternateSetting	= 0,
+	.bNumEndpoints		= 1,
+	.bInterfaceClass	= USB_CLASS_VIDEO,
+	.bInterfaceSubClass	= UVC_SC_VIDEOSTREAMING,
+	.bInterfaceProtocol	= 0x00,
+	.iInterface		= 0,
+};
+
+static struct UVC_INPUT_HEADER_DESCRIPTOR(1, 2) M_uvc_input_header = {
+	.bLength		= UVC_DT_INPUT_HEADER_SIZE(1, 2),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VS_INPUT_HEADER,
+	.bNumFormats		= 2,
+	.wTotalLength		= 0, /* dynamic */
+	.bEndpointAddress	= 0x82, /* dynamic */
+	.bmInfo			= 0,
+	.bTerminalLink		= 4,
+	.bStillCaptureMethod	= 1,
+	.bTriggerSupport	= 0,
+	.bTriggerUsage		= 0,
+	.bControlSize		= 1,
+	.bmaControls[0][0]	= 0,
+	.bmaControls[1][0]	= 0,
+};
+
+static struct uvc_format_mjpeg M_uvc_format_mjpg = {
+	.bLength		= UVC_DT_FORMAT_MJPEG_SIZE,
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VS_FORMAT_MJPEG,
+	.bFormatIndex		= 1,
+	.bNumFrameDescriptors	= 2,
+	.bmFlags		= 1,
+	.bDefaultFrameIndex	= 1,
+	.bAspectRatioX		= 0,
+	.bAspectRatioY		= 0,
+	.bmInterfaceFlags	= 0,
+	.bCopyProtect		= 0,
+};
+
+static struct UVC_FRAME_MJPEG(1) M_uvc_frame_mjpg_720p = {
+	.bLength		= UVC_DT_FRAME_MJPEG_SIZE(1),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VS_FRAME_MJPEG,
+	.bFrameIndex		= 1,
+	.bmCapabilities		= 0,
+	.wWidth			= cpu_to_le16(1280),
+	.wHeight		= cpu_to_le16(720),
+	.dwMinBitRate		= cpu_to_le32(663552000),
+	.dwMaxBitRate		= cpu_to_le32(663552000),
+	.dwMaxVideoFrameBufferSize	= cpu_to_le32(2764800),
+	.dwDefaultFrameInterval	= cpu_to_le32(333333),
+	.bFrameIntervalType	= 1,
+	.dwFrameInterval[0]	= cpu_to_le32(333333),
+};
+
+static struct UVC_FRAME_MJPEG(1) M_uvc_frame_mjpg_1080p = {
+	.bLength		= UVC_DT_FRAME_MJPEG_SIZE(1),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VS_FRAME_MJPEG,
+	.bFrameIndex		= 2,
+	.bmCapabilities		= 0,
+	.wWidth			= cpu_to_le16(1920),
+	.wHeight		= cpu_to_le16(1080),
+	.dwMinBitRate		= cpu_to_le32(663552000),
+	.dwMaxBitRate		= cpu_to_le32(663552000),
+	.dwMaxVideoFrameBufferSize	= cpu_to_le32(2764800),
+	.dwDefaultFrameInterval	= cpu_to_le32(333333),
+	.bFrameIntervalType	= 1,
+	.dwFrameInterval[0]	= cpu_to_le32(333333),
+};
+
+static struct uvc_color_matching_descriptor M_uvc_color_matching_mjpeg = {
+	.bLength		= UVC_DT_COLOR_MATCHING_SIZE,
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VS_COLORFORMAT,
+	.bColorPrimaries	= 1,
+	.bTransferCharacteristics	= 1,
+	.bMatrixCoefficients	= 4,
+};
+
+static struct uvc_format_frame_based M_uvc_format_h264 = {
+	.bLength = UVC_DT_FORMAT_FRAME_BASED_SIZE,
+	.bDescriptorType = USB_DT_CS_INTERFACE,
+	.bDescriptorSubType = UVC_VS_FORMAT_FRAME_BASED,
+	.bFormatIndex = 2,
+	.bNumFrameDescriptors = 2,
+	.guidFormat		=
+		{ 'H',  '2',  '6',  '4', 0x00, 0x00, 0x10, 0x00,
+		 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71},
+	.bBitsPerPixel = 0x10,
+	.bDefaultFrameIndex = 1,
+	.bAspectRatioX = 0x00,
+	.bAspectRatioY = 0x00,
+	.bmInterfaceFlags = 0x00,
+	.bCopyProtect = 0x00,
+	.bVariableSize = 0x01,
+};
+
+static struct UVC_FRAME_FRAME_BASED(1) M_uvc_frame_h264_720p = {
+	.bLength = UVC_DT_FRAME_FRAME_BASED_SIZE(1),
+	.bDescriptorType = USB_DT_CS_INTERFACE,
+	.bDescriptorSubType = UVC_VS_FRAME_FRAME_BASED,
+	.bFrameIndex = 1,
+	.bmCapabilities = 0,
+	.wWidth = cpu_to_le16(1280),
+	.wHeight = cpu_to_le16(720),
+	.dwMinBitRate = cpu_to_le32(663552000),
+	.dwMaxBitRate = cpu_to_le32(663552000),
+	.dwDefaultFrameInterval = cpu_to_le32(333333),
+	.bFrameIntervalType = 1,
+	.dwBytesPerLine = cpu_to_le32(0),
+	.dwFrameInterval[0] = cpu_to_le32(333333),
+};
+
+static struct UVC_FRAME_FRAME_BASED(1) M_uvc_frame_h264_1080p = {
+	.bLength = UVC_DT_FRAME_FRAME_BASED_SIZE(1),
+	.bDescriptorType = USB_DT_CS_INTERFACE,
+	.bDescriptorSubType = UVC_VS_FRAME_FRAME_BASED,
+	.bFrameIndex = 2,
+	.bmCapabilities = 0,
+	.wWidth = cpu_to_le16(1920),
+	.wHeight = cpu_to_le16(1080),
+	.dwMinBitRate = cpu_to_le32(663552000),
+	.dwMaxBitRate = cpu_to_le32(663552000),
+	.dwDefaultFrameInterval = cpu_to_le32(333333),
+	.bFrameIntervalType = 1,
+	.dwBytesPerLine = cpu_to_le32(0),
+	.dwFrameInterval[0] = cpu_to_le32(333333),
+};
+
+static struct uvc_color_matching_descriptor M_uvc_color_matching_h264 = {
+	.bLength		= UVC_DT_COLOR_MATCHING_SIZE,
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VS_COLORFORMAT,
+	.bColorPrimaries	= 1,
+	.bTransferCharacteristics	= 1,
+	.bMatrixCoefficients	= 4,
+};
+
 static struct usb_descriptor_header *fsg_hs_function[] = {
 #ifndef FSG_NO_OTG
 	(struct usb_descriptor_header *) &fsg_otg_desc,
 #endif
-	(struct usb_descriptor_header *) &fsg_intf_desc,
+	(struct usb_descriptor_header *) &M_uvc_iad,
+	(struct usb_descriptor_header *) &M_uvc_control_intf,
+	(struct usb_descriptor_header *) &M_uvc_control_header,
+	(struct usb_descriptor_header *) &M_uvc_camera_terminal,
+	(struct usb_descriptor_header *) &M_uvc_processing,
+	(struct usb_descriptor_header *) &M_uvc_extension,
+	(struct usb_descriptor_header *) &M_uvc_output_terminal,
+	(struct usb_descriptor_header *) &hidg0_hs_in_ep_desc,
+	(struct usb_descriptor_header *) &M_uvc_control_cs_ep,
+	(struct usb_descriptor_header *) &M_uvc_streaming_intf_alt0,
 	(struct usb_descriptor_header *) &fsg_hs_bulk_in_desc,
-	(struct usb_descriptor_header *) &fsg_hs_bulk_out_desc,
+	(struct usb_descriptor_header *) &M_uvc_input_header,
+	(struct usb_descriptor_header *) &M_uvc_format_mjpg,
+	(struct usb_descriptor_header *) &M_uvc_frame_mjpg_720p,
+	(struct usb_descriptor_header *) &M_uvc_frame_mjpg_1080p,
+	(struct usb_descriptor_header *) &M_uvc_color_matching_mjpeg,
+	(struct usb_descriptor_header *) &M_uvc_format_h264,
+	(struct usb_descriptor_header *) &M_uvc_frame_h264_720p,
+	(struct usb_descriptor_header *) &M_uvc_frame_h264_1080p,
+	(struct usb_descriptor_header *) &M_uvc_color_matching_h264,
+	//(struct usb_descriptor_header *) &fsg_intf_desc,
+	//(struct usb_descriptor_header *) &fsg_hs_bulk_in_desc,
+	//(struct usb_descriptor_header *) &fsg_hs_bulk_out_desc,
+	//(struct usb_descriptor_header *) &hid0_intf_desc,
+	//(struct usb_descriptor_header *) &hidg0_desc,
+	//(struct usb_descriptor_header *) &hidg0_hs_in_ep_desc,
+	//(struct usb_descriptor_header *) &hid1_intf_desc,
+	//(struct usb_descriptor_header *) &hidg1_desc,
+	//(struct usb_descriptor_header *) &hidg1_hs_in_ep_desc,
+	//(struct usb_descriptor_header *) &hid2_intf_desc,
+	//(struct usb_descriptor_header *) &hidg2_desc,
+	//(struct usb_descriptor_header *) &hidg2_hs_in_ep_desc,
 #ifndef FSG_NO_INTR_EP
 	(struct usb_descriptor_header *) &fsg_hs_intr_in_desc,
 #endif

@@ -90,6 +90,7 @@ struct rt_udc_struct {
 };
 
 #define USB_BASE		(0xB0120000)
+#define SYS_BASE		(0xB0000000)
 
 #define OUT0BC			(0x000)
 #define IN0BC			(0x001)

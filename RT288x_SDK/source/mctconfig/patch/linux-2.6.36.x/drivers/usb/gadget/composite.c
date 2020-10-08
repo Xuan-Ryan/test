@@ -24,9 +24,66 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/device.h>
+#include <linux/fs.h>
 
 #include <linux/usb/composite.h>
+#include "mnspdef.h"
 
+#define VENDOR_REQ_SPI_ROM_WRITE				0x01	//	TBD																			TBD
+#define VENDOR_REQ_I2C_WRITE					0x02	//	address				???					???									???
+#define VENDOR_REQ_SET_MONITOR_CTRL				0x03	//	View Index			0/off 1/on																				View Index:0:primary;  1:secondary
+#define VENDOR_REQ_SET_CURSOR1_POS				0x04	//	xPos				yPos				0									None
+#define VENDOR_REQ_SET_CURSOR1_STATE			0x05	//	Cursor index(0~9)	0/off 1/on			0									None
+#define VENDOR_REQ_SET_CURSOR2_POS				0x06	//	xPos				yPos				0									None
+#define VENDOR_REQ_SET_CURSOR2_STATE			0x07	//	cursor index(0~9)	0/off 1/on			0									None
+#define VENDOR_REQ_SET_RESOLUTION				0x08	//	View Index			index				0									None
+#define VENDOR_REQ_SET_CURSOR_SHAPE				0x09	//	Cursor index(0~9)	display set			Header+shape data					Header+shape data
+#define VENDOR_REQ_SET_CURSOR1_SHAPE			0x10	//	Cursor index(0~9)	data offset			datal length						
+#define VENDOR_REQ_SET_CURSOR2_SHAPE			0x11	//	Cursor index(0~9)	data offset			datal length						
+#define VENDOR_REQ_SET_RESOLUTION_DETAIL_TIMING	0x12	//	View Index			0					Size of RESOLUTIONTIMING
+#define VENDOR_REQ_SET_CANCEL_BULK_OUT			0x14	//	0					0					0									None
+
+#define VENDOR_REQ_RESET_HARDWARE				0x30	//	0x0000				ResetLevel			0x0000								None							Reset hardware.
+#define VENDOR_REQ_SOFTWARE_READY				0x31	//	0x0000				Signature			0x0000								None							Software ready.
+#define VENDOR_REQ_WRITE_ROM_DATA				0x32	//	Region				DataOffset			Length								Data							Region-0:boot data; 1:current image data; 2: user data
+
+#define VENDOR_REQ_GET_EDID						0x80	//	Offset				ViewIndex			<=256								EDID
+#define VENDOR_REQ_I2C_READ						0x81	//	Address				???					???									???
+#define VENDOR_REQ_SPI_ROM_READ					0x82	//	TBD																			TBD
+#define VENDOR_REQ_GET_MAC_ID					0x83	//	0,					0					6									Data
+#define VENDOR_REQ_GET_RESOLUTION_TABLE_NUM		0x84	//	View Index			0					4									Number
+#define VENDOR_REQ_GET_RESOLUTION_TABLE_DATA	0x85	//	View Index			0					Num*sizeof(resolution_entry)		USBD_DISPLAY_RESOLUTION_INFO
+#define VENDOR_REQ_RESET_JPEG_ENGINE			0x86	//	0					0					0									None
+#define VENDOR_REQ_QUERY_MONITOR_CONNECTION_STATUS	0x87//	View Index			0					1									0:disconnect;  1:connect.
+#define VENDOR_REQ_QUERY_VIDEO_RAM_SIZE			0x88	//	0					0					1									Unit: MB
+#define VENDOR_REQ_GET_RESOLUTION_TIMING_TABLE	0x89	//	View Index			StartIndex			Num*sizeof(timing)					RESOLUTIONTIMING
+
+#define VENDOR_REQ_AUD_GET_NUM_ENGINES			0xA0	//	0x0000				0x0000				sizeof (UINT8)						UINT8 NumDmaEngines				Get number of DMA engines.
+#define VENDOR_REQ_AUD_GET_ENGINE_CAPS			0xA1	//	0x0000				EngineIndex			sizeof (T6AUD_ENGINECAPS)			T6AUD_ENGINECAPS EngineCaps		Get DMA engine capabilities.
+#define VENDOR_REQ_AUD_GET_NODE_CAPS			0xA2	//	NodeIndex			EngineIndex			sizeof (T6AUD_NODECAPS)				T6AUD_NODECAPS NodeCaps			Get node capabilities.
+#define VENDOR_REQ_AUD_GET_NODE_VALUE			0xA3	//	NodeIndex			EngineIndex			sizeof (T6AUD_NODEVALUE)			T6AUD_NODEVALUE Value			Get node value.
+#define VENDOR_REQ_AUD_SET_NODE_VALUE			0x23	//	NodeIndex			EngineIndex			sizeof (T6AUD_NODEVALUE)			T6AUD_NODEVALUE Value			Set node value.
+#define VENDOR_REQ_AUD_GET_ENGINE_STATE			0xA4	//	0x0000				EngineIndex			sizeof (T6AUD_GETENGINESTATE)		T6AUD_GETENGINESTATE State		Get DMA engine state.
+#define VENDOR_REQ_AUD_SET_ENGINE_STATE			0x24	//	0x0000				EngineIndex			sizeof (T6AUD_SETENGINESTATE)		T6AUD_SETENGINESTATE State		Set DMA engine state.
+#define VENDOR_REQ_AUD_GET_FORMAT_LIST			0xA5	//	Start Index			EngineIndex			NumFmts * sizeof (T6AUD_FORMAT)		T6AUD_FORMAT array				Get format list of the DMA engine.
+#define VENDOR_REQ_AUD_SET_ENGINE_INTERFACE		0x26	//	see doc				EngineIndex			0									None
+
+#define VENDOR_REQ_GET_VERSION					0xB0	//	0x0000				Type				Variant								Variant							Type: see T6VER_TYPE_XXX
+#define VENDOR_REQ_GET_FUNC_ID					0xB1	//	0x0000				Signature			sizeof (T6FUNCID)					T6FUNCID						See tT6FuncID
+#define VENDOR_REQ_READ_ROM_DATA				0xB2	//	Region				DataOffset			Length								Data							Region-0:boot data; 1:current image data; 2: user data
+#define VENDOR_REQ_QUERY_SECTION_DATA			0xB3	//	Signature			DataOffset			Length								Data							Query section data.
+#define VENDOR_REQ_QUERY_SIZE					0xB4
+
+//UVC COMMAND
+#define UVC_SET_CUR					0x01
+#define UVC_GET_CUR					0x81
+#define UVC_GET_MIN					0x82
+#define UVC_GET_MAX					0x83
+#define UVC_GET_RES					0x84
+#define UVC_GET_LEN					0x85
+#define UVC_GET_INFO				0x86
+#define UVC_GET_DEF					0x87
+//End UVC COMMAND
 
 /*
  * The code in this file is utility code, used to build a gadget driver
@@ -39,6 +96,10 @@
 #define USB_BUFSIZ	1024
 
 static struct usb_composite_driver *composite;
+static unsigned int bit_rate_control = 10;
+static unsigned int compress_rate = 70;
+static unsigned int skip_rate_control = 7800;
+extern wait_queue_head_t gUVCwq;
 
 /* Some systems will need runtime overrides for the  product identifers
  * published in the device descriptor, either numbers or strings or both.
@@ -69,6 +130,9 @@ static char *iSerialNumber;
 module_param(iSerialNumber, charp, 0);
 MODULE_PARM_DESC(iSerialNumber, "SerialNumber string");
 
+module_param(bit_rate_control, uint, S_IRWXU|S_IRWXG);
+module_param(compress_rate, uint, S_IRWXU|S_IRWXG);
+module_param(skip_rate_control, uint, S_IRWXU|S_IRWXG);
 /*-------------------------------------------------------------------------*/
 
 /**
@@ -242,11 +306,11 @@ static int config_buf(struct usb_configuration *config,
 	c->bLength = USB_DT_CONFIG_SIZE;
 	c->bDescriptorType = type;
 	/* wTotalLength is written later */
-	c->bNumInterfaces = config->next_interface_id;
+	c->bNumInterfaces = 2;//config->next_interface_id;
 	c->bConfigurationValue = config->bConfigurationValue;
-	c->iConfiguration = config->iConfiguration;
-	c->bmAttributes = USB_CONFIG_ATT_ONE | config->bmAttributes;
-	c->bMaxPower = config->bMaxPower ? : (CONFIG_USB_GADGET_VBUS_DRAW / 2);
+	c->iConfiguration = 0x00;//config->iConfiguration;
+	c->bmAttributes = 0xC0;//USB_CONFIG_ATT_ONE | config->bmAttributes;
+	c->bMaxPower = 0xC8;//config->bMaxPower ? : (CONFIG_USB_GADGET_VBUS_DRAW / 2);
 
 	/* There may be e.g. OTG descriptors */
 	if (config->descriptors) {
@@ -286,7 +350,7 @@ static int config_desc(struct usb_composite_dev *cdev, unsigned w_value)
 	struct usb_gadget		*gadget = cdev->gadget;
 	struct usb_configuration	*c;
 	u8				type = w_value >> 8;
-	enum usb_device_speed		speed = USB_SPEED_UNKNOWN;
+	enum usb_device_speed		speed = USB_SPEED_HIGH;
 
 	if (gadget_is_dualspeed(gadget)) {
 		int			hs = 0;
@@ -294,7 +358,7 @@ static int config_desc(struct usb_composite_dev *cdev, unsigned w_value)
 		if (gadget->speed == USB_SPEED_HIGH)
 			hs = 1;
 		if (type == USB_DT_OTHER_SPEED_CONFIG)
-			hs = !hs;
+			hs = 1;
 		if (hs)
 			speed = USB_SPEED_HIGH;
 
@@ -329,7 +393,7 @@ static int count_configs(struct usb_composite_dev *cdev, unsigned type)
 		if (gadget->speed == USB_SPEED_HIGH)
 			hs = 1;
 		if (type == USB_DT_DEVICE_QUALIFIER)
-			hs = !hs;
+			hs = 1;
 	}
 	list_for_each_entry(c, &cdev->configs, list) {
 		/* ignore configs that won't work at this speed */
@@ -751,14 +815,333 @@ int usb_string_ids_n(struct usb_composite_dev *c, unsigned n)
 
 
 /*-------------------------------------------------------------------------*/
+static void hex_dump(unsigned char *buf, int len)
+{
+	while (len--)
+		printk("%02x,", *buf++);
+}
+
+#define UDP_CURSORBLOCK_SIZE 8
+#define UDP_CURSORSHAPEBLOCK_SIZE 512
+#define UDP_CURSORDATABLOCK_SIZE 20*1024
+unsigned char ep0_setup_dir;
+unsigned char t6_vendor_cmd;
+unsigned char g_udp_control_XactId = 0;
+unsigned char g_udp_cursor_buf[UDP_CURSORDATABLOCK_SIZE];
+unsigned char g_udp_cursor_state_buf[20*1024];
+unsigned char g_udp_cursor_shape_buf[10][20*1024];
+unsigned char g_tcp_cursor_buf[64];
+unsigned int g_cursor_buf_offset;
+unsigned int g_cursor_shape_idx;
+unsigned int g_cursor_shape_width, g_cursor_shape_height;
+extern struct socket *g_UCURconn_socket;
+extern struct sockaddr_in g_Usaddr;
+extern struct sockaddr_in g_UCURsaddr;
+extern int ksocket_send(struct socket *sock, struct sockaddr_in *addr, unsigned char *buf, int len);
+extern struct fsg_common cursor_udp_common;
+extern struct fsg_common cursor_tcp_common;
+extern spinlock_t cursor_lock;
+extern unsigned long cursor_flags;
+extern struct fsg_common hid_udp_common;
+extern void wakeup_thread(struct fsg_common *common);
+extern unsigned int udp_send_total_bytes;
+extern unsigned char shapeusbin[10];
 
 static void composite_setup_complete(struct usb_ep *ep, struct usb_request *req)
 {
+	//hex_dump(req->buf, req->length);
+	//printk("SHAPECOM:%x,%x\n",ep0_setup_dir,t6_vendor_cmd);
+	MNSPXACTHDR udp_hdr;
+	int udp_send_size;
+	if(ep0_setup_dir & 0x80)//get
+	{
+
+	}
+	else//set
+	{
+		hex_dump(req->buf, req->length);
+		if(t6_vendor_cmd == VENDOR_REQ_SET_CURSOR_SHAPE || t6_vendor_cmd == VENDOR_REQ_SET_CURSOR1_SHAPE || t6_vendor_cmd == VENDOR_REQ_SET_CURSOR2_SHAPE)
+		{
+			//if(g_UCURconn_socket)
+			{
+				udp_hdr.Tag = MNSP_TAG;
+				udp_hdr.XactType = MNSP_XACTTYPE_CURSOR;
+				udp_hdr.HdrSize = sizeof(udp_hdr);
+				udp_hdr.XactId = g_udp_control_XactId;
+				udp_hdr.XactOffset = 0;
+				udp_hdr.PayloadLength = (UDP_CURSORSHAPEBLOCK_SIZE + UDP_CURSORBLOCK_SIZE)*(g_cursor_buf_offset+1);
+				udp_hdr.TotalLength = (UDP_CURSORSHAPEBLOCK_SIZE + UDP_CURSORBLOCK_SIZE)*(g_cursor_buf_offset+1);
+				//memcpy(g_udp_cursor_buf, &udp_hdr, sizeof(udp_hdr));
+				//memcpy(&g_udp_cursor_buf[sizeof(udp_hdr)+UDP_CURSORBLOCK_SIZE], req->buf, UDP_CURSORSHAPEBLOCK_SIZE);
+				//wakeup_thread(&cursor_udp_common);
+
+				memcpy(g_udp_cursor_shape_buf[g_cursor_shape_idx], &udp_hdr, sizeof(udp_hdr));
+				memcpy(&g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+(UDP_CURSORBLOCK_SIZE*(g_cursor_buf_offset+1)+UDP_CURSORSHAPEBLOCK_SIZE*g_cursor_buf_offset)],req->buf,UDP_CURSORSHAPEBLOCK_SIZE);
+				if(g_cursor_buf_offset == 0)
+				{
+					g_cursor_shape_width = g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+UDP_CURSORBLOCK_SIZE+2] + (g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+UDP_CURSORBLOCK_SIZE+3]<<8);
+					g_cursor_shape_height = g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+UDP_CURSORBLOCK_SIZE+4] + (g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+UDP_CURSORBLOCK_SIZE+5]<<8);
+				}
+				//printk("w h off %d %d %d\n",g_cursor_shape_width,g_cursor_shape_height,g_cursor_buf_offset);
+				if(g_cursor_buf_offset*512 == g_cursor_shape_width*g_cursor_shape_height*4)
+				{
+					//spin_lock_irqsave(&cursor_lock, cursor_flags);
+					smp_wmb();
+					//shapeusbin[g_cursor_shape_idx] = 1;
+					//wakeup_thread(&cursor_tcp_common);
+				}
+				//if(g_UCURconn_socket)
+				//{
+				//	udp_send_size = ksocket_send(g_UCURconn_socket, &g_UCURsaddr, g_udp_cursor_buf, UDP_CURSORDATABLOCK_SIZE);
+				//	udp_send_total_bytes = udp_send_total_bytes + udp_send_size;
+				//	udp_send_size = ksocket_send(g_UCURconn_socket, &g_UCURsaddr, g_udp_cursor_buf, UDP_CURSORDATABLOCK_SIZE);
+				//	udp_send_total_bytes = udp_send_total_bytes + udp_send_size;
+				//	udp_send_size = ksocket_send(g_UCURconn_socket, &g_UCURsaddr, g_udp_cursor_buf, UDP_CURSORDATABLOCK_SIZE);
+				//	udp_send_total_bytes = udp_send_total_bytes + udp_send_size;
+				//	g_udp_control_XactId++;
+				//}
+			}
+		}
+		else if(t6_vendor_cmd == VENDOR_REQ_SET_CURSOR1_POS || t6_vendor_cmd == VENDOR_REQ_SET_CURSOR2_POS || t6_vendor_cmd == VENDOR_REQ_SET_CURSOR1_STATE || t6_vendor_cmd == VENDOR_REQ_SET_CURSOR2_STATE)
+		{
+
+		}
+	}
+
 	if (req->status || req->actual != req->length)
 		DBG((struct usb_composite_dev *) ep->driver_data,
 				"setup complete --> %d, %d/%d\n",
 				req->status, req->actual, req->length);
 }
+
+const unsigned char fsg_bos_desc[] = {
+	// ============== REPORT DESCRIPTOR MOUSE ===========
+	0x05, 0x0f,
+	0x16, 0x00,
+	0x02, 0x07,
+	0x10, 0x02,
+	0x02, 0x00,
+	0x00, 0x00,
+	0x0a, 0x10,
+	0x03, 0x00,
+	0x0e, 0x00,
+	0x01, 0x0a,
+	0x20, 0x00,
+};
+
+const unsigned char ReportDescHSMouse1[] = {
+	// ============== REPORT DESCRIPTOR MOUSE ===========
+	0x05, 0x01,
+	0x09, 0x02,
+	0xA1, 0x01,
+	0x09, 0x01,
+	0xA1, 0x00,
+	0x05, 0x09,
+	0x19, 0x01,
+	0x29, 0x03,
+	0x15, 0x00,
+	0x25, 0x01,
+	0x95, 0x08,
+	0x75, 0x01,
+	0x81, 0x02,
+	0x05, 0x01,
+	0x09, 0x30,
+	0x09, 0x31,
+	0x09, 0x38,
+	0x15, 0x81,
+	0x25, 0x7F,
+	0x75, 0x08,
+	0x95, 0x03,
+	0x81, 0x06,
+	0xC0, 0xC0,
+};
+
+const unsigned char ReportDescHSMouse[] = {
+	// ============== REPORT DESCRIPTOR MOUSE ===========
+	0x05, 0x01, 0x09, 0x02, 0xA1, 0x01, 0x85, 0x01, 0x09, 0x01, 0xA1, 0x00, 0x05, 0x09, 0x19, 0x01,
+	0x29, 0x03, 0x15, 0x00, 0x25, 0x01, 0x95, 0x03, 0x75, 0x01, 0x81, 0x02, 0x95, 0x05, 0x81, 0x03,
+	0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x15, 0x81, 0x25, 0x7F, 0x75, 0x08, 0x95, 0x02, 0x81, 0x06,
+	0xC0, 0xC0, 0x06, 0x0D, 0xFF, 0x09, 0x01, 0xA1, 0x01, 0x85, 0x11, 0x09, 0x20, 0xA1, 0x00, 0x75,
+	0x04, 0x95, 0x01, 0x81, 0x03, 0x09, 0x42, 0x09, 0x44, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95,
+	0x02, 0x81, 0x02, 0x75, 0x01, 0x95, 0x01, 0x81, 0x03, 0x09, 0x32, 0x15, 0x00, 0x25, 0x01, 0x75,
+	0x01, 0x95, 0x01, 0x81, 0x02, 0x09, 0x30, 0x15, 0x00, 0x26, 0xFF, 0x03, 0x75, 0x0A, 0x95, 0x01,
+	0x81, 0x02, 0x75, 0x06, 0x95, 0x01, 0x81, 0x03, 0x0A, 0x30, 0x01, 0x65, 0x11, 0x55, 0x0D, 0x15,
+	0x00, 0x26, 0x90, 0x58, 0x75, 0x10, 0x95, 0x01, 0x81, 0x02, 0x0A, 0x31, 0x01, 0x65, 0x11, 0x55,
+	0x0D, 0x15, 0x00, 0x26, 0x80, 0x32, 0x75, 0x10, 0x95, 0x01, 0x81, 0x02, 0x09, 0x56, 0x15, 0x00,
+	0x27, 0xFF, 0xFF, 0x00, 0x00, 0x75, 0x10, 0x95, 0x01, 0x81, 0x02, 0x0A, 0x20, 0x02, 0x15, 0x00,
+	0x27, 0xFF, 0xFF, 0x00, 0x00, 0x75, 0x10, 0x95, 0x01, 0x81, 0x02, 0xC0, 0x85, 0x15, 0x09, 0x39,
+	0xA1, 0x00, 0x0A, 0x10, 0x09, 0x0A, 0x11, 0x09, 0x0A, 0x12, 0x09, 0x0A, 0x13, 0x09, 0x15, 0x00,
+	0x25, 0x01, 0x75, 0x01, 0x95, 0x04, 0x81, 0x02, 0x75, 0x01, 0x95, 0x04, 0x81, 0x03, 0xC0, 0x85,
+	0x12, 0x0A, 0x01, 0x02, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x10, 0x81, 0x02, 0x85,
+	0x13, 0x0A, 0x01, 0x02, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x10, 0x81, 0x02, 0x85,
+	0x10, 0x0A, 0x00, 0x02, 0x0A, 0x02, 0x02, 0x15, 0x00, 0x25, 0x02, 0x75, 0x08, 0x95, 0x01, 0x81,
+	0x02, 0x0A, 0x03, 0x02, 0x15, 0x00, 0x25, 0x02, 0x75, 0x06, 0x95, 0x01, 0x81, 0x02, 0x0A, 0x04,
+	0x02, 0x15, 0x00, 0x25, 0x02, 0x75, 0x02, 0x95, 0x01, 0x81, 0x02, 0x0A, 0x05, 0x02, 0x15, 0x00,
+	0x25, 0x01, 0x75, 0x01, 0x95, 0x01, 0x81, 0x02, 0x0A, 0x06, 0x02, 0x15, 0x00, 0x25, 0x01, 0x75,
+	0x01, 0x95, 0x01, 0x81, 0x02, 0x75, 0x06, 0x95, 0x01, 0x81, 0x03, 0x0A, 0x07, 0x02, 0x15, 0x00,
+	0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x01, 0x81, 0x02, 0x0A, 0x08, 0x02, 0x15, 0x00, 0x26, 0xFF,
+	0x00, 0x75, 0x08, 0x95, 0x01, 0x81, 0x02, 0x0A, 0x09, 0x02, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75,
+	0x08, 0x95, 0x01, 0x81, 0x02, 0x0A, 0x1A, 0x02, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08, 0x95,
+	0x01, 0x81, 0x02, 0x0A, 0x1D, 0x02, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x01, 0x81, 0x02,
+	0x0A, 0x1C, 0x02, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x01, 0x81, 0x02, 0x0A, 0x1B, 0x02,
+	0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x01, 0x81, 0x02, 0x75, 0x05, 0x95, 0x01, 0x81, 0x03,
+	0x75, 0x08, 0x95, 0x08, 0x81, 0x03, 0x09, 0x0E, 0xA1, 0x02, 0x85, 0x02, 0x0A, 0x02, 0x10, 0x15,
+	0x00, 0x25, 0x02, 0x75, 0x08, 0x95, 0x01, 0xB1, 0x02, 0x85, 0x03, 0x0A, 0x03, 0x10, 0x15, 0x00,
+	0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x01, 0xB1, 0x02, 0x85, 0x04, 0x0A, 0x07, 0x10, 0x15, 0x00,
+	0x27, 0xFF, 0xFF, 0x00, 0x00, 0x75, 0x10, 0x95, 0x01, 0xB1, 0x02, 0x0A, 0x08, 0x10, 0x15, 0x00,
+	0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x01, 0xB1, 0x02, 0x75, 0x08, 0x95, 0x04, 0xB1, 0x03, 0x85,
+	0x06, 0x0A, 0x0A, 0x10, 0x15, 0x01, 0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x01, 0xB1, 0x02, 0x85,
+	0xCC, 0x0A, 0xCC, 0x10, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x02, 0xB1, 0x02, 0x85,
+	0x0C, 0x0A, 0x14, 0x10, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x0A, 0xB1, 0x02, 0x85,
+	0x0E, 0x0A, 0x14, 0x10, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x0D, 0xB1, 0x02, 0x85,
+	0x10, 0x0A, 0x02, 0x02, 0x15, 0x00, 0x25, 0x02, 0x75, 0x08, 0x95, 0x01, 0xB1, 0x02, 0x0A, 0x03,
+	0x02, 0x15, 0x00, 0x25, 0x02, 0x75, 0x06, 0x95, 0x01, 0xB1, 0x02, 0x0A, 0x04, 0x02, 0x15, 0x00,
+	0x25, 0x02, 0x75, 0x02, 0x95, 0x01, 0xB1, 0x02, 0x0A, 0x05, 0x02, 0x15, 0x00, 0x25, 0x01, 0x75,
+	0x01, 0x95, 0x01, 0xB1, 0x02, 0x0A, 0x06, 0x02, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x01,
+	0xB1, 0x02, 0x75, 0x06, 0x95, 0x01, 0xB1, 0x03, 0x0A, 0x07, 0x02, 0x15, 0x00, 0x26, 0xFF, 0x00,
+	0x75, 0x08, 0x95, 0x01, 0xB1, 0x02, 0x0A, 0x08, 0x02, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08,
+	0x95, 0x01, 0xB1, 0x02, 0x0A, 0x09, 0x02, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x01,
+	0xB1, 0x02, 0x0A, 0x1A, 0x02, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x01, 0xB1, 0x02,
+	0x0A, 0x1D, 0x02, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x01, 0xB1, 0x02, 0x0A, 0x1C, 0x02,
+	0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x01, 0xB1, 0x02, 0x0A, 0x1B, 0x02, 0x15, 0x00, 0x25,
+	0x01, 0x75, 0x01, 0x95, 0x01, 0xB1, 0x02, 0x75, 0x05, 0x95, 0x01, 0xB1, 0x03, 0x75, 0x08, 0x95,
+	0x08, 0xB1, 0x03, 0x85, 0x40, 0x09, 0x00, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08, 0x95, 0x43,
+	0xB1, 0x02, 0xC0, 0x0A, 0xAC, 0x10, 0xA1, 0x02, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08, 0x85,
+	0x05, 0x09, 0x00, 0x95, 0x01, 0xB1, 0x02, 0x85, 0x07, 0x09, 0x00, 0x95, 0x05, 0xB1, 0x02, 0x85,
+	0x08, 0x09, 0x00, 0x95, 0x02, 0xB1, 0x02, 0x85, 0x09, 0x09, 0x00, 0x95, 0x03, 0xB1, 0x02, 0x85,
+	0x14, 0x09, 0x00, 0x95, 0x3F, 0x81, 0x02, 0x85, 0x0A, 0x09, 0x00, 0x95, 0x01, 0xB1, 0x02, 0x85,
+	0x0B, 0x09, 0x00, 0x95, 0x01, 0xB1, 0x02, 0x85, 0x0D, 0x09, 0x00, 0x95, 0x01, 0xB1, 0x02, 0x85,
+	0x88, 0x09, 0x00, 0x95, 0x08, 0xB1, 0x02, 0x85, 0xB0, 0x09, 0x00, 0x95, 0x01, 0xB1, 0x02, 0x85,
+	0xB5, 0x09, 0x00, 0x95, 0x0A, 0xB1, 0x02, 0x85, 0xB9, 0x09, 0x00, 0x95, 0x0D, 0xB1, 0x02, 0x85,
+	0xB1, 0x09, 0x00, 0x95, 0x28, 0x81, 0x02, 0xC0, 0xC0,
+};
+
+const unsigned char ReportDescHSKeyboard[] = {
+	// ============= REPORT DESCRIPTOR KEYBOARD ==========
+	0x05, 0x01,
+	0x09, 0x06,
+	0xA1, 0x01,
+	0x05, 0x07,
+	0x19, 0xE0,
+	0x29, 0xE7,
+	0x15, 0x00,
+	0x25, 0x01,
+	0x75, 0x01,
+	0x95, 0x08,
+	0x81, 0x02,
+	0x95, 0x01,
+	0x75, 0x08,
+	0x81, 0x01,
+	0x95, 0x03,
+	0x75, 0x01,
+	0x05, 0x08,
+	0x19, 0x01,
+	0x29, 0x03,
+	0x91, 0x02,
+	0x95, 0x05,
+	0x75, 0x01,
+	0x91, 0x01,
+	0x95, 0x06,
+	0x75, 0x08,
+	0x26, 0xFF, 0x00,
+	0x05, 0x07,
+	0x19, 0x00,
+	0x29, 0x91,
+	0x81, 0x00,
+	0xC0,
+};
+
+const unsigned char ReportDescHSNone[] = {
+	// ============= REPORT DESCRIPTOR NONE ==========
+	0x05, 0x01,
+	0x09, 0x80,
+	0xA1, 0x01,
+	0x85, 0x01,
+	0x19, 0x81,
+	0x29, 0x83,
+	0x15, 0x00,
+	0x25, 0x01,
+	0x95, 0x03,
+	0x75, 0x01,
+	0x81, 0x02,
+	0x95, 0x01,
+	0x75, 0x05,
+	0x81, 0x01,
+	0xC0,
+	0x05, 0x0C,
+	0x09, 0x01,
+	0xA1, 0x01,
+	0x85, 0x02,
+	0x15, 0x00,
+	0x25, 0x01,
+	0x09, 0xE9,
+	0x09, 0xEA,
+	0x09, 0xE2,
+	0x09, 0xCD,
+	0x19, 0xB5,
+	0x29, 0xB8,
+	0x75, 0x01,
+	0x95, 0x08,
+	0x81, 0x02,
+	0x0A, 0x8A, 0x01,
+	0x0A, 0x21, 0x02,
+	0x0A, 0x2A, 0x02,
+	0x1A, 0x23, 0x02,
+	0x2A, 0x27, 0x02,
+	0x81, 0x02,
+	0x0A, 0x83, 0x01,
+	0x0A, 0x96, 0x01,
+	0x0A, 0x92, 0x01,
+	0x0A, 0x9E, 0x01,
+	0x0A, 0x94, 0x01,
+	0x0A, 0x06, 0x02,
+	0x09, 0xB2,
+	0x09, 0xB4,
+	0x81, 0xC2,
+	0xC0,
+};
+
+#define WACOM_1024X600 0
+
+unsigned char t6rom[128] = {
+#if WACOM_1024X600
+	0x44,0x49,0x53,0x50,0x90,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x11,0x07,0x29,0x56,
+	0x44,0x00,0x54,0x00,0x55,0x00,0x2D,0x00,0x31,0x00,0x30,0x00,0x33,0x00,0x31,0x00,
+	0x41,0x00,0x58,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x01,0x00,0x00,0x00,0x48,0x00,0x00,0x08,0x08,0x01,0x70,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x00,0x00,0x00,0x5A,0x32,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+#else
+	0x44,0x49,0x53,0x50,0x30,0x04,0x00,0x00,0x00,0x00,0x00,0x00,0x11,0x07,0x21,0x56,
+	0x54,0x00,0x72,0x00,0x69,0x00,0x67,0x00,0x67,0x00,0x65,0x00,0x72,0x00,0x20,0x00,
+	0x36,0x00,0x20,0x00,0x54,0x00,0x78,0x00,0x74,0x00,0x65,0x00,0x72,0x00,0x6E,0x00,
+	0x61,0x00,0x6C,0x00,0x20,0x00,0x47,0x00,0x72,0x00,0x61,0x00,0x70,0x00,0x68,0x00,
+	0x69,0x00,0x63,0x00,0x73,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x01,0x00,0x00,0x00,0x48,0x00,0x00,0x00,0x08,0x1E,0x70,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x30,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+#endif
+};
+
+#define CY_FX_UVC_MAX_PROBE_SETTING 34
+unsigned char glProbeCtrl[CY_FX_UVC_MAX_PROBE_SETTING] = {
+    0x00,0x00,                       /* bmHint : No fixed parameters */
+    0x01,                            /* Use 1st Video format index */
+    0x01,                            /* Use 1st Video frame index */
+    0x15,0x16,0x05,0x00,             /* Desired frame interval in 100ns */
+    0x00,0x00,                       /* Key frame rate in key frame/video frame units */
+    0x00,0x00,                       /* PFrame rate in PFrame / key frame units */
+    0x00,0x00,                       /* Compression quality control */
+    0x00,0x00,                       /* Window size for average bit rate */
+    0x00,0x00,                       /* Internal video streaming i/f latency in ms */
+    0x00,0x30,0x2A,0x00,             /* Max video frame size in bytes */
+    0x00,0x30,0x2A,0x00,             /* No. of bytes device can transmit in single payload */
+    0x00,0x6C,0xDC,0x02,
+    0x03,0x01,0x01,0x02,
+};
+
+extern struct fsg_common *g_userspaceUVC_common;
+extern unsigned char g_start_transfer;
 
 /*
  * The setup() callback implements all the ep0 functionality that's
@@ -779,7 +1162,8 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	u16				w_length = le16_to_cpu(ctrl->wLength);
 	struct usb_function		*f = NULL;
 	u8				endp;
-
+	MNSPXACTHDR udp_hdr;
+	//printk("composite_setup_0x%x, 0x%x\n", (ctrl->bRequest), ctrl->bRequestType);
 	/* partial re-init of the response message; the function or the
 	 * gadget might need to intercept e.g. a control-OUT completion
 	 * when we delegate to it.
@@ -788,150 +1172,866 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	req->complete = composite_setup_complete;
 	req->length = USB_BUFSIZ;
 	gadget->ep0->driver_data = cdev;
+	ep0_setup_dir = ctrl->bRequestType;
+	//t6_vendor_cmd = ctrl->bRequest;
 
-	switch (ctrl->bRequest) {
-
-	/* we handle all standard USB descriptors */
-	case USB_REQ_GET_DESCRIPTOR:
-		if (ctrl->bRequestType != USB_DIR_IN)
-			goto unknown;
-		switch (w_value >> 8) {
-
-		case USB_DT_DEVICE:
-			cdev->desc.bNumConfigurations =
-				count_configs(cdev, USB_DT_DEVICE);
-			value = min(w_length, (u16) sizeof cdev->desc);
-			memcpy(req->buf, &cdev->desc, value);
-			break;
-		case USB_DT_DEVICE_QUALIFIER:
-			if (!gadget_is_dualspeed(gadget))
+	if(((ctrl->bRequestType) & USB_TYPE_VENDOR) == USB_TYPE_VENDOR)
+	{
+		//printk("USB_TYPE_VENDOR\n");
+		switch(ctrl->bRequest)
+		{
+			case VENDOR_REQ_GET_VERSION:
+				switch(w_index)
+				{
+					case 0:
+						memcpy(req->buf, "\x01\x00\x00\x00", 4);
+						value = 4;
+						break;
+					case 1:
+						memcpy(req->buf, "\x99\x28\x06\x16", 4);
+						value = 4;
+						break;
+					case 2:
+#if WACOM_1024X600
+						memcpy(req->buf, "\x02\x03\x12\x18", 4);
+						value = 4;
+#else
+						memcpy(req->buf, "\x01\x14\x09\x17", 4);
+						value = 4;
+#endif
+						break;
+					case 3:
+#if WACOM_1024X600
+						memcpy(req->buf, "\x41\x4c\x44\x32\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 16);
+						value = 16;
+#else
+						memcpy(req->buf, "\x41\x38\x36\x32\x30\x48\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 16);
+						value = 16;
+#endif
+						break;
+					case 4:
+						memcpy(req->buf, "\x06\x00\x00\x00", 4);
+						value = 4;
+						break;
+					case 5:
+						memcpy(req->buf, "\x00\x00\x00\x00\x00\x00\x00\x00", 8);
+						value = 8;
+						break;
+				}
 				break;
-			device_qual(cdev);
-			value = min_t(int, w_length,
-				sizeof(struct usb_qualifier_descriptor));
-			break;
-		case USB_DT_OTHER_SPEED_CONFIG:
-			if (!gadget_is_dualspeed(gadget))
+			case VENDOR_REQ_QUERY_SIZE:
+#if WACOM_1024X600
+				memcpy(req->buf, "\x00\x00\x00\x00", 4);
+				value = 4;
+#else
+				memcpy(req->buf, "\x04\x00\x00\x00", 4);
+				value = 4;
+#endif
 				break;
-			/* FALLTHROUGH */
-		case USB_DT_CONFIG:
-			value = config_desc(cdev, w_value);
-			if (value >= 0)
-				value = min(w_length, (u16) value);
-			break;
-		case USB_DT_STRING:
-			value = get_string(cdev, req->buf,
-					w_index, w_value & 0xff);
-			if (value >= 0)
-				value = min(w_length, (u16) value);
-			break;
+			case VENDOR_REQ_GET_FUNC_ID:
+				switch(w_index)
+				{
+					case 0:
+#if WACOM_1024X600
+						memcpy(req->buf, "\x11\x07\x29\x56\x44\x00\x54\x00\x55\x00\x2D\x00\x31\x00\x30\x00"
+							"\x33\x00\x31\x00\x41\x00\x58\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x01\x00\x00\x00\x80\x00\x00\x08\x08\x01\x70\x00"
+							"\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x00\xC8\x00\x00\x3C\x00\x40\x05\x00\x04\x18\x04"
+							"\x88\x00\x7B\x02\x58\x02\x5A\x02\x04\x00\xE0\x01\xE8\x03\x14\x02"
+							"\x00\x01\x00\x00", 132);
+						value = 132;
+#else
+						memcpy(req->buf, "\x11\x07\x21\x56\x54\x00\x72\x00\x69\x00\x67\x00\x67\x00\x65\x00"
+							"\x72\x00\x20\x00\x36\x00\x20\x00\x45\x00\x78\x00\x74\x00\x65\x00"
+							"\x72\x00\x6E\x00\x61\x00\x6C\x00\x20\x00\x47\x00\x72\x00\x61\x00"
+							"\x70\x00\x68\x00\x69\x00\x63\x00\x73\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x08\x08\x1E\x70\x00"
+							"\x00\x00\x00\x00\x00\x30\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x57\x62\x00\x00\x3C\x00\x20\x03\x80\x02\x90\x02"
+							"\x60\x00\x0D\x02\xE0\x01\xEA\x01\x02\x00\x8C\x00\xE8\x03\x14\x00"
+							"\x00\x00\x00\x00", 132);
+						value = 132;
+
+#endif
+						break;
+					case 3:
+#if WACOM_1024X600
+						memcpy(req->buf, "\xC0\xB1\x00\x00\x03\x00\x84\x00\x42\x00\x20\x00\x41\x00\x75\x00"
+							"\x64\x00\x69\x00\x6F\x00\x20\x00\x44\x00\x65\x00\x76\x00\x69\x00"
+							"\x63\x00\x65\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x03\x01\x70\x00\x00\x00\x00\x00\x11\x32\x00\x00"
+							"\x11\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x80\xBB\x00\x00\x80\x00\x10\x02\x00\x00\x50\x46"
+							"\x00\x00\x00\x00\x00\x70\x17\x00\xE9\x44\x01\x00\xEB\x01\xE8\x03"
+							"\x00\x00\x00\x00", 8);
+						value = 8;
+#else
+						memcpy(req->buf, "\x11\x07\x40\x56\x55\x00\x53\x00\x42\x00\x20\x00\x41\x00\x75\x00"
+							"\x64\x00\x69\x00\x6F\x00\x20\x00\x44\x00\x65\x00\x76\x00\x69\x00"
+							"\x63\x00\x65\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x03\x01\x70\x00\x00\x00\x00\x00\x11\x32\x00\x00"
+							"\x11\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+							"\x00\x00\x00\x00\x80\xBB\x00\x00\x80\x00\x10\x02\x00\x00\x50\x46"
+							"\x00\x00\x00\x00\x00\x70\x17\x00\xE9\x44\x01\x00\xEB\x01\xE8\x03"
+							"\x00\x00\x00\x00", 132);
+						value = 132;
+#endif
+						break;
+				}
+				break;
+			case VENDOR_REQ_AUD_GET_ENGINE_CAPS:
+				switch(w_index)
+				{
+					case 0:
+						memcpy(req->buf, "\x00\x00\x01\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00", 16);
+						value = 16;
+						break;
+					case 1:
+						memcpy(req->buf, "\x00\x00\x01\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00", 16);
+						value = 16;
+						break;
+				}
+				break;
+			case VENDOR_REQ_AUD_GET_ENGINE_STATE:
+#if WACOM_1024X600
+				memcpy(req->buf, "\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00", 16);
+				value = 16;
+#else
+				memcpy(req->buf, "\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00", 16);
+				value = 16;
+#endif
+				break;
+			case VENDOR_REQ_AUD_GET_FORMAT_LIST:
+				memcpy(req->buf, "\x80\xBB\x00\x00\x80\x00\x10\x02\x00\x00\x50\x46\x00\x00\x00\x00"
+					"\x00\x70\x17\x00\xE9\x44\x01\x00\xEB\x01\xE8\x03\x00\x00\x00\x00", 32);
+				value = 32;
+				break;
+			case VENDOR_REQ_AUD_GET_NODE_CAPS:
+				memcpy(req->buf, "\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x1F\x00\x00\x00", 16);
+				value = 16;
+				break;
+			case VENDOR_REQ_AUD_GET_NODE_VALUE:
+				memcpy(req->buf, "\xFF\x00\x00\x00\x00\x00\x00\x00\x0F\x00\x00\x00\x0F\x00\x00\x00"
+					"\x0F\x00\x00\x00\x0F\x00\x00\x00\x0F\x00\x00\x00\x0F\x00\x00\x00"
+					"\x0F\x00\x00\x00\x0F\x00\x00\x00", 40);
+				value = 40;
+				break;
+			case VENDOR_REQ_AUD_SET_NODE_VALUE:
+				value = 40;
+				break;
+			case VENDOR_REQ_QUERY_VIDEO_RAM_SIZE:
+				memcpy(req->buf, "\x3A", 1);
+				value = 1;
+				break;
+			case VENDOR_REQ_QUERY_SECTION_DATA:
+				t6rom[0x64] = compress_rate;
+				t6rom[0x65] = bit_rate_control;
+				memcpy(req->buf, t6rom, 112);
+				//memcpy(req->buf, "\x44\x49\x53\x50\x90\x00\x00\x00\x00\x00\x00\x00\x11\x07\x29\x56"
+				//	"\x44\x00\x54\x00\x55\x00\x2D\x00\x31\x00\x30\x00\x33\x00\x31\x00"
+				//	"\x41\x00\x58\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+				//	"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+				//	"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+				//	"\x01\x00\x00\x00\x40\x00\x00\x08\x08\x01\x70\x00\x00\x00\x00\x00"
+				//	"\x00\x00\x00\x00\x5A\x32\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 112);
+				value = 112;
+				break;
+			case VENDOR_REQ_GET_RESOLUTION_TIMING_TABLE:
+				switch(w_value)
+				{
+					case 0:
+						switch(w_index)
+						{
+							case 0:
+								memcpy(req->buf, 
+#if WACOM_1024X600
+									"\x00\xC8\x00\x00\x3C\x00\x40\x05\x00\x04\x18\x04\x88\x00\x7B\x02"
+									"\x58\x02\x5A\x02\x04\x00\xE0\x01\xE8\x03\x14\x02\x00\x01\x00\x00"
+									"\x0C\x7B\x00\x00\x4B\x00\x48\x03\x80\x02\x90\x02\x40\x00\xF4\x01"
+									"\xE0\x01\xE1\x01\x03\x00\xC7\x00\xE8\x03\x19\x00\x00\x00\x00\x00"
+#else
+									"\x57\x62\x00\x00\x3C\x00\x20\x03\x80\x02\x90\x02\x60\x00\x0D\x02"
+									"\xE0\x01\xEA\x01\x02\x00\x8C\x00\xE8\x03\x14\x00\x00\x00\x00\x00"
+									"\x0C\x7B\x00\x00\x4B\x00\x48\x03\x80\x02\x90\x02\x40\x00\xF4\x01"
+									"\xE0\x01\xE1\x01\x03\x00\xC7\x00\xE8\x03\x19\x00\x00\x00\x00\x00"
+#endif
+									"\x40\x9C\x00\x00\x3C\x00\x20\x04\x20\x03\x48\x03\x80\x00\x74\x02"
+									"\x58\x02\x59\x02\x04\x00\x00\x00\xE8\x03\x20\x00\x01\x01\x00\x00"
+									"\x50\xC3\x00\x00\x48\x00\x10\x04\x20\x03\x58\x03\x78\x00\x9A\x02"
+									"\x58\x02\x7D\x02\x06\x00\x00\x00\xE8\x03\x14\x02\x01\x01\x00\x00"
+									"\x5C\xC1\x00\x00\x4B\x00\x20\x04\x20\x03\x30\x03\x50\x00\x71\x02"
+									"\x58\x02\x59\x02\x03\x00\x58\x02\xE8\x03\x27\x00\x01\x01\x00\x00"
+									"\xE8\xFD\x00\x00\x3C\x00\x40\x05\x00\x04\x18\x04\x88\x00\x26\x03"
+									"\x00\x03\x03\x03\x06\x00\x00\x00\xE8\x03\x1A\x02\x00\x00\x00\x00"
+									"\xF8\x24\x01\x00\x46\x00\x30\x05\x00\x04\x18\x04\x88\x00\x26\x03"
+									"\x00\x03\x03\x03\x06\x00\x00\x00\xE8\x03\x1E\x02\x00\x00\x00\x00"
+									"\x9E\x33\x01\x00\x4B\x00\x20\x05\x00\x04\x10\x04\x60\x00\x20\x03"
+									"\x00\x03\x01\x03\x03\x00\xF4\x01\xE8\x03\x1F\x02\x01\x01\x00\x00"
+									"\xE0\xA5\x01\x00\x4B\x00\x40\x06\x80\x04\xC0\x04\x80\x00\x84\x03"
+									"\x60\x03\x61\x03\x03\x00\x58\x02\xE8\x03\x15\x01\x01\x01\x00\x00"
+									"\x0A\x22\x01\x00\x3C\x00\x72\x06\x00\x05\x6E\x05\x28\x00\xEE\x02"
+									"\xD0\x02\xD5\x02\x05\x00\xBB\x02\xE8\x03\x1D\x02\x01\x01\x00\x00"
+									"\x8C\x36\x01\x00\x3C\x00\x80\x06\x00\x05\x40\x05\x80\x00\x1E\x03"
+									"\x00\x03\x03\x03\x07\x00\x20\x03\xE8\x03\x1F\x02\x00\x01\x00\x00"
+									"\x6A\x8F\x01\x00\x4B\x00\xA0\x06\x00\x05\x50\x05\x80\x00\x25\x03"
+									"\x00\x03\x03\x03\x07\x00\xC1\x01\xE8\x03\x14\x01\x00\x01\x00\x00"
+									"\x2C\x46\x01\x00\x3C\x00\x90\x06\x00\x05\x48\x05\x80\x00\x3F\x03"
+									"\x20\x03\x23\x03\x06\x00\x8F\x01\xE8\x03\x21\x02\x00\x01\x00\x00"
+									"\x04\xA0\x01\x00\x4B\x00\xA0\x06\x00\x05\x50\x05\x80\x00\x46\x03"
+									"\x20\x03\x23\x03\x06\x00\x2C\x01\xE8\x03\x15\x01\x00\x01\x00\x00"
+									"\xE0\xA5\x01\x00\x3C\x00\x08\x07\x00\x05\x60\x05\x70\x00\xE8\x03"
+									"\xC0\x03\xC1\x03\x03\x00\x58\x02\xE8\x03\x15\x01\x01\x01\x00\x00"
+									"\xE0\xA5\x01\x00\x3C\x00\x98\x06\x00\x05\x30\x05\x70\x00\x2A\x04"
+									"\x00\x04\x01\x04\x03\x00\x58\x02\xE8\x03\x15\x01\x01\x01\x00\x00", 32);
+								value = 32;
+								break;
+							case 0x200:
+#if WACOM_1024X600
+								memcpy(req->buf, 
+									"\x58\x0F\x02\x00\x4B\x00\x98\x06\x00\x05\x10\x05\x90\x00\x2A\x04"
+									"\x00\x04\x01\x04\x03\x00\x00\x00\xE8\x03\x1B\x01\x01\x01\x00\x00"
+									"\xFC\x4D\x01\x00\x3C\x00\x00\x07\x50\x05\x90\x05\x70\x00\x1B\x03"
+									"\x00\x03\x03\x03\x06\x00\xC8\x00\xE8\x03\x22\x02\x01\x01\x00\x02"
+									"\xF6\x4E\x01\x00\x3C\x00\x00\x07\x56\x05\x9C\x05\x8F\x00\x1E\x03"
+									"\x00\x03\x03\x03\x03\x00\x2B\x01\xE8\x03\x22\x02\x01\x01\x00\x00"
+									"\x96\xDB\x01\x00\x3C\x00\x48\x07\x78\x05\xD0\x05\x90\x00\x41\x04"
+									"\x1A\x04\x1D\x04\x04\x00\x5E\x01\xE8\x03\x18\x01\x00\x01\x00\x00"
+									"\x60\x61\x02\x00\x4B\x00\x68\x07\x78\x05\xE0\x05\x90\x00\x4B\x04"
+									"\x1A\x04\x1D\x04\x04\x00\xC7\x00\xE8\x03\x1F\x01\x00\x01\x00\x00"
+									"\x04\xA0\x01\x00\x3C\x00\x70\x07\xA0\x05\xF0\x05\x98\x00\xA6\x03"
+									"\x84\x03\x87\x03\x06\x00\x2C\x01\xE8\x03\x15\x01\x00\x01\x00\x00"
+									"\x2E\x16\x02\x00\x4B\x00\x90\x07\xA0\x05\x00\x06\x98\x00\xAE\x03"
+									"\x84\x03\x87\x03\x06\x00\x5E\x01\xE8\x03\x1B\x01\x00\x01\x00\x00"
+									"\xD6\x7D\x01\x00\x3C\x00\xE0\x06\x40\x06\x70\x06\x20\x00\x98\x03"
+									"\x84\x03\x87\x03\x05\x00\x64\x00\xE8\x03\x27\x02\x01\x00\x01\x00"
+									"\x4A\x3B\x02\x00\x3C\x00\xC0\x08\x90\x06\xF8\x06\xB0\x00\x41\x04"
+									"\x1A\x04\x1D\x04\x06\x00\xFA\x00\xE8\x03\x1D\x01\x00\x01\x00\x02"
+									"\xD0\x78\x02\x00\x3C\x00\x70\x08\x40\x06\x80\x06\xC0\x00\xE2\x04"
+									"\xB0\x04\xB1\x04\x03\x00\x8F\x01\xE8\x03\x20\x01\x01\x01\x00\x00"
+									"\x14\x44\x02\x00\x3C\x00\x98\x08\x80\x07\xD8\x07\x2C\x00\x65\x04"
+									"\x38\x04\x3C\x04\x05\x00\xBB\x02\xE8\x03\x1D\x01\x01\x01\x00\x00"
+									"\xE2\xF2\x02\x00\x3C\x00\x20\x0A\x80\x07\x08\x08\xC8\x00\xDD\x04"
+									"\xB0\x04\xB3\x04\x06\x00\x89\x02\xE8\x03\x26\x01\x00\x01\x00\x00"
+									"\x88\x01\x03\x00\x3C\x00\xC0\x0A\x00\x08\x88\x08\xD7\x00\xAB\x04"
+									"\x80\x04\x85\x04\x05\x00\x8F\x01\xE8\x03\x27\x01\x01\x00\x00\x00"
+									"\x70\x05\x03\x00\x3C\x00\xB8\x0B\x00\x0A\xF8\x0A\x2C\x00\x4C\x04"
+									"\x38\x04\x3C\x04\x05\x00\x58\x02\xE8\x03\x27\x01\x01\x01\x00\x00"
+									"\x24\xB0\x03\x00\x3C\x00\xA0\x0A\x00\x0A\x30\x0A\x20\x00\xC9\x05"
+									"\xA0\x05\xA3\x05\x05\x00\xA9\x00\xE8\x03\x18\x03\x01\x00\x01\x00"
+									"\xD4\x18\x04\x00\x3C\x00\xA0\x0A\x00\x0A\x30\x0A\x20\x00\x6E\x06"
+									"\x40\x06\x43\x06\x06\x00\x52\x03\xE8\x03\x1A\x03\x01\x00\x01\x00", 512);
+								value = 512;
+#else
+								memcpy(req->buf, 
+									"\x0A\x22\x01\x00\x3C\x00\x72\x06\x00\x05\x6E\x05\x28\x00\xEE\x02"
+									"\xD0\x02\xD5\x02\x05\x00\xBB\x02\xE8\x03\x1D\x02\x01\x01\x00\x00"
+									"\x58\x0F\x02\x00\x4B\x00\x98\x06\x00\x05\x10\x05\x90\x00\x2A\x04"
+									"\x00\x04\x01\x04\x03\x00\x00\x00\xE8\x03\x1B\x01\x01\x01\x00\x00"
+									"\xFC\x4D\x01\x00\x3C\x00\x00\x07\x50\x05\x90\x05\x70\x00\x1B\x03"
+									"\x00\x03\x03\x03\x06\x00\xC8\x00\xE8\x03\x22\x02\x01\x01\x00\x02"
+									"\xF6\x4E\x01\x00\x3C\x00\x00\x07\x56\x05\x9C\x05\x8F\x00\x1E\x03"
+									"\x00\x03\x03\x03\x03\x00\x2B\x01\xE8\x03\x22\x02\x01\x01\x00\x00"
+									"\x96\xDB\x01\x00\x3C\x00\x48\x07\x78\x05\xD0\x05\x90\x00\x41\x04"
+									"\x1A\x04\x1D\x04\x04\x00\x5E\x01\xE8\x03\x18\x01\x00\x01\x00\x00"
+									"\x60\x61\x02\x00\x4B\x00\x68\x07\x78\x05\xE0\x05\x90\x00\x4B\x04"
+									"\x1A\x04\x1D\x04\x04\x00\xC7\x00\xE8\x03\x1F\x01\x00\x01\x00\x00"
+									"\x04\xA0\x01\x00\x3C\x00\x70\x07\xA0\x05\xF0\x05\x98\x00\xA6\x03"
+									"\x84\x03\x87\x03\x06\x00\x2C\x01\xE8\x03\x15\x01\x00\x01\x00\x00"
+									"\x2E\x16\x02\x00\x4B\x00\x90\x07\xA0\x05\x00\x06\x98\x00\xAE\x03"
+									"\x84\x03\x87\x03\x06\x00\x5E\x01\xE8\x03\x1B\x01\x00\x01\x00\x00"
+									"\xD6\x7D\x01\x00\x3C\x00\xE0\x06\x40\x06\x70\x06\x20\x00\x98\x03"
+									"\x84\x03\x87\x03\x05\x00\x64\x00\xE8\x03\x27\x02\x01\x00\x01\x00"
+									"\x4A\x3B\x02\x00\x3C\x00\xC0\x08\x90\x06\xF8\x06\xB0\x00\x41\x04"
+									"\x1A\x04\x1D\x04\x06\x00\xFA\x00\xE8\x03\x1D\x01\x00\x01\x00\x02"
+									"\xD0\x78\x02\x00\x3C\x00\x70\x08\x40\x06\x80\x06\xC0\x00\xE2\x04"
+									"\xB0\x04\xB1\x04\x03\x00\x8F\x01\xE8\x03\x20\x01\x01\x01\x00\x00"
+									"\x14\x44\x02\x00\x3C\x00\x98\x08\x80\x07\xD8\x07\x2C\x00\x65\x04"
+									"\x38\x04\x3C\x04\x05\x00\xBB\x02\xE8\x03\x1D\x01\x01\x01\x00\x00"
+									"\x14\x44\x02\x00\x32\x00\x50\x0A\x80\x07\x90\x09\x2C\x00\x65\x04"
+									"\x38\x04\x3C\x04\x05\x00\xBB\x02\xE8\x03\x1D\x01\x01\x01\x00\x00"
+									"\xE2\xF2\x02\x00\x3C\x00\x20\x0A\x80\x07\x08\x08\xC8\x00\xDD\x04"
+									"\xB0\x04\xB3\x04\x06\x00\x89\x02\xE8\x03\x26\x01\x00\x01\x00\x00"
+									"\x88\x01\x03\x00\x3C\x00\xC0\x0A\x00\x08\x88\x08\xD7\x00\xAB\x04"
+									"\x80\x04\x85\x04\x05\x00\x8F\x01\xE8\x03\x27\x01\x01\x00\x00\x00", 480);
+								value = 480;
+#endif
+								break;
+							case 0x400:
+								memcpy(req->buf, "\x5E\x02\x04\x00\x1E\x00\xA0\x0F\x00\x0F\x30\x0F\x20\x00\x8F\x08"
+									"\x70\x08\x73\x08\x05\x00\x12\x01\xE8\x03\x1A\x03\x01\x01\x01\x00"
+									"\x14\x44\x02\x00\x32\x00\x50\x0A\x80\x07\x90\x09\x2C\x00\x65\x04"
+									"\x38\x04\x3C\x04\x05\x00\xBB\x02\xE8\x03\x1D\x01\x01\x01\x00\x00", 64);
+								value = 64;
+								break;
+						}	
+						break;
+					case 1:
+						switch(w_index)
+						{
+							case 0:
+								memcpy(req->buf, "\x57\x62\x00\x00\x3C\x00\x20\x03\x80\x02\x90\x02\x60\x00\x0D\x02"
+									"\xE0\x01\xEA\x01\x02\x00\x8C\x00\xE8\x03\x14\x00\x00\x00\x00\x00"
+									"\x0C\x7B\x00\x00\x4B\x00\x48\x03\x80\x02\x90\x02\x40\x00\xF4\x01"
+									"\xE0\x01\xE1\x01\x03\x00\xC7\x00\xE8\x03\x19\x00\x00\x00\x00\x00"
+									"\x40\x9C\x00\x00\x3C\x00\x20\x04\x20\x03\x48\x03\x80\x00\x74\x02"
+									"\x58\x02\x59\x02\x04\x00\x00\x00\xE8\x03\x20\x00\x01\x01\x00\x00"
+									"\x50\xC3\x00\x00\x48\x00\x10\x04\x20\x03\x58\x03\x78\x00\x9A\x02"
+									"\x58\x02\x7D\x02\x06\x00\x00\x00\xE8\x03\x14\x02\x01\x01\x00\x00"
+									"\x5C\xC1\x00\x00\x4B\x00\x20\x04\x20\x03\x30\x03\x50\x00\x71\x02"
+									"\x58\x02\x59\x02\x03\x00\x58\x02\xE8\x03\x27\x00\x01\x01\x00\x00"
+									"\xE8\xFD\x00\x00\x3C\x00\x40\x05\x00\x04\x18\x04\x88\x00\x26\x03"
+									"\x00\x03\x03\x03\x06\x00\x00\x00\xE8\x03\x1A\x02\x00\x00\x00\x00"
+									"\xF8\x24\x01\x00\x46\x00\x30\x05\x00\x04\x18\x04\x88\x00\x26\x03"
+									"\x00\x03\x03\x03\x06\x00\x00\x00\xE8\x03\x1E\x02\x00\x00\x00\x00"
+									"\x9E\x33\x01\x00\x4B\x00\x20\x05\x00\x04\x10\x04\x60\x00\x20\x03"
+									"\x00\x03\x01\x03\x03\x00\xF4\x01\xE8\x03\x1F\x02\x01\x01\x00\x00"
+									"\xE0\xA5\x01\x00\x4B\x00\x40\x06\x80\x04\xC0\x04\x80\x00\x84\x03"
+									"\x60\x03\x61\x03\x03\x00\x58\x02\xE8\x03\x15\x01\x01\x01\x00\x00"
+									"\x0A\x22\x01\x00\x3C\x00\x72\x06\x00\x05\x6E\x05\x28\x00\xEE\x02"
+									"\xD0\x02\xD5\x02\x05\x00\xBB\x02\xE8\x03\x1D\x02\x01\x01\x00\x00"
+									"\x8C\x36\x01\x00\x3C\x00\x80\x06\x00\x05\x40\x05\x80\x00\x1E\x03"
+									"\x00\x03\x03\x03\x07\x00\x20\x03\xE8\x03\x1F\x02\x00\x01\x00\x00"
+									"\x6A\x8F\x01\x00\x4B\x00\xA0\x06\x00\x05\x50\x05\x80\x00\x25\x03"
+									"\x00\x03\x03\x03\x07\x00\xC1\x01\xE8\x03\x14\x01\x00\x01\x00\x00"
+									"\x2C\x46\x01\x00\x3C\x00\x90\x06\x00\x05\x48\x05\x80\x00\x3F\x03"
+									"\x20\x03\x23\x03\x06\x00\x8F\x01\xE8\x03\x21\x02\x00\x01\x00\x00"
+									"\x04\xA0\x01\x00\x4B\x00\xA0\x06\x00\x05\x50\x05\x80\x00\x46\x03"
+									"\x20\x03\x23\x03\x06\x00\x2C\x01\xE8\x03\x15\x01\x00\x01\x00\x00"
+									"\xE0\xA5\x01\x00\x3C\x00\x08\x07\x00\x05\x60\x05\x70\x00\xE8\x03"
+									"\xC0\x03\xC1\x03\x03\x00\x58\x02\xE8\x03\x15\x01\x01\x01\x00\x00"
+									"\xE0\xA5\x01\x00\x3C\x00\x98\x06\x00\x05\x30\x05\x70\x00\x2A\x04"
+									"\x00\x04\x01\x04\x03\x00\x58\x02\xE8\x03\x15\x01\x01\x01\x00\x00", 512);
+								value = 512;
+								break;
+							case 0x200:
+								memcpy(req->buf, "\x58\x0F\x02\x00\x4B\x00\x98\x06\x00\x05\x10\x05\x90\x00\x2A\x04"
+									"\x00\x04\x01\x04\x03\x00\x00\x00\xE8\x03\x1B\x01\x01\x01\x00\x00"
+									"\xFC\x4D\x01\x00\x3C\x00\x00\x07\x50\x05\x90\x05\x70\x00\x1B\x03"
+									"\x00\x03\x03\x03\x06\x00\xC8\x00\xE8\x03\x22\x02\x01\x01\x00\x02"
+									"\xF6\x4E\x01\x00\x3C\x00\x00\x07\x56\x05\x9C\x05\x8F\x00\x1E\x03"
+									"\x00\x03\x03\x03\x03\x00\x2B\x01\xE8\x03\x22\x02\x01\x01\x00\x00"
+									"\x96\xDB\x01\x00\x3C\x00\x48\x07\x78\x05\xD0\x05\x90\x00\x41\x04"
+									"\x1A\x04\x1D\x04\x04\x00\x5E\x01\xE8\x03\x18\x01\x00\x01\x00\x00"
+									"\x60\x61\x02\x00\x4B\x00\x68\x07\x78\x05\xE0\x05\x90\x00\x4B\x04"
+									"\x1A\x04\x1D\x04\x04\x00\xC7\x00\xE8\x03\x1F\x01\x00\x01\x00\x00"
+									"\x04\xA0\x01\x00\x3C\x00\x70\x07\xA0\x05\xF0\x05\x98\x00\xA6\x03"
+									"\x84\x03\x87\x03\x06\x00\x2C\x01\xE8\x03\x15\x01\x00\x01\x00\x00"
+									"\x2E\x16\x02\x00\x4B\x00\x90\x07\xA0\x05\x00\x06\x98\x00\xAE\x03"
+									"\x84\x03\x87\x03\x06\x00\x5E\x01\xE8\x03\x1B\x01\x00\x01\x00\x00"
+									"\xD6\x7D\x01\x00\x3C\x00\xE0\x06\x40\x06\x70\x06\x20\x00\x98\x03"
+									"\x84\x03\x87\x03\x05\x00\x64\x00\xE8\x03\x27\x02\x01\x00\x01\x00"
+									"\x4A\x3B\x02\x00\x3C\x00\xC0\x08\x90\x06\xF8\x06\xB0\x00\x41\x04"
+									"\x1A\x04\x1D\x04\x06\x00\xFA\x00\xE8\x03\x1D\x01\x00\x01\x00\x02"
+									"\xD0\x78\x02\x00\x3C\x00\x70\x08\x40\x06\x80\x06\xC0\x00\xE2\x04"
+									"\xB0\x04\xB1\x04\x03\x00\x8F\x01\xE8\x03\x20\x01\x01\x01\x00\x00"
+									"\x14\x44\x02\x00\x3C\x00\x98\x08\x80\x07\xD8\x07\x2C\x00\x65\x04"
+									"\x38\x04\x3C\x04\x05\x00\xBB\x02\xE8\x03\x1D\x01\x01\x01\x00\x00"
+									"\xE2\xF2\x02\x00\x3C\x00\x20\x0A\x80\x07\x08\x08\xC8\x00\xDD\x04"
+									"\xB0\x04\xB3\x04\x06\x00\x89\x02\xE8\x03\x26\x01\x00\x01\x00\x00"
+									"\x88\x01\x03\x00\x3C\x00\xC0\x0A\x00\x08\x88\x08\xD7\x00\xAB\x04"
+									"\x80\x04\x85\x04\x05\x00\x8F\x01\xE8\x03\x27\x01\x01\x00\x00\x00"
+									"\x70\x05\x03\x00\x3C\x00\xB8\x0B\x00\x0A\xF8\x0A\x2C\x00\x4C\x04"
+									"\x38\x04\x3C\x04\x05\x00\x58\x02\xE8\x03\x27\x01\x01\x01\x00\x00"
+									"\x14\x44\x02\x00\x32\x00\x50\x0A\x80\x07\x90\x09\x2C\x00\x65\x04"
+									"\x38\x04\x3C\x04\x05\x00\xBB\x02\xE8\x03\x1D\x01\x01\x01\x00\x00", 480);
+								value = 480;
+								break;
+						}
+						break;
+				}
+				break;
+			case VENDOR_REQ_QUERY_MONITOR_CONNECTION_STATUS:
+				switch(w_value)
+				{
+					case 0:
+						memcpy(req->buf, "\x00", 1);
+						value = 1;
+						break;
+					case 1:
+						memcpy(req->buf, "\x01", 1);
+						value = 1;
+						break;
+				}
+				break;
+			case VENDOR_REQ_SET_MONITOR_CTRL:
+				switch(w_index)
+				{
+					case 0:
+						value = 0;
+						break;
+					case 1:
+						value = 0;
+						break;
+				}
+				break;
+			case VENDOR_REQ_SET_CURSOR_SHAPE:
+				//printk("SHAPE\n");
+				t6_vendor_cmd = ctrl->bRequest;
+				g_cursor_buf_offset = w_index/512;
+				g_cursor_shape_idx = w_value;
+				memcpy(&g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+g_cursor_buf_offset*(UDP_CURSORSHAPEBLOCK_SIZE+UDP_CURSORBLOCK_SIZE)], ctrl, UDP_CURSORBLOCK_SIZE);
+				value = w_length;
+				break;
+			case VENDOR_REQ_SET_CURSOR1_SHAPE:
+				//printk("SHAPE1\n");
+				t6_vendor_cmd = ctrl->bRequest;
+				g_cursor_buf_offset = w_index/512;
+				g_cursor_shape_idx = w_value;
+				memcpy(&g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+g_cursor_buf_offset*(UDP_CURSORSHAPEBLOCK_SIZE+UDP_CURSORBLOCK_SIZE)], ctrl, UDP_CURSORBLOCK_SIZE);
+				value = w_length;
+				break;
+			case VENDOR_REQ_SET_CURSOR1_POS:
+				//if(g_UCURconn_socket)
+				{
+					udp_hdr.Tag = MNSP_TAG;
+					udp_hdr.XactType = MNSP_XACTTYPE_CURSOR;
+					udp_hdr.HdrSize = sizeof(udp_hdr);
+					udp_hdr.XactId = g_udp_control_XactId;
+					udp_hdr.XactOffset = 0;
+					udp_hdr.PayloadLength = UDP_CURSORBLOCK_SIZE;
+					udp_hdr.TotalLength = UDP_CURSORBLOCK_SIZE;
+					memcpy(g_udp_cursor_buf, &udp_hdr, sizeof(udp_hdr));
+					memcpy(&g_udp_cursor_buf[sizeof(udp_hdr)], ctrl, UDP_CURSORBLOCK_SIZE);
+					//spin_lock_irqsave(&cursor_lock, cursor_flags);
+					smp_wmb();
+					//wakeup_thread(&cursor_udp_common);
+				}
+				value = 0;
+				break;
+			case VENDOR_REQ_SET_CURSOR1_STATE:
+				//if(g_UCURconn_socket)
+				{
+					t6_vendor_cmd = ctrl->bRequest;
+					udp_hdr.Tag = MNSP_TAG;
+					udp_hdr.XactType = MNSP_XACTTYPE_CURSOR;
+					udp_hdr.HdrSize = sizeof(udp_hdr);
+					udp_hdr.XactId = g_udp_control_XactId;
+					udp_hdr.XactOffset = 0;
+					udp_hdr.PayloadLength = UDP_CURSORBLOCK_SIZE;
+					udp_hdr.TotalLength = UDP_CURSORBLOCK_SIZE;
+					memcpy(g_udp_cursor_state_buf, &udp_hdr, sizeof(udp_hdr));
+					memcpy(&g_udp_cursor_state_buf[sizeof(udp_hdr)], ctrl, UDP_CURSORBLOCK_SIZE);
+					//spin_lock_irqsave(&cursor_lock, cursor_flags);
+					smp_wmb();
+					//wakeup_thread(&cursor_tcp_common);
+				}
+				value = 0;
+				break;
+			case VENDOR_REQ_SET_CURSOR2_SHAPE:
+				//printk("SHAPE2\n");
+				t6_vendor_cmd = ctrl->bRequest;
+				g_cursor_buf_offset = w_index/512;
+				g_cursor_shape_idx = w_value;
+				memcpy(&g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+g_cursor_buf_offset*(UDP_CURSORSHAPEBLOCK_SIZE+UDP_CURSORBLOCK_SIZE)], ctrl, UDP_CURSORBLOCK_SIZE);
+				value = w_length;
+				break;
+			case VENDOR_REQ_SET_CURSOR2_POS:
+				//if(g_UCURconn_socket)
+				{
+					udp_hdr.Tag = MNSP_TAG;
+					udp_hdr.XactType = MNSP_XACTTYPE_CURSOR;
+					udp_hdr.HdrSize = sizeof(udp_hdr);
+					udp_hdr.XactId = g_udp_control_XactId;
+					udp_hdr.XactOffset = 0;
+					udp_hdr.PayloadLength = UDP_CURSORBLOCK_SIZE;
+					udp_hdr.TotalLength = UDP_CURSORBLOCK_SIZE;
+					memcpy(g_udp_cursor_buf, &udp_hdr, sizeof(udp_hdr));
+					memcpy(&g_udp_cursor_buf[sizeof(udp_hdr)], ctrl, UDP_CURSORBLOCK_SIZE);
+					//spin_lock_irqsave(&cursor_lock, cursor_flags);
+					smp_wmb();
+					//wakeup_thread(&cursor_udp_common);
+				}
+				value = 0;
+				break;
+			case VENDOR_REQ_SET_CURSOR2_STATE:
+				//if(g_UCURconn_socket)
+				{
+					t6_vendor_cmd = ctrl->bRequest;
+					udp_hdr.Tag = MNSP_TAG;
+					udp_hdr.XactType = MNSP_XACTTYPE_CURSOR;
+					udp_hdr.HdrSize = sizeof(udp_hdr);
+					udp_hdr.XactId = g_udp_control_XactId;
+					udp_hdr.XactOffset = 0;
+					udp_hdr.PayloadLength = UDP_CURSORBLOCK_SIZE;
+					udp_hdr.TotalLength = UDP_CURSORBLOCK_SIZE;
+					memcpy(g_udp_cursor_state_buf, &udp_hdr, sizeof(udp_hdr));
+					memcpy(&g_udp_cursor_state_buf[sizeof(udp_hdr)], ctrl, UDP_CURSORBLOCK_SIZE);
+					//spin_lock_irqsave(&cursor_lock, cursor_flags);
+					smp_wmb();
+					//wakeup_thread(&cursor_tcp_common);
+				}
+				value = 0;
+				break;
+			case VENDOR_REQ_SET_CANCEL_BULK_OUT:
+				value = 0;
+				break;
+			case VENDOR_REQ_GET_EDID:
+				switch(w_value)
+				{
+					case 0:
+						switch(w_index)
+						{
+							case 0:
+#if WACOM_1024X600
+								memcpy(req->buf, "\x00\xFF\xFF\xFF\xFF\xFF\xFF\x00\x5C\x23\x45\x10\x01\x00\x00\x00"
+									"\x15\x1C\x01\x03\x80\x16\x0D\x78\x2A\x13\x60\x97\x58\x57\x91\x26"
+									"\x1E\x50\x54\x00\x00\x00\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+									"\x01\x01\x01\x01\x01\x01\xC7\x13\x00\x40\x41\x58\x1C\x20\x18\x88"
+									"\x14\x00\xE7\x86\x00\x00\x00\x18\x00\x00\x00\xFC\x00\x44\x54\x55"
+									"\x2D\x31\x30\x33\x31\x41\x58\x0A\x20\x20\x00\x00\x00\xFF\x00\x31"
+									"\x0A\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x00\x00\x00\x00"
+									"\x00\x0B\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xEA", 128);
+								value = 128;
+#else
+								memcpy(req->buf, "\x00\xFF\xFF\xFF\xFF\xFF\xFF\x00\x1C\xAE\x73\x24\x01\x01\x01\x01"
+									"\x00\x14\x01\x03\x81\x30\x0B\x78\x2A\xE6\x75\xA4\x56\x4F\x9E\x27"
+									"\x0F\x50\x54\xBF\xEF\x80\xB3\x00\xA9\x40\x95\x00\x81\x40\x81\x80"
+									"\x95\x0F\x71\x4F\x90\x40\x02\x3A\x80\x18\x71\x38\x2D\x40\x58\x2C"
+									"\x45\x00\xDE\x0D\x11\x00\x00\x1E\x66\x21\x50\xB0\x51\x00\x1B\x30"
+									"\x40\x70\x36\x00\xDE\x0D\x11\x00\x00\x1E\x00\x00\x00\xFD\x00\x37"
+									"\x4C\x1E\x52\x11\x00\x0A\x20\x20\x20\x20\x20\x20\x00\x00\x00\xFC"
+									"\x00\x47\x65\x6E\x75\x69\x6E\x65\x32\x31\x2E\x35\x27\x27\x01\x13", 128);
+								value = 128;
+#endif
+								break;
+							case 1:
+								memcpy(req->buf, "\x00\xFF\xFF\xFF\xFF\xFF\xFF\x00\x10\xAC\xBB\x40\x4C\x30\x31\x30"
+									"\x0E\x1B\x01\x03\x80\x3C\x22\x78\xEA\xEE\x95\xA3\x54\x4C\x99\x26"
+									"\x0F\x50\x54\xA5\x4B\x00\x71\x4F\x81\x80\xA9\xC0\xD1\xC0\x01\x01"
+									"\x01\x01\x01\x01\x01\x01\x02\x3A\x80\x18\x71\x38\x2D\x40\x58\x2C"
+									"\x45\x00\x56\x50\x21\x00\x00\x1E\x00\x00\x00\xFF\x00\x39\x33\x4B"
+									"\x34\x35\x37\x34\x36\x30\x31\x30\x4C\x0A\x00\x00\x00\xFC\x00\x44"
+									"\x45\x4C\x4C\x20\x53\x32\x37\x31\x35\x48\x0A\x20\x00\x00\x00\xFD"
+									"\x00\x38\x4C\x1E\x53\x11\x00\x0A\x20\x20\x20\x20\x20\x20\x01\x3C", 128);
+								value = 128;
+								break;
+						}
+						break;
+					case 0x80:
+						switch(w_index)
+						{
+							case 0:
+								memcpy(req->buf, "\x02\x03\x22\xF1\x4F\x9F\x14\x13\x12\x11\x16\x15\x10\x05\x04\x03"
+									"\x02\x07\x06\x01\x23\x09\x07\x01\x83\x01\x00\x00\x65\x03\x0C\x00"
+									"\x10\x00\x02\x3A\x80\xD0\x72\x38\x2D\x40\x10\x2C\x45\x80\xDE\x0D"
+									"\x11\x00\x00\x1F\x01\x1D\x80\xD0\x72\x1C\x16\x20\x10\x2C\x25\x00"
+									"\xDE\x0D\x11\x00\x00\x9F\x01\x1D\x00\xBC\x52\xD0\x1E\x20\xB8\x28"
+									"\x55\x40\xDE\x0D\x11\x00\x00\x1E\x8C\x0A\xD0\x90\x20\x40\x31\x20"
+									"\x0C\x40\x55\x00\xDE\x0D\x11\x00\x00\x18\x02\x3A\x80\x18\x71\x38"
+									"\x2D\x40\x58\x2C\x45\x00\xDE\x0D\x11\x00\x00\x1E\x00\x00\x00\x3E", 128);
+								value = 128;
+								break;
+							case 1:
+								memcpy(req->buf, "\x02\x03\x26\xF1\x4F\x90\x05\x04\x03\x02\x07\x16\x01\x06\x11\x12"
+									"\x15\x13\x14\x1F\x23\x09\x07\x07\x65\x03\x0C\x00\x10\x00\x83\x01"
+									"\x00\x00\xE3\x05\x03\x01\x02\x3A\x80\x18\x71\x38\x2D\x40\x58\x2C"
+									"\x45\x00\x56\x50\x21\x00\x00\x1E\x01\x1D\x80\x18\x71\x1C\x16\x20"
+									"\x58\x2C\x25\x00\x56\x50\x21\x00\x00\x9E\x01\x1D\x00\x72\x51\xD0"
+									"\x1E\x20\x6E\x28\x55\x00\x56\x50\x21\x00\x00\x1E\x8C\x0A\xD0\x8A"
+									"\x20\xE0\x2D\x10\x10\x3E\x96\x00\x56\x50\x21\x00\x00\x18\x00\x00"
+									"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x59", 128);
+								value = 128;
+								break;
+						}
+						break;
+				}
+				break;
+			case VENDOR_REQ_SOFTWARE_READY:
+				value = 0;
+				break;
+			case VENDOR_REQ_SET_RESOLUTION_DETAIL_TIMING:
+				value = 32;
+				break;
+			case 0x13:
+				value = 0;
+			case VENDOR_REQ_AUD_SET_ENGINE_STATE:
+				value = 16;
+				break;
+			default:
+				
+				break;
 		}
-		break;
+	}
+	else if(((ctrl->bRequestType) & USB_TYPE_CLASS) == USB_TYPE_CLASS)
+	{
+		printk("USB_TYPE_CLASS\n");
+		switch (ctrl->bRequest)
+		{
+			case 0x0A:
+				value = 0x00;
+				break;
+			//case 0x01: //T6 CMD
+			//	memcpy(req->buf, "\x04\x00\x02\x01\x00\x00\x00\x00", 8);
+			//	value = 0x08;
+			//	break;
+			case UVC_SET_CUR:
+				switch(w_value)
+				{
+					case 0x200://start streaming
+						printk("Start Web_UVC\n");
+						//wakeup_thread(g_userspaceUVC_common);//for kernel
+						break;
+					case 0x100:
+						
+						break;
+					default:
+						break;
+				}
+				value = w_length;
+				break;
+			case UVC_GET_CUR:
+				memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+				value = w_length;
+				break;
+			case UVC_GET_MIN:
+				memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+				value = w_length;
+				break;
+			case UVC_GET_MAX:
+				memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+				value = w_length;
+				break;
+			case UVC_GET_RES:
+				break;
+			case UVC_GET_LEN:
+				break;
+			case UVC_GET_INFO:
+				break;
+			case UVC_GET_DEF:
+				memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+				value = w_length;
+				break;
+			default:
+				VDBG(cdev,
+					"non-core control req%02x.%02x v%04x i%04x l%d\n",
+					ctrl->bRequestType, ctrl->bRequest,
+					w_value, w_index, w_length);
 
-	/* any number of configs can work */
-	case USB_REQ_SET_CONFIGURATION:
-		if (ctrl->bRequestType != 0)
-			goto unknown;
-		if (gadget_is_otg(gadget)) {
-			if (gadget->a_hnp_support)
-				DBG(cdev, "HNP available\n");
-			else if (gadget->a_alt_hnp_support)
-				DBG(cdev, "HNP on another port\n");
-			else
-				VDBG(cdev, "HNP inactive\n");
-		}
-		spin_lock(&cdev->lock);
-		value = set_config(cdev, ctrl, w_value);
-		spin_unlock(&cdev->lock);
-		break;
-	case USB_REQ_GET_CONFIGURATION:
-		if (ctrl->bRequestType != USB_DIR_IN)
-			goto unknown;
-		if (cdev->config)
-			*(u8 *)req->buf = cdev->config->bConfigurationValue;
-		else
-			*(u8 *)req->buf = 0;
-		value = min(w_length, (u16) 1);
-		break;
-
-	/* function drivers must handle get/set altsetting; if there's
-	 * no get() method, we know only altsetting zero works.
-	 */
-	case USB_REQ_SET_INTERFACE:
-		if (ctrl->bRequestType != USB_RECIP_INTERFACE)
-			goto unknown;
-		if (!cdev->config || w_index >= MAX_CONFIG_INTERFACES)
-			break;
-		f = cdev->config->interface[intf];
-		if (!f)
-			break;
-		if (w_value && !f->set_alt)
-			break;
-		value = f->set_alt(f, w_index, w_value);
-		break;
-	case USB_REQ_GET_INTERFACE:
-		if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE))
-			goto unknown;
-		if (!cdev->config || w_index >= MAX_CONFIG_INTERFACES)
-			break;
-		f = cdev->config->interface[intf];
-		if (!f)
-			break;
-		/* lots of interfaces only need altsetting zero... */
-		value = f->get_alt ? f->get_alt(f, w_index) : 0;
-		if (value < 0)
-			break;
-		*((u8 *)req->buf) = value;
-		value = min(w_length, (u16) 1);
-		break;
-	default:
-unknown:
-		VDBG(cdev,
-			"non-core control req%02x.%02x v%04x i%04x l%d\n",
-			ctrl->bRequestType, ctrl->bRequest,
-			w_value, w_index, w_length);
-
-		/* functions always handle their interfaces and endpoints...
-		 * punt other recipients (other, WUSB, ...) to the current
-		 * configuration code.
-		 *
-		 * REVISIT it could make sense to let the composite device
-		 * take such requests too, if that's ever needed:  to work
-		 * in config 0, etc.
-		 */
-		switch (ctrl->bRequestType & USB_RECIP_MASK) {
-		case USB_RECIP_INTERFACE:
-			f = cdev->config->interface[intf];
-			break;
-
-		case USB_RECIP_ENDPOINT:
-			endp = ((w_index & 0x80) >> 3) | (w_index & 0x0f);
-			list_for_each_entry(f, &cdev->config->functions, list) {
-				if (test_bit(endp, f->endpoints))
+				/* functions always handle their interfaces and endpoints...
+				 * punt other recipients (other, WUSB, ...) to the current
+				 * configuration code.
+				 *
+				 * REVISIT it could make sense to let the composite device
+				 * take such requests too, if that's ever needed:  to work
+				 * in config 0, etc.
+				 */
+				switch (ctrl->bRequestType & USB_RECIP_MASK) {
+				case USB_RECIP_INTERFACE:
+					f = cdev->config->interface[0];
 					break;
+
+				case USB_RECIP_ENDPOINT:
+					endp = ((w_index & 0x80) >> 3) | (w_index & 0x0f);
+					list_for_each_entry(f, &cdev->config->functions, list) {
+						if (test_bit(endp, f->endpoints))
+							break;
+					}
+					if (&f->list == &cdev->config->functions)
+						f = NULL;
+					break;
+				}
+
+				if (f && f->setup)
+					value = f->setup(f, ctrl);
+				else {
+					struct usb_configuration	*c;
+
+					c = cdev->config;
+					if (c && c->setup)
+						value = c->setup(c, ctrl);
+				}
+
+				goto done;
+		}
+	}
+	else if(((ctrl->bRequestType) & USB_TYPE_STANDARD) == USB_TYPE_STANDARD)
+	{
+		printk("USB_TYPE_STANDARD\n");
+		switch (ctrl->bRequest) {
+
+		/* we handle all standard USB descriptors */
+		case USB_REQ_GET_DESCRIPTOR:
+			if ((ctrl->bRequestType & USB_DIR_IN) != USB_DIR_IN)
+				goto unknown;
+			switch (w_value >> 8) {
+
+			case USB_DT_DEVICE:
+				cdev->desc.bNumConfigurations =
+					count_configs(cdev, USB_DT_DEVICE);
+				value = min(w_length, (u16) sizeof cdev->desc);
+				memcpy(req->buf, &cdev->desc, value);
+				break;
+			case USB_DT_DEVICE_QUALIFIER:
+				if (!gadget_is_dualspeed(gadget))
+					break;
+				device_qual(cdev);
+				value = min_t(int, w_length,
+					sizeof(struct usb_qualifier_descriptor));
+				break;
+			case USB_DT_OTHER_SPEED_CONFIG:
+				if (!gadget_is_dualspeed(gadget))
+					break;
+				/* FALLTHROUGH */
+			case USB_DT_CONFIG:
+				value = config_desc(cdev, w_value);
+				if (value >= 0)
+					value = min(w_length, (u16) value);
+				break;
+			case USB_DT_STRING:
+				value = get_string(cdev, req->buf,
+						w_index, w_value & 0xff);
+				if (value >= 0)
+					value = min(w_length, (u16) value);
+				break;
+			case USB_DT_BOS:
+				memcpy(req->buf, fsg_bos_desc, sizeof(fsg_bos_desc));
+				value = min(w_length, (u16) sizeof(fsg_bos_desc));
+			case (USB_TYPE_CLASS | 0x02):
+				DBG(cdev, "USB_REQ_GET_DESCRIPTOR: REPORT\n");
+				switch(w_index)
+				{
+					case 1:
+						value = 0x379;
+						memcpy(req->buf, ReportDescHSMouse, value);
+						break;
+					case 2:
+						value = 0x3e;
+						memcpy(req->buf, ReportDescHSKeyboard, value);
+						break;
+					case 3:
+						value = 0x65;
+						memcpy(req->buf, ReportDescHSNone, value);
+						break;
+				}
+				break;
 			}
-			if (&f->list == &cdev->config->functions)
-				f = NULL;
 			break;
+
+		/* any number of configs can work */
+		case USB_REQ_SET_CONFIGURATION:
+			if (ctrl->bRequestType != 0)
+				goto unknown;
+			if (gadget_is_otg(gadget)) {
+				if (gadget->a_hnp_support)
+					DBG(cdev, "HNP available\n");
+				else if (gadget->a_alt_hnp_support)
+					DBG(cdev, "HNP on another port\n");
+				else
+					VDBG(cdev, "HNP inactive\n");
+			}
+			spin_lock(&cdev->lock);
+			value = set_config(cdev, ctrl, w_value);
+			spin_unlock(&cdev->lock);
+			break;
+		case USB_REQ_GET_CONFIGURATION:
+			if (ctrl->bRequestType != USB_DIR_IN)
+				goto unknown;
+			if (cdev->config)
+				*(u8 *)req->buf = cdev->config->bConfigurationValue;
+			else
+				*(u8 *)req->buf = 0;
+			value = min(w_length, (u16) 1);
+			break;
+		case USB_REQ_GET_STATUS:
+			value = 0x2;
+			memcpy(req->buf, "\x00\x00", value);
+			break;
+		/* function drivers must handle get/set altsetting; if there's
+		 * no get() method, we know only altsetting zero works.
+		 */
+		case USB_REQ_SET_INTERFACE:
+			if (ctrl->bRequestType != USB_RECIP_INTERFACE)
+				goto unknown;
+			if (!cdev->config || w_index >= MAX_CONFIG_INTERFACES)
+				break;
+			f = cdev->config->interface[intf];
+			if (!f)
+				break;
+			if (w_value && !f->set_alt)
+				break;
+			value = f->set_alt(f, w_index, w_value);
+			break;
+		case USB_REQ_GET_INTERFACE:
+			if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE))
+				goto unknown;
+			if (!cdev->config || w_index >= MAX_CONFIG_INTERFACES)
+				break;
+			f = cdev->config->interface[intf];
+			if (!f)
+				break;
+			/* lots of interfaces only need altsetting zero... */
+			value = f->get_alt ? f->get_alt(f, w_index) : 0;
+			if (value < 0)
+				break;
+			*((u8 *)req->buf) = value;
+			value = min(w_length, (u16) 1);
+			break;
+		case USB_REQ_CLEAR_FEATURE:
+			if(w_value == 0)//halt_endpoint
+			{
+				if(w_index == 0x82)//stop UVC bulk streaming
+				{
+					printk("Stop Web_UVC\n");
+				}
+			}
+			value = 0;
+			break;
+		default:
+	unknown:
+			VDBG(cdev,
+				"non-core control req%02x.%02x v%04x i%04x l%d\n",
+				ctrl->bRequestType, ctrl->bRequest,
+				w_value, w_index, w_length);
+
+			/* functions always handle their interfaces and endpoints...
+			 * punt other recipients (other, WUSB, ...) to the current
+			 * configuration code.
+			 *
+			 * REVISIT it could make sense to let the composite device
+			 * take such requests too, if that's ever needed:  to work
+			 * in config 0, etc.
+			 */
+			switch (ctrl->bRequestType & USB_RECIP_MASK) {
+			case USB_RECIP_INTERFACE:
+				f = cdev->config->interface[intf];
+				break;
+
+			case USB_RECIP_ENDPOINT:
+				endp = ((w_index & 0x80) >> 3) | (w_index & 0x0f);
+				list_for_each_entry(f, &cdev->config->functions, list) {
+					if (test_bit(endp, f->endpoints))
+						break;
+				}
+				if (&f->list == &cdev->config->functions)
+					f = NULL;
+				break;
+			}
+
+			if (f && f->setup)
+				value = f->setup(f, ctrl);
+			else {
+				struct usb_configuration	*c;
+
+				c = cdev->config;
+				if (c && c->setup)
+					value = c->setup(c, ctrl);
+			}
+
+			goto done;
 		}
-
-		if (f && f->setup)
-			value = f->setup(f, ctrl);
-		else {
-			struct usb_configuration	*c;
-
-			c = cdev->config;
-			if (c && c->setup)
-				value = c->setup(c, ctrl);
-		}
-
-		goto done;
 	}
 
 	/* respond with data transfer before status phase? */
 	if (value >= 0) {
 		req->length = value;
 		req->zero = value < w_length;
+		if(value%64 == 0)
+			req->zero = 1;
 		value = usb_ep_queue(gadget->ep0, req, GFP_ATOMIC);
 		if (value < 0) {
 			DBG(cdev, "ep_queue --> %d\n", value);
@@ -1057,6 +2157,7 @@ static int composite_bind(struct usb_gadget *gadget)
 		return status;
 
 	spin_lock_init(&cdev->lock);
+	spin_lock_init(&cursor_lock);
 	cdev->gadget = gadget;
 	set_gadget_data(gadget, cdev);
 	INIT_LIST_HEAD(&cdev->configs);
@@ -1206,6 +2307,73 @@ static struct usb_gadget_driver composite_driver = {
  * while it was binding.  That would usually be done in order to wait for
  * some userspace participation.
  */
+
+int WebUVCMajor;
+extern unsigned char g_incomplete;
+
+extern u32 reg_read(u32 addr);
+extern void reg_write(u32 addr, u32 value);
+	
+int device_open(struct inode *inode, struct file *filp)
+{
+	printk("WebUVCO\n");
+	init_waitqueue_head(&gUVCwq);
+	return 0;
+}
+
+int device_release(struct inode *inode, struct file *filp)
+{
+	return 0;
+}
+
+extern int Enable_UVC_Bulk(struct fsg_common *common);
+extern int Disable_UVC_Bulk(struct fsg_common *common);
+
+int device_read(struct file *filp, char __user *buf, size_t count, loff_t *offset)
+{
+	unsigned int temp;
+	printk("WebUVCR\n");
+	//reg_write(0xB0000034, 0x02000000);
+	//temp = reg_read(0xB0000030);
+	//reg_write(0xB0000030, temp & 0xFDFFFFFF);
+	//reg_write(0xB0000030, temp | 0x02000000);
+	//reg_write(0xB0000034, 0x00000001);
+	Enable_UVC_Bulk(g_userspaceUVC_common);
+	//Disable_UVC_Bulk(g_userspaceUVC_common);
+	return 0;
+}
+
+extern int send_UVB_bulk_usr(struct fsg_common *common, unsigned int length, unsigned char *UVCbuf);
+
+int device_write(struct file *filp, const char __user *buf, size_t count, loff_t *offset)
+{
+	//printk("WebUVCW\n");
+	unsigned char UVC_Buff[512];
+	copy_from_user(UVC_Buff, buf, count);
+	g_incomplete = 0;
+	send_UVB_bulk_usr(g_userspaceUVC_common, count, UVC_Buff);
+	wait_event_interruptible(gUVCwq, g_incomplete);
+	return 0;
+}
+
+int device_ioctl(struct file *file, unsigned int cmd, unsigned long data)
+{
+	g_incomplete = 0;
+	wait_event_interruptible(gUVCwq, g_incomplete);
+	return 0;
+}
+
+struct file_operations webUVCfops = {
+  owner : THIS_MODULE,
+  read : device_read,
+  write : device_write,
+  open : device_open,
+  release : device_release,
+  unlocked_ioctl : device_ioctl,
+};
+  
+#define WEBUVC_DEVICE_NAME "Web_UVC0"
+
 int usb_composite_register(struct usb_composite_driver *driver)
 {
 	if (!driver || !driver->dev || !driver->bind || composite)
@@ -1216,6 +2384,14 @@ int usb_composite_register(struct usb_composite_driver *driver)
 	composite_driver.function =  (char *) driver->name;
 	composite_driver.driver.name = driver->name;
 	composite = driver;
+
+	WebUVCMajor = register_chrdev(255, WEBUVC_DEVICE_NAME, &webUVCfops);
+
+	printk("reg Web_UVC0\n");
+	if (WebUVCMajor < 0) {
+    	printk("Register char device Web_UVC0 fail\n");
+    	return WebUVCMajor;
+    }
 
 	return usb_gadget_register_driver(&composite_driver);
 }
@@ -1231,5 +2407,7 @@ void usb_composite_unregister(struct usb_composite_driver *driver)
 {
 	if (composite != driver)
 		return;
+	
+	unregister_chrdev(255, WEBUVC_DEVICE_NAME);
 	usb_gadget_unregister_driver(&composite_driver);
 }
