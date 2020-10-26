@@ -1,0 +1,14 @@
+after check out this project, please read this file first.
+
+1. cp MT7620-MT7612.tar.bz2 to current folder
+   you can download it from ftp://192.168.1.250/mnt/MD0/MTK
+   # ftp 192.168.1.250
+   username:password=ftpuser:ftpuser
+
+2. execute finish.sh
+	# ./finish.sh
+
+3. cd RT288x_SDK/source and excute the ./mct_init_config.sh at first time
+
+4. You only need to excute make under RT288x_SDK/source on every compiling time
+
