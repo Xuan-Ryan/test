@@ -671,6 +671,11 @@ DECLARE_UVC_INPUT_HEADER_DESCRIPTOR(1, 6);
 DECLARE_UVC_FRAME_MJPEG(1);
 DECLARE_UVC_FRAME_FRAME_BASED(1);
 DECLARE_UVC_EXTENSION_UNIT_DESCRIPTOR(1, 1);
+DECLARE_UVC_EXTENSION_UNIT_DESCRIPTOR(1, 2);
+DECLARE_UVC_EXTENSION_UNIT_DESCRIPTOR(1, 3);
+DECLARE_UVC_EXTENSION_UNIT_DESCRIPTOR(1, 4);
+DECLARE_UVC_EXTENSION_UNIT_DESCRIPTOR(1, 5);
+DECLARE_UVC_EXTENSION_UNIT_DESCRIPTOR(1, 6);
 DECLARE_UVC_FRAME_UNCOMPRESSED(1);
 
 static struct UVC_HEADER_DESCRIPTOR(1) M_uvc_control_header = {
@@ -716,7 +721,9 @@ static struct uvc_processing_unit_descriptor M_uvc_processing = {
 	.bmVideoStandards   = 0x09,
 };
 
-static struct UVC_EXTENSION_UNIT_DESCRIPTOR(1, 1) M_uvc_extension = {
+static struct uvc_extension_unit_descriptor *M_uvc_extension;
+
+static struct UVC_EXTENSION_UNIT_DESCRIPTOR(1, 1) M_uvc_extension1 = {
 	.bLength = UVC_DT_EXTENSION_UNIT_SIZE(1, 1),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VC_EXTENSION_UNIT,
@@ -742,6 +749,166 @@ static struct UVC_EXTENSION_UNIT_DESCRIPTOR(1, 1) M_uvc_extension = {
 	.baSourceID[0] = 0x02,
 	.bControlSize = 0x01,
 	.bmControls[0] = 0x00,
+	.iExtension = 0x00,
+};
+
+static struct UVC_EXTENSION_UNIT_DESCRIPTOR(1, 2) M_uvc_extension2 = {
+	.bLength = UVC_DT_EXTENSION_UNIT_SIZE(1, 2),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VC_EXTENSION_UNIT,
+	.bUnitID = 3,
+	.guidExtensionCode[0] = 0xFF,
+	.guidExtensionCode[1] = 0xFF,
+	.guidExtensionCode[2] = 0xFF,
+	.guidExtensionCode[3] = 0xFF,
+	.guidExtensionCode[4] = 0xFF,
+	.guidExtensionCode[5] = 0xFF,
+	.guidExtensionCode[6] = 0xFF,
+	.guidExtensionCode[7] = 0xFF,
+	.guidExtensionCode[8] = 0xFF,
+	.guidExtensionCode[9] = 0xFF,
+	.guidExtensionCode[10] = 0xFF,
+	.guidExtensionCode[11] = 0xFF,
+	.guidExtensionCode[12] = 0xFF,
+	.guidExtensionCode[13] = 0xFF,
+	.guidExtensionCode[14] = 0xFF,
+	.guidExtensionCode[15] = 0xFF,
+	.bNumControls = 0x00,
+	.bNrInPins = 0x01,
+	.baSourceID[0] = 0x02,
+	.bControlSize = 0x02,
+	.bmControls[0] = 0x00,
+	.bmControls[1] = 0x00,
+	.iExtension = 0x00,
+};
+
+static struct UVC_EXTENSION_UNIT_DESCRIPTOR(1, 3) M_uvc_extension3 = {
+	.bLength = UVC_DT_EXTENSION_UNIT_SIZE(1, 3),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VC_EXTENSION_UNIT,
+	.bUnitID = 3,
+	.guidExtensionCode[0] = 0xFF,
+	.guidExtensionCode[1] = 0xFF,
+	.guidExtensionCode[2] = 0xFF,
+	.guidExtensionCode[3] = 0xFF,
+	.guidExtensionCode[4] = 0xFF,
+	.guidExtensionCode[5] = 0xFF,
+	.guidExtensionCode[6] = 0xFF,
+	.guidExtensionCode[7] = 0xFF,
+	.guidExtensionCode[8] = 0xFF,
+	.guidExtensionCode[9] = 0xFF,
+	.guidExtensionCode[10] = 0xFF,
+	.guidExtensionCode[11] = 0xFF,
+	.guidExtensionCode[12] = 0xFF,
+	.guidExtensionCode[13] = 0xFF,
+	.guidExtensionCode[14] = 0xFF,
+	.guidExtensionCode[15] = 0xFF,
+	.bNumControls = 0x00,
+	.bNrInPins = 0x01,
+	.baSourceID[0] = 0x02,
+	.bControlSize = 0x03,
+	.bmControls[0] = 0x00,
+	.bmControls[1] = 0x00,
+	.bmControls[2] = 0x00,
+	.iExtension = 0x00,
+};
+
+static struct UVC_EXTENSION_UNIT_DESCRIPTOR(1, 4) M_uvc_extension4 = {
+	.bLength = UVC_DT_EXTENSION_UNIT_SIZE(1, 4),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VC_EXTENSION_UNIT,
+	.bUnitID = 3,
+	.guidExtensionCode[0] = 0xFF,
+	.guidExtensionCode[1] = 0xFF,
+	.guidExtensionCode[2] = 0xFF,
+	.guidExtensionCode[3] = 0xFF,
+	.guidExtensionCode[4] = 0xFF,
+	.guidExtensionCode[5] = 0xFF,
+	.guidExtensionCode[6] = 0xFF,
+	.guidExtensionCode[7] = 0xFF,
+	.guidExtensionCode[8] = 0xFF,
+	.guidExtensionCode[9] = 0xFF,
+	.guidExtensionCode[10] = 0xFF,
+	.guidExtensionCode[11] = 0xFF,
+	.guidExtensionCode[12] = 0xFF,
+	.guidExtensionCode[13] = 0xFF,
+	.guidExtensionCode[14] = 0xFF,
+	.guidExtensionCode[15] = 0xFF,
+	.bNumControls = 0x00,
+	.bNrInPins = 0x01,
+	.baSourceID[0] = 0x02,
+	.bControlSize = 0x04,
+	.bmControls[0] = 0x00,
+	.bmControls[1] = 0x00,
+	.bmControls[2] = 0x00,
+	.bmControls[3] = 0x00,
+	.iExtension = 0x00,
+};
+
+static struct UVC_EXTENSION_UNIT_DESCRIPTOR(1, 5) M_uvc_extension5 = {
+	.bLength = UVC_DT_EXTENSION_UNIT_SIZE(1, 5),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VC_EXTENSION_UNIT,
+	.bUnitID = 3,
+	.guidExtensionCode[0] = 0xFF,
+	.guidExtensionCode[1] = 0xFF,
+	.guidExtensionCode[2] = 0xFF,
+	.guidExtensionCode[3] = 0xFF,
+	.guidExtensionCode[4] = 0xFF,
+	.guidExtensionCode[5] = 0xFF,
+	.guidExtensionCode[6] = 0xFF,
+	.guidExtensionCode[7] = 0xFF,
+	.guidExtensionCode[8] = 0xFF,
+	.guidExtensionCode[9] = 0xFF,
+	.guidExtensionCode[10] = 0xFF,
+	.guidExtensionCode[11] = 0xFF,
+	.guidExtensionCode[12] = 0xFF,
+	.guidExtensionCode[13] = 0xFF,
+	.guidExtensionCode[14] = 0xFF,
+	.guidExtensionCode[15] = 0xFF,
+	.bNumControls = 0x00,
+	.bNrInPins = 0x01,
+	.baSourceID[0] = 0x02,
+	.bControlSize = 0x05,
+	.bmControls[0] = 0x00,
+	.bmControls[1] = 0x00,
+	.bmControls[2] = 0x00,
+	.bmControls[3] = 0x00,
+	.bmControls[4] = 0x00,
+	.iExtension = 0x00,
+};
+
+static struct UVC_EXTENSION_UNIT_DESCRIPTOR(1, 6) M_uvc_extension6 = {
+	.bLength = UVC_DT_EXTENSION_UNIT_SIZE(1, 6),
+	.bDescriptorType	= USB_DT_CS_INTERFACE,
+	.bDescriptorSubType	= UVC_VC_EXTENSION_UNIT,
+	.bUnitID = 3,
+	.guidExtensionCode[0] = 0xFF,
+	.guidExtensionCode[1] = 0xFF,
+	.guidExtensionCode[2] = 0xFF,
+	.guidExtensionCode[3] = 0xFF,
+	.guidExtensionCode[4] = 0xFF,
+	.guidExtensionCode[5] = 0xFF,
+	.guidExtensionCode[6] = 0xFF,
+	.guidExtensionCode[7] = 0xFF,
+	.guidExtensionCode[8] = 0xFF,
+	.guidExtensionCode[9] = 0xFF,
+	.guidExtensionCode[10] = 0xFF,
+	.guidExtensionCode[11] = 0xFF,
+	.guidExtensionCode[12] = 0xFF,
+	.guidExtensionCode[13] = 0xFF,
+	.guidExtensionCode[14] = 0xFF,
+	.guidExtensionCode[15] = 0xFF,
+	.bNumControls = 0x00,
+	.bNrInPins = 0x01,
+	.baSourceID[0] = 0x02,
+	.bControlSize = 0x06,
+	.bmControls[0] = 0x00,
+	.bmControls[1] = 0x00,
+	.bmControls[2] = 0x00,
+	.bmControls[3] = 0x00,
+	.bmControls[4] = 0x00,
+	.bmControls[5] = 0x00,
 	.iExtension = 0x00,
 };
 
@@ -930,7 +1097,7 @@ static struct UVC_FRAME_MJPEG(1) M_uvc_frame_mjpg_480p = {
 	.dwMinBitRate		= cpu_to_le32(221184000),
 	.dwMaxBitRate		= cpu_to_le32(221184000),
 	.dwMaxVideoFrameBufferSize	= cpu_to_le32(921600),
-	.dwDefaultFrameInterval		= cpu_to_le32(333333),
+	.dwDefaultFrameInterval	= cpu_to_le32(333333),
 	.bFrameIntervalType	= 1,
 	.dwFrameInterval[0]	= cpu_to_le32(333333),
 };
@@ -951,7 +1118,7 @@ static struct UVC_FRAME_MJPEG(1) M_uvc_frame_mjpg_720p = {
 	.dwFrameInterval[0]	= cpu_to_le32(333333),
 };
 
-static struct UVC_FRAME_MJPEG(1) M_uvc_frame_mjpg_1080p	= {
+static struct UVC_FRAME_MJPEG(1) M_uvc_frame_mjpg_1080p = {
 	.bLength		= UVC_DT_FRAME_MJPEG_SIZE(1),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FRAME_MJPEG,
@@ -962,7 +1129,7 @@ static struct UVC_FRAME_MJPEG(1) M_uvc_frame_mjpg_1080p	= {
 	.dwMinBitRate		= cpu_to_le32(1492992000),
 	.dwMaxBitRate		= cpu_to_le32(1492992000),
 	.dwMaxVideoFrameBufferSize	= cpu_to_le32(6220800),
-	.dwDefaultFrameInterval		= cpu_to_le32(333333),
+	.dwDefaultFrameInterval	= cpu_to_le32(333333),
 	.bFrameIntervalType	= 1,
 	.dwFrameInterval[0]	= cpu_to_le32(333333),
 };
@@ -977,20 +1144,20 @@ static struct uvc_color_matching_descriptor M_uvc_color_matching_mjpeg = {
 };
 
 static struct uvc_format_frame_based M_uvc_format_h264 = {
-	.bLength		= UVC_DT_FORMAT_FRAME_BASED_SIZE,
-	.bDescriptorType	= USB_DT_CS_INTERFACE,
-	.bDescriptorSubType	= UVC_VS_FORMAT_FRAME_BASED,
-	.bFormatIndex =	2,
-	.bNumFrameDescriptors	= 4,
+	.bLength = UVC_DT_FORMAT_FRAME_BASED_SIZE,
+	.bDescriptorType = USB_DT_CS_INTERFACE,
+	.bDescriptorSubType = UVC_VS_FORMAT_FRAME_BASED,
+	.bFormatIndex = 2,
+	.bNumFrameDescriptors = 4,
 	.guidFormat		=
-		{ 'H',	'2',  '6',  '4', 0x00, 0x00, 0x10, 0x00,
+		{ 'H',  '2',  '6',  '4', 0x00, 0x00, 0x10, 0x00,
 		 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71},
 	.bBitsPerPixel = 0x10,
 	.bDefaultFrameIndex = 1,
 	.bAspectRatioX = 0x00,
 	.bAspectRatioY = 0x00,
 	.bmInterfaceFlags = 0x00,
-	.bCopyProtect =	0x00,
+	.bCopyProtect = 0x00,
 	.bVariableSize = 0x01,
 };
 
@@ -999,14 +1166,14 @@ static struct UVC_FRAME_FRAME_BASED(1) M_uvc_frame_h264_320p = {
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 	.bDescriptorSubType = UVC_VS_FRAME_FRAME_BASED,
 	.bFrameIndex = 1,
-	.bmCapabilities	= 0,
-	.wWidth	= cpu_to_le16(320),
+	.bmCapabilities = 0,
+	.wWidth = cpu_to_le16(320),
 	.wHeight = cpu_to_le16(240),
-	.dwMinBitRate =	cpu_to_le32(55296000),
-	.dwMaxBitRate =	cpu_to_le32(55296000),
+	.dwMinBitRate = cpu_to_le32(55296000),
+	.dwMaxBitRate = cpu_to_le32(55296000),
 	.dwDefaultFrameInterval = cpu_to_le32(333333),
 	.bFrameIntervalType = 1,
-	.dwBytesPerLine	= cpu_to_le32(0),
+	.dwBytesPerLine = cpu_to_le32(0),
 	.dwFrameInterval[0] = cpu_to_le32(333333),
 };
 
@@ -1015,14 +1182,14 @@ static struct UVC_FRAME_FRAME_BASED(1) M_uvc_frame_h264_480p = {
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 	.bDescriptorSubType = UVC_VS_FRAME_FRAME_BASED,
 	.bFrameIndex = 2,
-	.bmCapabilities	= 0,
-	.wWidth	= cpu_to_le16(640),
+	.bmCapabilities = 0,
+	.wWidth = cpu_to_le16(640),
 	.wHeight = cpu_to_le16(480),
-	.dwMinBitRate =	cpu_to_le32(221184000),
-	.dwMaxBitRate =	cpu_to_le32(221184000),
-	.dwDefaultFrameInterval	= cpu_to_le32(333333),
+	.dwMinBitRate = cpu_to_le32(221184000),
+	.dwMaxBitRate = cpu_to_le32(221184000),
+	.dwDefaultFrameInterval = cpu_to_le32(333333),
 	.bFrameIntervalType = 1,
-	.dwBytesPerLine	= cpu_to_le32(0),
+	.dwBytesPerLine = cpu_to_le32(0),
 	.dwFrameInterval[0] = cpu_to_le32(333333),
 };
 
@@ -1031,30 +1198,30 @@ static struct UVC_FRAME_FRAME_BASED(1) M_uvc_frame_h264_720p = {
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 	.bDescriptorSubType = UVC_VS_FRAME_FRAME_BASED,
 	.bFrameIndex = 3,
-	.bmCapabilities	= 0,
-	.wWidth	= cpu_to_le16(1280),
+	.bmCapabilities = 0,
+	.wWidth = cpu_to_le16(1280),
 	.wHeight = cpu_to_le16(720),
-	.dwMinBitRate =	cpu_to_le32(663552000),
-	.dwMaxBitRate =	cpu_to_le32(663552000),
-	.dwDefaultFrameInterval	= cpu_to_le32(333333),
+	.dwMinBitRate = cpu_to_le32(663552000),
+	.dwMaxBitRate = cpu_to_le32(663552000),
+	.dwDefaultFrameInterval = cpu_to_le32(333333),
 	.bFrameIntervalType = 1,
-	.dwBytesPerLine	= cpu_to_le32(0),
+	.dwBytesPerLine = cpu_to_le32(0),
 	.dwFrameInterval[0] = cpu_to_le32(333333),
 };
 
-static struct UVC_FRAME_FRAME_BASED(1) M_uvc_frame_h264_1080p =	{
+static struct UVC_FRAME_FRAME_BASED(1) M_uvc_frame_h264_1080p = {
 	.bLength = UVC_DT_FRAME_FRAME_BASED_SIZE(1),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 	.bDescriptorSubType = UVC_VS_FRAME_FRAME_BASED,
 	.bFrameIndex = 4,
-	.bmCapabilities	= 0,
-	.wWidth	= cpu_to_le16(1920),
+	.bmCapabilities = 0,
+	.wWidth = cpu_to_le16(1920),
 	.wHeight = cpu_to_le16(1080),
-	.dwMinBitRate =	cpu_to_le32(1492992000),
-	.dwMaxBitRate =	cpu_to_le32(1492992000),
-	.dwDefaultFrameInterval	= cpu_to_le32(333333),
+	.dwMinBitRate = cpu_to_le32(1492992000),
+	.dwMaxBitRate = cpu_to_le32(1492992000),
+	.dwDefaultFrameInterval = cpu_to_le32(333333),
 	.bFrameIntervalType = 1,
-	.dwBytesPerLine	= cpu_to_le32(0),
+	.dwBytesPerLine = cpu_to_le32(0),
 	.dwFrameInterval[0] = cpu_to_le32(333333),
 };
 
@@ -1063,14 +1230,14 @@ static struct UVC_FRAME_FRAME_BASED(1) M_uvc_frame_h264_4k = {
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 	.bDescriptorSubType = UVC_VS_FRAME_FRAME_BASED,
 	.bFrameIndex = 5,
-	.bmCapabilities	= 0,
-	.wWidth	= cpu_to_le16(3840),
+	.bmCapabilities = 0,
+	.wWidth = cpu_to_le16(3840),
 	.wHeight = cpu_to_le16(2160),
-	.dwMinBitRate =	cpu_to_le32(5971968000),
-	.dwMaxBitRate =	cpu_to_le32(5971968000),
-	.dwDefaultFrameInterval	= cpu_to_le32(333333),
+	.dwMinBitRate = cpu_to_le32(5971968000),
+	.dwMaxBitRate = cpu_to_le32(5971968000),
+	.dwDefaultFrameInterval = cpu_to_le32(333333),
 	.bFrameIntervalType = 1,
-	.dwBytesPerLine	= cpu_to_le32(0),
+	.dwBytesPerLine = cpu_to_le32(0),
 	.dwFrameInterval[0] = cpu_to_le32(333333),
 };
 
@@ -1090,7 +1257,7 @@ static struct uvc_format_uncompressed M_uvc_format_yuv = {
 	.bFormatIndex		= 3,
 	.bNumFrameDescriptors	= 2,
 	.guidFormat		=
-		{ 'Y',	'U',  'Y',  '2', 0x00, 0x00, 0x10, 0x00,
+		{ 'Y',  'U',  'Y',  '2', 0x00, 0x00, 0x10, 0x00,
 		 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71},
 	.bBitsPerPixel		= 16,
 	.bDefaultFrameIndex	= 1,
@@ -1100,7 +1267,7 @@ static struct uvc_format_uncompressed M_uvc_format_yuv = {
 	.bCopyProtect		= 0,
 };
 
-static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_yuv_320p = {
+static struct UVC_FRAME_UNCOMPRESSED(1) M_uvc_frame_yuv_320p = {
 	.bLength		= UVC_DT_FRAME_UNCOMPRESSED_SIZE(1),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FRAME_UNCOMPRESSED,
@@ -1116,7 +1283,7 @@ static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_yuv_320p = {
 	.dwFrameInterval[0]	= cpu_to_le32(333333),
 };
 
-static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_yuv_480p = {
+static struct UVC_FRAME_UNCOMPRESSED(1) M_uvc_frame_yuv_480p = {
 	.bLength		= UVC_DT_FRAME_UNCOMPRESSED_SIZE(1),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FRAME_UNCOMPRESSED,
@@ -1141,14 +1308,14 @@ static struct uvc_color_matching_descriptor M_uvc_color_matching_yuv = {
 	.bMatrixCoefficients	= 4,
 };
 
-static struct uvc_format_uncompressed M_uvc_format_nv12	= {
+static struct uvc_format_uncompressed M_uvc_format_nv12 = {
 	.bLength		= UVC_DT_FORMAT_UNCOMPRESSED_SIZE,
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FORMAT_UNCOMPRESSED,
 	.bFormatIndex		= 4,
 	.bNumFrameDescriptors	= 2,
 	.guidFormat		=
-		{ 'N',	'V',  '1',  '2', 0x00, 0x00, 0x10, 0x00,
+		{ 'N',  'V',  '1',  '2', 0x00, 0x00, 0x10, 0x00,
 		 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71},
 	.bBitsPerPixel		= 12,
 	.bDefaultFrameIndex	= 1,
@@ -1158,7 +1325,7 @@ static struct uvc_format_uncompressed M_uvc_format_nv12	= {
 	.bCopyProtect		= 0,
 };
 
-static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_nv12_320p =	{
+static struct UVC_FRAME_UNCOMPRESSED(1) M_uvc_frame_nv12_320p = {
 	.bLength		= UVC_DT_FRAME_UNCOMPRESSED_SIZE(1),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FRAME_UNCOMPRESSED,
@@ -1174,7 +1341,7 @@ static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_nv12_320p =	{
 	.dwFrameInterval[0]	= cpu_to_le32(333333),
 };
 
-static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_nv12_480p =	{
+static struct UVC_FRAME_UNCOMPRESSED(1) M_uvc_frame_nv12_480p = {
 	.bLength		= UVC_DT_FRAME_UNCOMPRESSED_SIZE(1),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FRAME_UNCOMPRESSED,
@@ -1199,14 +1366,14 @@ static struct uvc_color_matching_descriptor M_uvc_color_matching_nv12 = {
 	.bMatrixCoefficients	= 4,
 };
 
-static struct uvc_format_uncompressed M_uvc_format_i420	= {
+static struct uvc_format_uncompressed M_uvc_format_i420 = {
 	.bLength		= UVC_DT_FORMAT_UNCOMPRESSED_SIZE,
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FORMAT_UNCOMPRESSED,
 	.bFormatIndex		= 5,
 	.bNumFrameDescriptors	= 2,
 	.guidFormat		=
-		{ 'I',	'4',  '2',  '0', 0x00, 0x00, 0x10, 0x00,
+		{ 'I',  '4',  '2',  '0', 0x00, 0x00, 0x10, 0x00,
 		 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71},
 	.bBitsPerPixel		= 12,
 	.bDefaultFrameIndex	= 1,
@@ -1216,7 +1383,7 @@ static struct uvc_format_uncompressed M_uvc_format_i420	= {
 	.bCopyProtect		= 0,
 };
 
-static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_i420_320p =	{
+static struct UVC_FRAME_UNCOMPRESSED(1) M_uvc_frame_i420_320p = {
 	.bLength		= UVC_DT_FRAME_UNCOMPRESSED_SIZE(1),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FRAME_UNCOMPRESSED,
@@ -1232,7 +1399,7 @@ static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_i420_320p =	{
 	.dwFrameInterval[0]	= cpu_to_le32(333333),
 };
 
-static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_i420_480p =	{
+static struct UVC_FRAME_UNCOMPRESSED(1) M_uvc_frame_i420_480p = {
 	.bLength		= UVC_DT_FRAME_UNCOMPRESSED_SIZE(1),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FRAME_UNCOMPRESSED,
@@ -1257,14 +1424,14 @@ static struct uvc_color_matching_descriptor M_uvc_color_matching_i420 = {
 	.bMatrixCoefficients	= 4,
 };
 
-static struct uvc_format_uncompressed M_uvc_format_m420	= {
+static struct uvc_format_uncompressed M_uvc_format_m420 = {
 	.bLength		= UVC_DT_FORMAT_UNCOMPRESSED_SIZE,
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FORMAT_UNCOMPRESSED,
 	.bFormatIndex		= 6,
 	.bNumFrameDescriptors	= 2,
 	.guidFormat		=
-		{ 'M',	'4',  '2',  '0', 0x00, 0x00, 0x10, 0x00,
+		{ 'M',  '4',  '2',  '0', 0x00, 0x00, 0x10, 0x00,
 		 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71},
 	.bBitsPerPixel		= 12,
 	.bDefaultFrameIndex	= 1,
@@ -1274,7 +1441,7 @@ static struct uvc_format_uncompressed M_uvc_format_m420	= {
 	.bCopyProtect		= 0,
 };
 
-static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_m420_320p =	{
+static struct UVC_FRAME_UNCOMPRESSED(1) M_uvc_frame_m420_320p = {
 	.bLength		= UVC_DT_FRAME_UNCOMPRESSED_SIZE(1),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FRAME_UNCOMPRESSED,
@@ -1290,7 +1457,7 @@ static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_m420_320p =	{
 	.dwFrameInterval[0]	= cpu_to_le32(333333),
 };
 
-static struct UVC_FRAME_UNCOMPRESSED(1)	M_uvc_frame_m420_480p =	{
+static struct UVC_FRAME_UNCOMPRESSED(1) M_uvc_frame_m420_480p = {
 	.bLength		= UVC_DT_FRAME_UNCOMPRESSED_SIZE(1),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VS_FRAME_UNCOMPRESSED,
@@ -1315,22 +1482,20 @@ static struct uvc_color_matching_descriptor M_uvc_color_matching_m420 = {
 	.bMatrixCoefficients	= 4,
 };
 
-
-#define INPUT_HEADER_IDX    11
-#define INPUT_FORMAT_IDX    12
+#define VC_START_IDX 2
 #define RESOLUTION_BIT_MASK 0x1f
-#define RESOLUTION_320p     0x1
-#define RESOLUTION_480p     0x2
-#define RESOLUTION_720p     0x4
-#define RESOLUTION_1080p    0x8
-#define RESOLUTION_4k       0x10
-#define FORMAT_COUNT1       0x1
-#define FORMAT_COUNT2       0x2
-#define FORMAT_COUNT3       0x3
-#define FORMAT_COUNT4       0x4
-#define FORMAT_COUNT5       0x5
-#define FORMAT_COUNT6       0x6
-#define MAX_DESC_NUM        100
+#define RESOLUTION_320p 0x1
+#define RESOLUTION_480p 0x2
+#define RESOLUTION_720p 0x4
+#define RESOLUTION_1080p 0x8
+#define RESOLUTION_4k 0x10
+#define FORMAT_COUNT1 0x1
+#define FORMAT_COUNT2 0x2
+#define FORMAT_COUNT3 0x3
+#define FORMAT_COUNT4 0x4
+#define FORMAT_COUNT5 0x5
+#define FORMAT_COUNT6 0x6
+#define MAX_DESC_NUM 100
 
 static struct usb_descriptor_header *fsg_hs_function[MAX_DESC_NUM] = {
 #ifndef FSG_NO_OTG
@@ -1338,15 +1503,15 @@ static struct usb_descriptor_header *fsg_hs_function[MAX_DESC_NUM] = {
 #endif
 	(struct usb_descriptor_header *) &M_uvc_iad,
 	(struct usb_descriptor_header *) &M_uvc_control_intf,
-	(struct usb_descriptor_header *) &M_uvc_control_header,
-	(struct usb_descriptor_header *) &M_uvc_camera_terminal,
-	(struct usb_descriptor_header *) &M_uvc_processing,
-	(struct usb_descriptor_header *) &M_uvc_extension,
-	(struct usb_descriptor_header *) &M_uvc_output_terminal,
-	(struct usb_descriptor_header *) &hidg0_hs_in_ep_desc,
-	(struct usb_descriptor_header *) &M_uvc_control_cs_ep,
-	(struct usb_descriptor_header *) &M_uvc_streaming_intf_alt0,
-	(struct usb_descriptor_header *) &fsg_hs_bulk_in_desc,
+	//(struct usb_descriptor_header *) &M_uvc_control_header,
+	//(struct usb_descriptor_header *) &M_uvc_camera_terminal,
+	//(struct usb_descriptor_header *) &M_uvc_processing,
+	//(struct usb_descriptor_header *) &M_uvc_extension,
+	//(struct usb_descriptor_header *) &M_uvc_output_terminal,
+	//(struct usb_descriptor_header *) &hidg0_hs_in_ep_desc,
+	//(struct usb_descriptor_header *) &M_uvc_control_cs_ep,
+	//(struct usb_descriptor_header *) &M_uvc_streaming_intf_alt0,
+	//(struct usb_descriptor_header *) &fsg_hs_bulk_in_desc,
 	//(struct usb_descriptor_header *) &M_uvc_input_header,                        //fsg_hs_function[INPUT_HEADER_IDX]
 	//(struct usb_descriptor_header *) &M_uvc_format_mjpg,                         //fsg_hs_function[INPUT_FORMAT_IDX]
 	//(struct usb_descriptor_header *) &M_uvc_frame_mjpg_720p,
