@@ -469,14 +469,14 @@ static void rx_do_tasklet(unsigned long arg)
 {
 	struct rt_ep_struct 	*rt_ep;
 	struct rt_request 		*req;
-	struct usb_ep 			*ep;
+	//struct usb_ep 			*ep;
 	int						i;
 	struct rt_udc_struct 	*rt_usb = &controller;
 
 	for (i = (IN_EP_NUM+1/* EP0 */); i < RT_USB_NB_EP; i++){
 		u8 epcs;
 		rt_ep = &rt_usb->rt_ep[i];
-		ep = &rt_ep->ep;
+		//ep = &rt_ep->ep;
 
 		epcs = read_epcs(rt_ep);        
 		while(!(epcs & EP_CS_BSY)){
@@ -2342,7 +2342,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 
 	DBG;
 	if (!driver || driver->speed < USB_SPEED_FULL || !driver->bind || !driver->disconnect || !driver->setup)
-			return -EINVAL;
+		return -EINVAL;
 	if (!rt_usb)
 		return -ENODEV;
 	if (rt_usb->driver)
@@ -2365,7 +2365,6 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 	D_INI(rt_usb->dev, "<%s> registered gadget driver '%s'\n", __func__, driver->driver.name);
 	rt_udc_enable(rt_usb);
 	return 0;
-
 fail:
 	rt_usb->driver = NULL;
 	rt_usb->gadget.dev.driver = NULL;
