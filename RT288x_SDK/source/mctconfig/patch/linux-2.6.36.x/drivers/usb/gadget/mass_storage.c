@@ -46,8 +46,8 @@
 
 /*-------------------------------------------------------------------------*/
 
-#define DRIVER_DESC		"MCT camera"
-#define DRIVER_VERSION		"2009/09/11"
+#define DRIVER_DESC		"UVC Camera"
+#define DRIVER_VERSION		"2020/10/20"
 
 /*-------------------------------------------------------------------------*/
 
@@ -69,7 +69,7 @@
 #include "f_hid.c"
 #include "f_mass_storage.c"
 #include "mnspdef.h"
-
+#if 0
 static struct hidg_func_descriptor my_hid_data = {
 	.subclass		= 0, /* No subclass */
 	.protocol		= 1, /* Keyboard */
@@ -110,7 +110,8 @@ static struct hidg_func_descriptor my_hid_data = {
 		0xc0		/* END_COLLECTION                         */
 	}
 };
-
+#endif
+/*
 static struct platform_device my_hid = {
 	.name			= "hidg",
 	.id			= 0,
@@ -118,7 +119,7 @@ static struct platform_device my_hid = {
 	.resource		= 0,
 	.dev.platform_data	= &my_hid_data,
 };
-
+*/
 struct hidg_func_node {
 	struct list_head node;
 	struct hidg_func_descriptor *func;
@@ -195,15 +196,15 @@ static const struct usb_descriptor_header *otg_desc[] = {
 #define STRING_MICROSOFT_OS0_IDX	238
 #define STRING_MICROSOFT_OS1_IDX	239
 
-static char manufacturer[50] = "MCT Corp.";
+static char manufacturer[50] = "j5create";
 static char product[50] = DRIVER_DESC;
 
 static struct usb_string strings_dev[] = {
 	[STRING_MANUFACTURER_IDX].s = manufacturer,
 	[STRING_PRODUCT_IDX].s = product,
 	[STRING_CONFIGURATION_IDX].s = "Self Powered",
-	[3].s = "MCT UVC Gadget",
-	[4].s = "MCT UVC Camera",
+	[3].s = "j5create UVC Gadget",
+	[4].s = "j5create UVC Camera",
 	{  } /* end of list */
 };
 
@@ -241,7 +242,7 @@ static int __ref msg_do_config(struct usb_configuration *c)
 		.thread_exits = msg_thread_exits,
 	};
 	static struct fsg_common common;
-printk("%s, %d\n", __FUNCTION__, __LINE__);
+
 	struct fsg_common *retp;
 	struct fsg_config config;
 	int ret;
@@ -297,7 +298,7 @@ static struct usb_configuration config_driver = {
 	/* .iConfiguration = DYNAMIC */
 	.bmAttributes		= USB_CONFIG_ATT_SELFPOWER,
 };
-
+#if 0
 static int __ref hid_bind(struct usb_composite_dev *cdev)
 {
 	struct usb_gadget *gadget = cdev->gadget;
@@ -351,8 +352,7 @@ static int __ref hid_bind(struct usb_composite_dev *cdev)
 
 	return 0;
 }
-
-
+#endif
 /****************************** Gadget Bind ******************************/
 
 static int __ref msg_bind(struct usb_composite_dev *cdev)
@@ -367,8 +367,8 @@ static int __ref msg_bind(struct usb_composite_dev *cdev)
 		return -ENOMEM;
 
 	ep = usb_ep_autoconfig(gadget, &hidg0_hs_in_ep_desc);
-	ep = usb_ep_autoconfig(gadget, &hidg1_hs_in_ep_desc);
-	ep = usb_ep_autoconfig(gadget, &hidg2_hs_in_ep_desc);
+	//ep = usb_ep_autoconfig(gadget, &hidg1_hs_in_ep_desc);
+	//ep = usb_ep_autoconfig(gadget, &hidg2_hs_in_ep_desc);
 	ep->driver_data = &config_driver.cdev;	/* claim */
 	g_hidg->in_ep = ep;
 
@@ -436,7 +436,7 @@ static int __ref msg_bind(struct usb_composite_dev *cdev)
 
 
 /****************************** Some noise ******************************/
-
+#if 0
 static int __init hidg_plat_driver_probe(struct platform_device *pdev)
 {
 	struct hidg_func_descriptor *func = pdev->dev.platform_data;
@@ -468,14 +468,14 @@ static int __devexit hidg_plat_driver_remove(struct platform_device *pdev)
 
 	return 0;
 }
-
+#endif
 static struct usb_composite_driver msg_driver = {
 	.name		= "g_mass_storage",
 	.dev		= &msg_device_desc,
 	.strings	= dev_strings,
 	.bind		= msg_bind,
 };
-
+/*
 static struct platform_driver hidg_plat_driver = {
 	.remove		= __devexit_p(hidg_plat_driver_remove),
 	.driver		= {
@@ -483,7 +483,7 @@ static struct platform_driver hidg_plat_driver = {
 		.name	= "hidg",
 	},
 };
-
+*/
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_AUTHOR("Michal Nazarewicz");
 MODULE_LICENSE("GPL");
@@ -493,13 +493,11 @@ static int __init msg_init(void)
 	//int status;
 
 	//platform_device_register(&my_hid);
-	//open_1280x720JPG(&UVC_Buff[2], 97549);
 	//status = platform_driver_probe(&hidg_plat_driver,
 	//			hidg_plat_driver_probe);
-	//printk("Louis 1\n");
+	//printk("===== msg_init =====\n");
 	//if (status < 0)
 	//	return status;
-	//printk("Louis 2\n");	
 	return usb_composite_register(&msg_driver);
 }
 module_init(msg_init);
