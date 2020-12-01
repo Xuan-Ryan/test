@@ -269,7 +269,8 @@ struct interrupt_data {
 
 
 /*-------------------------------------------------------------------------*/
-
+#define INPUT_HEADER_IDX 11
+#define INPUT_FORMAT_IDX 12
 
 struct fsg_lun {
 	struct file	*filp;
@@ -1299,8 +1300,7 @@ static struct uvc_color_matching_descriptor M_uvc_color_matching_m420 = {
 	.bMatrixCoefficients	= 4,
 };
 
-#define INPUT_HEADER_IDX 11
-#define INPUT_FORMAT_IDX 12
+#define VC_START_IDX 2
 #define RESOLUTION_BIT_MASK 0xf
 #define RESOLUTION_320p 0x1
 #define RESOLUTION_480p 0x2
@@ -1329,7 +1329,7 @@ static struct usb_descriptor_header *fsg_hs_function[MAX_DESC_NUM] = {
 	(struct usb_descriptor_header *) &M_uvc_control_cs_ep,
 	(struct usb_descriptor_header *) &M_uvc_streaming_intf_alt0,
 	(struct usb_descriptor_header *) &fsg_hs_bulk_in_desc,
-	//(struct usb_descriptor_header *) &M_uvc_input_header,                        //fsg_hs_function[INPUT_HEADER_IDX]
+	(struct usb_descriptor_header *) &M_uvc_input_header,                        //fsg_hs_function[INPUT_HEADER_IDX]
 	//(struct usb_descriptor_header *) &M_uvc_format_mjpg,                         //fsg_hs_function[INPUT_FORMAT_IDX]
 	//(struct usb_descriptor_header *) &M_uvc_frame_mjpg_720p,
 	//(struct usb_descriptor_header *) &M_uvc_frame_mjpg_1080p,
