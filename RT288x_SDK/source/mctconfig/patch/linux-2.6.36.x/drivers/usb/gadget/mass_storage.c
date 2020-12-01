@@ -196,10 +196,11 @@ static const struct usb_descriptor_header *otg_desc[] = {
 #define STRING_MICROSOFT_OS1_IDX	239
 
 static char manufacturer[50] = "MCT Corp.";
+static char product[50] = DRIVER_DESC;
 
 static struct usb_string strings_dev[] = {
 	[STRING_MANUFACTURER_IDX].s = manufacturer,
-	[STRING_PRODUCT_IDX].s = DRIVER_DESC,
+	[STRING_PRODUCT_IDX].s = product,
 	[STRING_CONFIGURATION_IDX].s = "Self Powered",
 	[3].s = "MCT UVC Gadget",
 	[4].s = "MCT UVC Camera",
@@ -240,7 +241,7 @@ static int __ref msg_do_config(struct usb_configuration *c)
 		.thread_exits = msg_thread_exits,
 	};
 	static struct fsg_common common;
-
+printk("%s, %d\n", __FUNCTION__, __LINE__);
 	struct fsg_common *retp;
 	struct fsg_config config;
 	int ret;
@@ -489,16 +490,16 @@ MODULE_LICENSE("GPL");
 
 static int __init msg_init(void)
 {
-	int status;
+	//int status;
 
 	//platform_device_register(&my_hid);
-	open_1280x720JPG(&UVC_Buff[2], 97549);
+	//open_1280x720JPG(&UVC_Buff[2], 97549);
 	//status = platform_driver_probe(&hidg_plat_driver,
 	//			hidg_plat_driver_probe);
-	printk("Louis 1\n");
-	if (status < 0)
-		return status;
-	printk("Louis 2\n");	
+	//printk("Louis 1\n");
+	//if (status < 0)
+	//	return status;
+	//printk("Louis 2\n");	
 	return usb_composite_register(&msg_driver);
 }
 module_init(msg_init);

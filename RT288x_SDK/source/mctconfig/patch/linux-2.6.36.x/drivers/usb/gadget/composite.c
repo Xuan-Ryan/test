@@ -81,9 +81,38 @@
 #define UVC_GET_MAX					0x83
 #define UVC_GET_RES					0x84
 #define UVC_GET_LEN					0x85
-#define UVC_GET_INFO				0x86
+#define UVC_GET_INFO					0x86
 #define UVC_GET_DEF					0x87
+#define UVC_GET_STAT					0x88
+#define QUERY_SETUP_DATA				0xF0
+#define CAMERA_STS_CHANGE				0xF1
+#define APPLY_DESC_CHANGE				0xF2
+
 //End UVC COMMAND
+
+//  Tiger
+__u8 current_b_request;
+unsigned current_w_value;
+
+unsigned int g_uvc_mjpeg_res_bitflag = 0x04;
+unsigned int g_uvc_h264_res_bitflag= 0x0;
+unsigned int g_uvc_yuv_res_bitflag= 0x0;
+unsigned int g_uvc_nv12_res_bitflag= 0x0;
+unsigned int g_uvc_i420_res_bitflag= 0x0;
+unsigned int g_uvc_m420_res_bitflag= 0x0;
+
+unsigned int g_uvc_camera_terminal_controlbit = 0x0;
+unsigned int g_uvc_processing_controlbit = 0x0;
+
+module_param(g_uvc_mjpeg_res_bitflag, uint, S_IRWXU|S_IRWXG);
+module_param(g_uvc_h264_res_bitflag, uint, S_IRWXU|S_IRWXG);
+module_param(g_uvc_yuv_res_bitflag, uint, S_IRWXU|S_IRWXG);
+module_param(g_uvc_nv12_res_bitflag, uint, S_IRWXU|S_IRWXG);
+module_param(g_uvc_i420_res_bitflag, uint, S_IRWXU|S_IRWXG);
+module_param(g_uvc_m420_res_bitflag, uint, S_IRWXU|S_IRWXG);
+
+module_param(g_uvc_camera_terminal_controlbit, uint, S_IRWXU|S_IRWXG);
+module_param(g_uvc_processing_controlbit, uint, S_IRWXU|S_IRWXG);
 
 /*
  * The code in this file is utility code, used to build a gadget driver
@@ -100,6 +129,7 @@ static unsigned int bit_rate_control = 10;
 static unsigned int compress_rate = 70;
 static unsigned int skip_rate_control = 7800;
 extern wait_queue_head_t gUVCwq;
+wait_queue_head_t gUVCioctl;
 
 /* Some systems will need runtime overrides for the  product identifers
  * published in the device descriptor, either numbers or strings or both.
@@ -134,6 +164,19 @@ module_param(bit_rate_control, uint, S_IRWXU|S_IRWXG);
 module_param(compress_rate, uint, S_IRWXU|S_IRWXG);
 module_param(skip_rate_control, uint, S_IRWXU|S_IRWXG);
 /*-------------------------------------------------------------------------*/
+
+extern unsigned char g_incomplete;
+unsigned char g_ioctlincomplete = 0;
+
+static struct work_struct ioctl_bottem_work;
+
+#define CY_FX_UVC_MAX_PROBE_SETTING     34
+
+struct uvc_state {
+	unsigned char setuptoken_8byte[8];
+	__u32 status;
+	unsigned char prob_ctrl[CY_FX_UVC_MAX_PROBE_SETTING];
+} mct_uvc_data;
 
 /**
  * usb_add_function() - add a function to a configuration
@@ -819,6 +862,7 @@ static void hex_dump(unsigned char *buf, int len)
 {
 	while (len--)
 		printk("%02x,", *buf++);
+	printk("\n");
 }
 
 #define UDP_CURSORBLOCK_SIZE 8
@@ -847,65 +891,46 @@ extern void wakeup_thread(struct fsg_common *common);
 extern unsigned int udp_send_total_bytes;
 extern unsigned char shapeusbin[10];
 
+void ioctl_bottem_notify(struct work_struct *work)
+{
+	g_ioctlincomplete = 1;
+	wake_up(&gUVCioctl);//for user
+}
+
+unsigned char glProbeCtrl[CY_FX_UVC_MAX_PROBE_SETTING] = {
+    0x00,0x00,                       /* bmHint : No fixed parameters */
+    0x01,                            /* Use 1st Video format index */
+    0x03,                            /* Use 1st Video frame index */
+    0x15,0x16,0x05,0x00,             /* Desired frame interval in 100ns */
+    0x00,0x00,                       /* Key frame rate in key frame/video frame units */
+    0x00,0x00,                       /* PFrame rate in PFrame / key frame units */
+    0x00,0x00,                       /* Compression quality control */
+    0x00,0x00,                       /* Window size for average bit rate */
+    0x00,0x00,                       /* Internal video streaming i/f latency in ms */
+    0x00,0x30,0x2A,0x00,             /* Max video frame size in bytes */
+    0x00,0x30,0x2A,0x00,             /* No. of bytes device can transmit in single payload */
+    0x00,0x6C,0xDC,0x02,
+    0x03,0x01,0x01,0x02,
+};
+
+#define MCT_UVC_DATA_SIZE                     CY_FX_UVC_MAX_PROBE_SETTING+12
+
 static void composite_setup_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	//hex_dump(req->buf, req->length);
 	//printk("SHAPECOM:%x,%x\n",ep0_setup_dir,t6_vendor_cmd);
-	MNSPXACTHDR udp_hdr;
-	int udp_send_size;
+
 	if(ep0_setup_dir & 0x80)//get
 	{
-
 	}
 	else//set
 	{
-		hex_dump(req->buf, req->length);
-		if(t6_vendor_cmd == VENDOR_REQ_SET_CURSOR_SHAPE || t6_vendor_cmd == VENDOR_REQ_SET_CURSOR1_SHAPE || t6_vendor_cmd == VENDOR_REQ_SET_CURSOR2_SHAPE)
-		{
-			//if(g_UCURconn_socket)
-			{
-				udp_hdr.Tag = MNSP_TAG;
-				udp_hdr.XactType = MNSP_XACTTYPE_CURSOR;
-				udp_hdr.HdrSize = sizeof(udp_hdr);
-				udp_hdr.XactId = g_udp_control_XactId;
-				udp_hdr.XactOffset = 0;
-				udp_hdr.PayloadLength = (UDP_CURSORSHAPEBLOCK_SIZE + UDP_CURSORBLOCK_SIZE)*(g_cursor_buf_offset+1);
-				udp_hdr.TotalLength = (UDP_CURSORSHAPEBLOCK_SIZE + UDP_CURSORBLOCK_SIZE)*(g_cursor_buf_offset+1);
-				//memcpy(g_udp_cursor_buf, &udp_hdr, sizeof(udp_hdr));
-				//memcpy(&g_udp_cursor_buf[sizeof(udp_hdr)+UDP_CURSORBLOCK_SIZE], req->buf, UDP_CURSORSHAPEBLOCK_SIZE);
-				//wakeup_thread(&cursor_udp_common);
-
-				memcpy(g_udp_cursor_shape_buf[g_cursor_shape_idx], &udp_hdr, sizeof(udp_hdr));
-				memcpy(&g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+(UDP_CURSORBLOCK_SIZE*(g_cursor_buf_offset+1)+UDP_CURSORSHAPEBLOCK_SIZE*g_cursor_buf_offset)],req->buf,UDP_CURSORSHAPEBLOCK_SIZE);
-				if(g_cursor_buf_offset == 0)
-				{
-					g_cursor_shape_width = g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+UDP_CURSORBLOCK_SIZE+2] + (g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+UDP_CURSORBLOCK_SIZE+3]<<8);
-					g_cursor_shape_height = g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+UDP_CURSORBLOCK_SIZE+4] + (g_udp_cursor_shape_buf[g_cursor_shape_idx][sizeof(udp_hdr)+UDP_CURSORBLOCK_SIZE+5]<<8);
-				}
-				//printk("w h off %d %d %d\n",g_cursor_shape_width,g_cursor_shape_height,g_cursor_buf_offset);
-				if(g_cursor_buf_offset*512 == g_cursor_shape_width*g_cursor_shape_height*4)
-				{
-					//spin_lock_irqsave(&cursor_lock, cursor_flags);
-					smp_wmb();
-					//shapeusbin[g_cursor_shape_idx] = 1;
-					//wakeup_thread(&cursor_tcp_common);
-				}
-				//if(g_UCURconn_socket)
-				//{
-				//	udp_send_size = ksocket_send(g_UCURconn_socket, &g_UCURsaddr, g_udp_cursor_buf, UDP_CURSORDATABLOCK_SIZE);
-				//	udp_send_total_bytes = udp_send_total_bytes + udp_send_size;
-				//	udp_send_size = ksocket_send(g_UCURconn_socket, &g_UCURsaddr, g_udp_cursor_buf, UDP_CURSORDATABLOCK_SIZE);
-				//	udp_send_total_bytes = udp_send_total_bytes + udp_send_size;
-				//	udp_send_size = ksocket_send(g_UCURconn_socket, &g_UCURsaddr, g_udp_cursor_buf, UDP_CURSORDATABLOCK_SIZE);
-				//	udp_send_total_bytes = udp_send_total_bytes + udp_send_size;
-				//	g_udp_control_XactId++;
-				//}
-			}
+		if (req->length > 4) {
+			glProbeCtrl[2] = *((char *)(req->buf)+2);
+			glProbeCtrl[3] = *((char *)(req->buf)+3);
 		}
-		else if(t6_vendor_cmd == VENDOR_REQ_SET_CURSOR1_POS || t6_vendor_cmd == VENDOR_REQ_SET_CURSOR2_POS || t6_vendor_cmd == VENDOR_REQ_SET_CURSOR1_STATE || t6_vendor_cmd == VENDOR_REQ_SET_CURSOR2_STATE)
-		{
-
-		}
+		memcpy(mct_uvc_data.prob_ctrl, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+		schedule_work(&ioctl_bottem_work);
 	}
 
 	if (req->status || req->actual != req->length)
@@ -1123,23 +1148,6 @@ unsigned char t6rom[128] = {
 #endif
 };
 
-#define CY_FX_UVC_MAX_PROBE_SETTING 34
-unsigned char glProbeCtrl[CY_FX_UVC_MAX_PROBE_SETTING] = {
-    0x00,0x00,                       /* bmHint : No fixed parameters */
-    0x01,                            /* Use 1st Video format index */
-    0x01,                            /* Use 1st Video frame index */
-    0x15,0x16,0x05,0x00,             /* Desired frame interval in 100ns */
-    0x00,0x00,                       /* Key frame rate in key frame/video frame units */
-    0x00,0x00,                       /* PFrame rate in PFrame / key frame units */
-    0x00,0x00,                       /* Compression quality control */
-    0x00,0x00,                       /* Window size for average bit rate */
-    0x00,0x00,                       /* Internal video streaming i/f latency in ms */
-    0x00,0x30,0x2A,0x00,             /* Max video frame size in bytes */
-    0x00,0x30,0x2A,0x00,             /* No. of bytes device can transmit in single payload */
-    0x00,0x6C,0xDC,0x02,
-    0x03,0x01,0x01,0x02,
-};
-
 extern struct fsg_common *g_userspaceUVC_common;
 extern unsigned char g_start_transfer;
 
@@ -1150,8 +1158,7 @@ extern unsigned char g_start_transfer;
  * housekeeping for the gadget function we're implementing.  Most of
  * the work is in config and function specific setup.
  */
-static int
-composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
+static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 {
 	struct usb_composite_dev	*cdev = get_gadget_data(gadget);
 	struct usb_request		*req = cdev->req;
@@ -1759,22 +1766,21 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	}
 	else if(((ctrl->bRequestType) & USB_TYPE_CLASS) == USB_TYPE_CLASS)
 	{
-		printk("USB_TYPE_CLASS\n");
+		//printk("USB_TYPE_CLASS\n");
 		switch (ctrl->bRequest)
 		{
 			case 0x0A:
 				value = 0x00;
 				break;
-			//case 0x01: //T6 CMD
-			//	memcpy(req->buf, "\x04\x00\x02\x01\x00\x00\x00\x00", 8);
-			//	value = 0x08;
-			//	break;
 			case UVC_SET_CUR:
 				switch(w_value)
 				{
 					case 0x200://start streaming
-						printk("Start Web_UVC\n");
+						printk("Start Streaming\n");
 						//wakeup_thread(g_userspaceUVC_common);//for kernel
+						current_b_request = ctrl->bRequest;
+						current_w_value = w_value;
+						mct_uvc_data.status = 0x01;
 						break;
 					case 0x100:
 						
@@ -1851,15 +1857,13 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	}
 	else if(((ctrl->bRequestType) & USB_TYPE_STANDARD) == USB_TYPE_STANDARD)
 	{
-		printk("USB_TYPE_STANDARD\n");
+		//printk("USB_TYPE_STANDARD: w_value=%04X, w_index=%04X\n", w_value, w_index);
 		switch (ctrl->bRequest) {
-
 		/* we handle all standard USB descriptors */
 		case USB_REQ_GET_DESCRIPTOR:
 			if ((ctrl->bRequestType & USB_DIR_IN) != USB_DIR_IN)
 				goto unknown;
 			switch (w_value >> 8) {
-
 			case USB_DT_DEVICE:
 				cdev->desc.bNumConfigurations =
 					count_configs(cdev, USB_DT_DEVICE);
@@ -1883,8 +1887,7 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 					value = min(w_length, (u16) value);
 				break;
 			case USB_DT_STRING:
-				value = get_string(cdev, req->buf,
-						w_index, w_value & 0xff);
+				value = get_string(cdev, req->buf, w_index, w_value & 0xff);
 				if (value >= 0)
 					value = min(w_length, (u16) value);
 				break;
@@ -1976,13 +1979,16 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			{
 				if(w_index == 0x82)//stop UVC bulk streaming
 				{
-					printk("Stop Web_UVC\n");
+					printk("Stop Streaming\n");
+					current_b_request = ctrl->bRequest;
+					current_w_value = w_value;
+					mct_uvc_data.status = 0x02;
 				}
 			}
 			value = 0;
 			break;
 		default:
-	unknown:
+unknown:
 			VDBG(cdev,
 				"non-core control req%02x.%02x v%04x i%04x l%d\n",
 				ctrl->bRequestType, ctrl->bRequest,
@@ -2309,15 +2315,12 @@ static struct usb_gadget_driver composite_driver = {
  */
 
 int WebUVCMajor;
-extern unsigned char g_incomplete;
 
 extern u32 reg_read(u32 addr);
 extern void reg_write(u32 addr, u32 value);
-	
 int device_open(struct inode *inode, struct file *filp)
 {
-	printk("WebUVCO\n");
-	init_waitqueue_head(&gUVCwq);
+	//printk("WebUVCO\n");
 	return 0;
 }
 
@@ -2331,7 +2334,7 @@ extern int Disable_UVC_Bulk(struct fsg_common *common);
 
 int device_read(struct file *filp, char __user *buf, size_t count, loff_t *offset)
 {
-	unsigned int temp;
+	//unsigned int temp;
 	printk("WebUVCR\n");
 	//reg_write(0xB0000034, 0x02000000);
 	//temp = reg_read(0xB0000030);
@@ -2347,19 +2350,52 @@ extern int send_UVB_bulk_usr(struct fsg_common *common, unsigned int length, uns
 
 int device_write(struct file *filp, const char __user *buf, size_t count, loff_t *offset)
 {
-	//printk("WebUVCW\n");
 	unsigned char UVC_Buff[512];
-	copy_from_user(UVC_Buff, buf, count);
 	g_incomplete = 0;
+	copy_from_user(UVC_Buff, buf, count);
 	send_UVB_bulk_usr(g_userspaceUVC_common, count, UVC_Buff);
 	wait_event_interruptible(gUVCwq, g_incomplete);
 	return 0;
 }
 
-int device_ioctl(struct file *file, unsigned int cmd, unsigned long data)
+typedef struct _uvc_capabilities_data{
+	unsigned int mjpeg;
+	unsigned int h264;
+	unsigned int yuv;
+	unsigned int nv12;
+	unsigned int i420;
+	unsigned int m420;
+	unsigned int camera;
+	unsigned int process;
+}UVC_CAPABILITIES_DATA;
+
+long device_ioctl(struct file *file, unsigned int cmd, unsigned long data)
 {
-	g_incomplete = 0;
-	wait_event_interruptible(gUVCwq, g_incomplete);
+	UVC_CAPABILITIES_DATA capabilities;
+
+	switch (cmd) {
+	case UVC_GET_STAT:
+		//printk("UVC_GET_STAT:    ");
+		wait_event_interruptible(gUVCioctl, g_ioctlincomplete);
+		g_ioctlincomplete = 0;
+		copy_to_user((char*)data, &mct_uvc_data, MCT_UVC_DATA_SIZE);
+		break;
+	case CAMERA_STS_CHANGE:
+		copy_from_user(&capabilities, data, sizeof(capabilities));
+		g_uvc_camera_terminal_controlbit = capabilities.camera;
+		g_uvc_processing_controlbit = capabilities.process;
+		g_uvc_mjpeg_res_bitflag = capabilities.mjpeg;
+		g_uvc_h264_res_bitflag = capabilities.h264;
+		g_uvc_yuv_res_bitflag = capabilities.yuv;
+		g_uvc_nv12_res_bitflag = capabilities.nv12;
+		g_uvc_i420_res_bitflag = capabilities.i420;
+		g_uvc_m420_res_bitflag = capabilities.m420;
+		break;
+	case APPLY_DESC_CHANGE:
+		break;
+	case QUERY_SETUP_DATA:
+		break;
+	}
 	return 0;
 }
 
@@ -2371,7 +2407,7 @@ struct file_operations webUVCfops = {
   release : device_release,
   unlocked_ioctl : device_ioctl,
 };
-  
+
 #define WEBUVC_DEVICE_NAME "Web_UVC0"
 
 int usb_composite_register(struct usb_composite_driver *driver)
@@ -2387,11 +2423,15 @@ int usb_composite_register(struct usb_composite_driver *driver)
 
 	WebUVCMajor = register_chrdev(255, WEBUVC_DEVICE_NAME, &webUVCfops);
 
-	printk("reg Web_UVC0\n");
+	init_waitqueue_head(&gUVCwq);
+	init_waitqueue_head(&gUVCioctl);
+	INIT_WORK(&ioctl_bottem_work, ioctl_bottem_notify);
+
+	//printk("reg Web_UVC0\n");
 	if (WebUVCMajor < 0) {
-    	printk("Register char device Web_UVC0 fail\n");
-    	return WebUVCMajor;
-    }
+		printk("Register char device Web_UVC0 fail\n");
+		return WebUVCMajor;
+	}
 
 	return usb_gadget_register_driver(&composite_driver);
 }
