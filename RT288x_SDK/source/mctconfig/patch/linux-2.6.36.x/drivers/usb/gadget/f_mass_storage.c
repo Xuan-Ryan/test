@@ -326,6 +326,7 @@ static const char fsg_string_interface[] = "Mass Storage";
 #include "storage_common.c"
 
 
+#define	TIGER_COMMENTOUT         1
 /*-------------------------------------------------------------------------*/
 
 struct fsg_dev;
@@ -813,7 +814,7 @@ static int fsg_setup(struct usb_function *f,
 
 			break;
 		}
-		return;
+		return 0;
 	}
 
 	VDBG(fsg,
@@ -1063,8 +1064,8 @@ struct sockaddr_in g_Usaddr;
 struct sockaddr_in g_UCURsaddr;
 struct sockaddr_in g_TCURsaddr;
 struct sockaddr_in g_TROMsaddr;
-struct usb_udp_pingpong* pingpong[2];
-struct usb_udp_pingpong* stable_bps_pingpong[3];
+struct usb_udp_pingpong* pingpong[2] = {NULL, NULL};
+struct usb_udp_pingpong* stable_bps_pingpong[3] = {NULL, NULL, NULL};
 unsigned char g_destip[5] = {192,168,2,185,'\0'};
 static unsigned int from_bc_uint_destip = 0;
 static unsigned int from_rx_current_bps = 10*2*1024*1024;//2sec broadcast once
@@ -1238,10 +1239,11 @@ int update_FW_by_USB(unsigned int len)
 #endif
 }
 
-uint64_t GetTimeStamp() {
-    struct timeval tv;
-    do_gettimeofday(&tv);
-    return tv.tv_sec*(uint64_t)1000000+tv.tv_usec;
+uint64_t GetTimeStamp(void)
+{
+	struct timeval tv;
+	do_gettimeofday(&tv);
+	return tv.tv_sec*(uint64_t)1000000+tv.tv_usec;
 }
 
 u32 reg_read(u32 addr)
@@ -1533,7 +1535,7 @@ static int do_write(struct fsg_common *common)
 			udp_hdr.XactOffset = temp_XactOffset;
 			//printk("temp_XactOffset1:%d, %d, %d\n", temp_XactOffset, amount_left_to_req, udp_block_write);
 			memcpy(temppingpong->buf, &udp_hdr, sizeof(udp_hdr));
-			memcpy(&temppingpong->buf[sizeof(udp_hdr)], &bh->outreq->buf[udp_block_write], amount_left_to_write - udp_block_write);
+			memcpy(&temppingpong->buf[sizeof(udp_hdr)], &((char *)bh->outreq->buf)[udp_block_write], amount_left_to_write - udp_block_write);
 			temp_XactOffset = temp_XactOffset + amount_left_to_write - udp_block_write;
 			udp_block_write = UDP_DATABLOCK_SIZE - amount_left_to_write + udp_block_write - sizeof(udp_hdr);
 		}
@@ -2554,6 +2556,7 @@ static int finish_reply(struct fsg_common *common)
 }
 
 wait_queue_head_t gUVCwq;
+wait_queue_head_t gUVCioctl;
 int send_UVB_bulk_usr(struct fsg_common *common, unsigned int length, unsigned char *UVCbuf)
 {
 	struct fsg_lun		*curlun = common->curlun;
@@ -2629,11 +2632,13 @@ int send_UVB_bulk(struct fsg_common *common, unsigned int length, unsigned char 
 int Enable_UVC_Bulk(struct fsg_common *common)
 {
 	usb_ep_enable(common->fsg->bulk_in, &fsg_hs_bulk_in_desc);
+	return 0;
 }
 
 int Disable_UVC_Bulk(struct fsg_common *common)
 {
 	usb_ep_disable(common->fsg->bulk_in);
+	return 0;
 }
 
 static int send_status(struct fsg_common *common)
@@ -3756,7 +3761,7 @@ u32 create_address(u8 *ip)
 static unsigned char hid_udp_buf[WACOM_TOUCH_LEN];
 static unsigned char usb_in_idx = 0;
 static unsigned char socket_out_idx = 0;
-
+#if TIGER_COMMENTOUT
 static int stable_bps_ksocket_send_thread(struct fsg_common	*common)
 {
 	struct usb_udp_pingpong* ksocket_send_pingpong = stable_bps_pingpong[0];
@@ -3844,6 +3849,7 @@ static int stable_bps_ksocket_send_thread(struct fsg_common	*common)
 			msleep(2*1000*UDP_DATABLOCK_SIZE/from_rx_current_bps);
 		}
 	}
+	return 0;
 }
 
 static int hid_udp_main_thread(void)
@@ -3864,6 +3870,7 @@ static int hid_udp_main_thread(void)
 		my_f_hidg_write(hid_udp_buf, ret);
 		sleep_thread(&hid_udp_common);
 	}
+	return 0;
 }
 extern unsigned char t6_vendor_cmd;
 spinlock_t cursor_lock;
@@ -3888,6 +3895,7 @@ static int cursor_udp_main_thread(void)
 		smp_wmb();
 		spin_unlock_irqrestore(&cursor_lock, cursor_flags);
 	}
+	return 0;
 }
 
 static int cursor_tcp_main_thread(void)
@@ -3947,6 +3955,7 @@ static int cursor_tcp_main_thread(void)
 		smp_wmb();
 		spin_unlock_irqrestore(&cursor_lock, cursor_flags);
 	}
+	return 0;
 }
 
 unsigned char g_led_blink_lv = 0;
@@ -4010,7 +4019,7 @@ static int led_blink_lv_main_thread(void)
 		msleep(1000);
 	}
 }
-
+#endif
 #define SERVER_IP_NAME  "br0"
 int tcp_buf_n = 4*1024*1024;
 int udp_buf_n = 4*1024*1024;
@@ -4037,12 +4046,15 @@ u32 get_default_ipaddr_by_devname(struct socket *sock, const char *devname)
 	return addr;
 }
 
+//  tiger
+int fsg_main_thread_running = 0;
 unsigned char UVC_Buff[0x20000];
 
 static int fsg_main_thread(void *common_)
 {
-    int ret = -1;
 	struct fsg_common	*common = common_;
+#if TIGER_COMMENTOUT
+	int ret = -1;
 	struct task_struct	*hid_udp_thread_task;
 	struct task_struct	*cursor_udp_thread_task;
 	struct task_struct	*cursor_tcp_thread_task;
@@ -4050,7 +4062,7 @@ static int fsg_main_thread(void *common_)
 	struct task_struct	*led_blink_lv_thread_task;
 	struct timeval tv;
 	unsigned int test_jpg_offset;
-	
+
 	pingpong[0] = kzalloc(sizeof *pingpong[0], GFP_KERNEL);
 	pingpong[1] = kzalloc(sizeof *pingpong[1], GFP_KERNEL);
 	pingpong[0]->buf = kmalloc(UDP_DATABLOCK_SIZE, GFP_KERNEL);
@@ -4091,15 +4103,15 @@ static int fsg_main_thread(void *common_)
 	//stable_bps_pingpong[3]->validblockcount = 0;
 	//stable_bps_pingpong[4]->validblockcount = 0;
 	g_temp_bps_pingpong = stable_bps_pingpong[0];
-	
+#endif
 	/* Allow the thread to be killed by a signal, but set the signal mask
 	 * to block everything but INT, TERM, KILL, and USR1. */
 	allow_signal(SIGINT);
 	allow_signal(SIGTERM);
 	allow_signal(SIGKILL);
 	allow_signal(SIGUSR1);
+#if TIGER_COMMENTOUT
 	printk("from_bc_uint_destip:%x %x\n",from_bc_uint_destip,htonl(create_address(g_destip)));
-	
 	DECLARE_WAIT_QUEUE_HEAD(recv_wait);
 	ret = sock_create(AF_INET, SOCK_DGRAM, IPPROTO_UDP, &g_Tconn_socket);
 	if(ret < 0)
@@ -4132,60 +4144,60 @@ static int fsg_main_thread(void *common_)
 		//goto err;
 	}
 	memset(&g_Tsaddr, 0, sizeof(g_Tsaddr));
-    g_Tsaddr.sin_family = AF_INET;
-    g_Tsaddr.sin_port = htons(TCP_PORT);
+	g_Tsaddr.sin_family = AF_INET;
+	g_Tsaddr.sin_port = htons(TCP_PORT);
 	g_Tsaddr.sin_addr.s_addr = get_default_ipaddr_by_devname(g_Tconn_socket, SERVER_IP_NAME);
 	memset(&g_Usaddr, 0, sizeof(g_Usaddr));
-    g_Usaddr.sin_family = AF_INET;
-    g_Usaddr.sin_port = htons(UDP_PORT);
-    //g_Usaddr.sin_addr.s_addr = htonl(create_address(g_destip));
+	g_Usaddr.sin_family = AF_INET;
+	g_Usaddr.sin_port = htons(UDP_PORT);
+	//g_Usaddr.sin_addr.s_addr = htonl(create_address(g_destip));
 	g_Usaddr.sin_addr.s_addr = from_bc_uint_destip;
 	memset(&g_UCURsaddr, 0, sizeof(g_UCURsaddr));
-    g_UCURsaddr.sin_family = AF_INET;
-    g_UCURsaddr.sin_port = htons(CURSOR_PORT);
-    //g_UCURsaddr.sin_addr.s_addr = htonl(create_address(g_destip));
+	g_UCURsaddr.sin_family = AF_INET;
+	g_UCURsaddr.sin_port = htons(CURSOR_PORT);
+	//g_UCURsaddr.sin_addr.s_addr = htonl(create_address(g_destip));
 	g_UCURsaddr.sin_addr.s_addr = from_bc_uint_destip;
 	memset(&g_TCURsaddr, 0, sizeof(g_TCURsaddr));
-    g_TCURsaddr.sin_family = AF_INET;
-    g_TCURsaddr.sin_port = htons(CURSOR_TCP_PORT);
-    //g_TCURsaddr.sin_addr.s_addr = htonl(create_address(g_destip));
+	g_TCURsaddr.sin_family = AF_INET;
+	g_TCURsaddr.sin_port = htons(CURSOR_TCP_PORT);
+	//g_TCURsaddr.sin_addr.s_addr = htonl(create_address(g_destip));
 	g_TCURsaddr.sin_addr.s_addr = get_default_ipaddr_by_devname(g_TCURconn_socket, SERVER_IP_NAME);
 	memset(&g_TROMsaddr, 0, sizeof(g_TROMsaddr));
-    g_TROMsaddr.sin_family = AF_INET;
-    g_TROMsaddr.sin_port = htons(JWR_ROM_TCP_PORT);
-    //g_TROMsaddr.sin_addr.s_addr = htonl(create_address(g_destip));
+	g_TROMsaddr.sin_family = AF_INET;
+	g_TROMsaddr.sin_port = htons(JWR_ROM_TCP_PORT);
+	//g_TROMsaddr.sin_addr.s_addr = htonl(create_address(g_destip));
 	g_TROMsaddr.sin_addr.s_addr = from_bc_uint_destip;
 
 	ret = sock_setsockopt(g_Tconn_socket, SOL_SOCKET, SO_RCVBUF, &tcp_buf_n, sizeof(tcp_buf_n));
-    if(ret && (ret != -EINPROGRESS))
-    {
-        printk(" *** Tmtp | Error: %d setsockopt. | option *** \n", ret);
-        //goto err;
-    }
+	if(ret && (ret != -EINPROGRESS))
+	{
+		printk(" *** Tmtp | Error: %d setsockopt. | option *** \n", ret);
+		//goto err;
+	}
 	ret = sock_setsockopt(g_Uconn_socket, SOL_SOCKET, SO_SNDBUF, &udp_buf_n, sizeof(udp_buf_n));
-    if(ret && (ret != -EINPROGRESS))
-    {
-        printk(" *** Umtp | Error: %d setsockopt. | option *** \n", ret);
-        //goto err;
-    }
+	if(ret && (ret != -EINPROGRESS))
+	{
+		printk(" *** Umtp | Error: %d setsockopt. | option *** \n", ret);
+		//goto err;
+	}
 	ret = sock_setsockopt(g_UCURconn_socket, SOL_SOCKET, SO_SNDBUF, &curudp_buf_n, sizeof(curudp_buf_n));
-    if(ret && (ret != -EINPROGRESS))
-    {
-        printk(" *** UCURmtp | Error: %d setsockopt. | option *** \n", ret);
-        //goto err;
-    }
+	if(ret && (ret != -EINPROGRESS))
+	{
+		printk(" *** UCURmtp | Error: %d setsockopt. | option *** \n", ret);
+		//goto err;
+	}
 	ret = sock_setsockopt(g_TCURconn_socket, SOL_SOCKET, SO_RCVBUF, &curtcp_buf_n, sizeof(curtcp_buf_n));
-    if(ret && (ret != -EINPROGRESS))
-    {
-        printk("0 *** TCURmtp | Error: %d setsockopt. | option *** \n", ret);
-        //goto err;
-    }
+	if(ret && (ret != -EINPROGRESS))
+	{
+		printk("0 *** TCURmtp | Error: %d setsockopt. | option *** \n", ret);
+		//goto err;
+	}
 	ret = sock_setsockopt(g_TROMconn_socket, SOL_SOCKET, SO_SNDBUF, &romtcp_buf_n, sizeof(romtcp_buf_n));
-    if(ret && (ret != -EINPROGRESS))
-    {
-        printk(" *** TROMmtp | Error: %d setsockopt. | option *** \n", ret);
-        //goto err;
-    }
+	if(ret && (ret != -EINPROGRESS))
+	{
+		printk(" *** TROMmtp | Error: %d setsockopt. | option *** \n", ret);
+		//goto err;
+	}
 	tv.tv_sec =  1;  
 	tv.tv_usec = 0;  
 	ret = sock_setsockopt(g_TCURconn_socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
@@ -4196,23 +4208,23 @@ static int fsg_main_thread(void *common_)
 	}
 	ret = g_Tconn_socket->ops->bind(g_Tconn_socket, (struct sockaddr *)&g_Tsaddr, sizeof(g_Tsaddr));
 	if(ret && (ret != -EINPROGRESS))
-    {
-        printk(" *** Tmtp | Error: %d while bind using conn socket. | setup_connection *** \n", ret);
-        //goto err;
-    }
+	{
+		printk(" *** Tmtp | Error: %d while bind using conn socket. | setup_connection *** \n", ret);
+		//goto err;
+	}
 	ret = g_TCURconn_socket->ops->bind(g_TCURconn_socket, (struct sockaddr *)&g_TCURsaddr, sizeof(g_TCURsaddr));
 	if(ret && (ret != -EINPROGRESS))
-    {
-        printk(" *** TCURmtp | Error: %d while bind using conn socket. | setup_connection *** \n", ret);
-        //goto err;
-    }
+	{
+		printk(" *** TCURmtp | Error: %d while bind using conn socket. | setup_connection *** \n", ret);
+		//goto err;
+	}
 	ret = g_TROMconn_socket->ops->connect(g_TROMconn_socket, (struct sockaddr *)&g_TROMsaddr, sizeof(g_TROMsaddr), O_RDWR);
-    if(ret && (ret != -EINPROGRESS))
-    {
-        printk(" *** TROMmtp | Error: %d while connecting using conn socket. | setup_connection *** \n", ret);
-        //goto err;
-    }
-
+	if(ret && (ret != -EINPROGRESS))
+	{
+		printk(" *** TROMmtp | Error: %d while connecting using conn socket. | setup_connection *** \n", ret);
+		//goto err;
+	}
+#endif
 	/* Allow the thread to be frozen */
 	set_freezable();
 
@@ -4220,6 +4232,7 @@ static int fsg_main_thread(void *common_)
 	 * pointers.  That way we can pass a kernel pointer to a routine
 	 * that expects a __user pointer and it will work okay. */
 	set_fs(get_ds());
+#if TIGER_COMMENTOUT
 	hid_udp_thread_task = kthread_create(hid_udp_main_thread, NULL, "hid_udp");
 	hid_udp_common.thread_task = hid_udp_thread_task;
 	wake_up_process(hid_udp_thread_task);
@@ -4238,10 +4251,13 @@ static int fsg_main_thread(void *common_)
 	wake_up_process(led_blink_lv_thread_task);
 
 	g_userspaceUVC_common = common;
+#if 0
 	open_1280x720JPG(&UVC_Buff[2], 97549);
 	UVC_Buff[0] = 0x02;
 	UVC_Buff[1] = 0x82;
-		
+#endif
+#endif
+	fsg_main_thread_running = 1;
 	/* The main loop */
 	while (common->state != FSG_STATE_TERMINATED) {
 		if (exception_in_progress(common) || signal_pending(current)) {
@@ -4253,10 +4269,12 @@ static int fsg_main_thread(void *common_)
 			sleep_thread(common);
 			continue;
 		}
-		//printk();
 
-		printk("sleep uvc kthread\n");
+		printk("usb replug\n");
 		sleep_thread(common);
+		g_incomplete = 1;
+		wake_up(&gUVCwq);//for user
+#if 0
 		test_jpg_offset = 0;
 		while(1)
 		{
@@ -4284,7 +4302,8 @@ static int fsg_main_thread(void *common_)
 			//common->state = FSG_STATE_IDLE;
 #endif
 		}
-		
+#endif
+
 		if (get_next_command(common))
 			continue;
 
@@ -4303,12 +4322,6 @@ static int fsg_main_thread(void *common_)
 
 		//if (send_status(common))
 		//	continue;
-		
-		//if(common->cmnd[0] == 0x00)
-		//{
-			//my_f_hidg_write(g_hid_m_buffer, 4);
-			//my_f_hidg_write(g_hid_k_buffer, 8);
-		//}
 
 		spin_lock_irq(&common->lock);
 		if (!exception_in_progress(common))
@@ -4321,7 +4334,7 @@ static int fsg_main_thread(void *common_)
 	spin_unlock_irq(&common->lock);
 
 	if (!common->ops || !common->ops->thread_exits
-	 || common->ops->thread_exits(common) < 0) {
+	  || common->ops->thread_exits(common) < 0) {
 		struct fsg_lun *curlun = common->luns;
 		unsigned i = common->nluns;
 
@@ -4329,10 +4342,10 @@ static int fsg_main_thread(void *common_)
 		for (; i--; ++curlun) {
 			if (!fsg_lun_is_open(curlun))
 				continue;
-
 			fsg_lun_close(curlun);
 			curlun->unit_attention_data = SS_MEDIUM_NOT_PRESENT;
 		}
+
 		up_write(&common->filesem);
 	}
 
@@ -4613,6 +4626,7 @@ static void fsg_common_release(struct kref *ref)
 
 	if (common->free_storage_on_release)
 		kfree(common);
+	fsg_main_thread_running = 0;
 }
 
 
@@ -4621,43 +4635,754 @@ static void fsg_common_release(struct kref *ref)
 
 static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 {
+	int i = 0;
 	struct fsg_dev		*fsg = fsg_from_func(f);
-	struct fsg_common	*common = fsg->common;
+	struct fsg_common	*common = NULL;;
 
-	DBG(fsg, "unbind\n");
-	if (fsg->common->fsg == fsg) {
-		fsg->common->new_fsg = NULL;
-		raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
-		/* FIXME: make interruptible or killable somehow? */
-		wait_event(common->fsg_wait, common->fsg != fsg);
+printk("%s: fsg = %x\n", __FUNCTION__, (unsigned int)fsg);
+	if (fsg) {
+		common = fsg->common;
+		DBG(fsg, "unbind\n");
+		if (fsg->common) {
+			if (fsg->common->fsg == fsg) {
+				fsg->common->new_fsg = NULL;
+				raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
+				/* FIXME: make interruptible or killable somehow? */
+				wait_event(common->fsg_wait, common->fsg != fsg);
+			}
+		}
 	}
 
-	kfree(pingpong[0]->buf);
-	kfree(pingpong[1]->buf);
-	kfree(pingpong[0]);
-	kfree(pingpong[1]);
-	sock_release(g_Tconn_socket);
-	sock_release(g_Uconn_socket);
-	sock_release(g_UCURconn_socket);
+	if (fsg) {
+		fsg_common_put(common);
+		usb_free_descriptors(fsg->function.descriptors);
+		usb_free_descriptors(fsg->function.hs_descriptors);
+		kfree(fsg);
+	}
+
+	for (i=0; i<2; i++) {
+printk("%s: pingpong[%d] = %x\n", __FUNCTION__, i, (unsigned int)pingpong[i]);
+		if (pingpong[i]) {
+printk("%s: pingpong[%d]->buf = %x\n", __FUNCTION__, i, (unsigned int)(pingpong[i]->buf));
+			kfree(pingpong[i]->buf);
+			pingpong[i]->buf = NULL;
+			kfree(pingpong[i]);
+			pingpong[i] = NULL;
+		}
+	}
+	for (i=0; i<3; i++) {
+printk("%s: stable_bps_pingpong[%d] = %x\n", __FUNCTION__, i, (unsigned int)stable_bps_pingpong[i]);
+		if (stable_bps_pingpong[i]) {
+printk("%s: stable_bps_pingpong[%d]->buf = %x\n", __FUNCTION__, i, (unsigned int)stable_bps_pingpong[i]->buf);
+			if (stable_bps_pingpong[i]->buf)
+				kfree(stable_bps_pingpong[i]->buf);
+			stable_bps_pingpong[i]->buf = NULL;
+			kfree(stable_bps_pingpong[i]);
+			stable_bps_pingpong[i] = NULL;
+		}
+	}
+
+	while (fsg_main_thread_running) {
+		printk("thread still running\n");
+		fsg_common_put(common);
+		udelay(100000);
+	}
+
+printk("%s: g_Tconn_socket = %x\n", __FUNCTION__, (unsigned int)g_Tconn_socket);
+printk("%s: g_Uconn_socket = %x\n", __FUNCTION__, (unsigned int)g_Uconn_socket);
+printk("%s: g_UCURconn_socket = %x\n", __FUNCTION__, (unsigned int)g_UCURconn_socket);
+printk("%s: g_TCURconn_socket = %x\n", __FUNCTION__, (unsigned int)g_TCURconn_socket);
+printk("%s: g_TROMconn_socket = %x\n", __FUNCTION__, (unsigned int)g_TROMconn_socket);
+	if (g_Tconn_socket)
+		sock_release(g_Tconn_socket);
+	if (g_Uconn_socket)
+		sock_release(g_Uconn_socket);
+	if (g_UCURconn_socket)
+		sock_release(g_UCURconn_socket);
+	if (g_TCURconn_socket)
+		sock_release(g_TCURconn_socket);
+	if (g_TROMconn_socket)
+		sock_release(g_TROMconn_socket);
 	g_Tconn_socket = NULL;
 	g_Uconn_socket = NULL;
 	g_UCURconn_socket = NULL;
-	kthread_stop(hid_udp_common.thread_task);
-	kthread_stop(cursor_udp_common.thread_task);
-
-	fsg_common_put(common);
-	usb_free_descriptors(fsg->function.descriptors);
-	usb_free_descriptors(fsg->function.hs_descriptors);
-	kfree(fsg);
+	g_TCURconn_socket = NULL;
+	g_TROMconn_socket = NULL;
+#if 0
+printk("%s: hid_udp_common.thread_task = %x\n", __FUNCTION__, (unsigned int)(hid_udp_common.thread_task));
+	if (hid_udp_common.thread_task > 0)
+		kthread_stop(hid_udp_common.thread_task);
+	hid_udp_common.thread_task = NULL;
+printk("%s: cursor_udp_common.thread_task = %x\n", __FUNCTION__, (unsigned int)(cursor_udp_common.thread_task));
+	if (cursor_udp_common.thread_task > 0)
+		kthread_stop(cursor_udp_common.thread_task);
+	cursor_udp_common.thread_task = NULL;
+#endif
 }
 
+void uvc_change_desc_compatable(void)
+{
+	int   descarrayidx, descformatcnt, descframecnt;
+	fsg_hs_function[2] = (struct usb_descriptor_header *) &M_uvc_control_header;
+	fsg_hs_function[3] = (struct usb_descriptor_header *) &M_uvc_camera_terminal;
+	fsg_hs_function[4] = (struct usb_descriptor_header *) &M_uvc_processing;
+	fsg_hs_function[5] = (struct usb_descriptor_header *) &M_uvc_extension1;
+	fsg_hs_function[6] = (struct usb_descriptor_header *) &M_uvc_output_terminal;
+	fsg_hs_function[7] = (struct usb_descriptor_header *) &hidg0_hs_in_ep_desc;
+	fsg_hs_function[8] = (struct usb_descriptor_header *) &M_uvc_control_cs_ep;
+	fsg_hs_function[9] = (struct usb_descriptor_header *) &M_uvc_streaming_intf_alt0;
+	fsg_hs_function[10] = (struct usb_descriptor_header *) &fsg_hs_bulk_in_desc;
+
+	M_uvc_control_header.wTotalLength = sizeof(M_uvc_control_header) + 
+					    sizeof(M_uvc_camera_terminal) + 
+					    sizeof(M_uvc_processing) + 
+					    sizeof(M_uvc_output_terminal) + 
+					    sizeof(M_uvc_extension1);
+	M_uvc_camera_terminal.bmControls[0] = g_uvc_camera_terminal_controlbit & 0xff;
+	M_uvc_camera_terminal.bmControls[1] = (g_uvc_camera_terminal_controlbit & 0xff00) >> 8;
+	M_uvc_camera_terminal.bmControls[2] = (g_uvc_camera_terminal_controlbit & 0xff0000) >> 16;
+	M_uvc_processing.bmControls[0] = g_uvc_processing_controlbit & 0xff;
+	M_uvc_processing.bmControls[1] = (g_uvc_processing_controlbit & 0xff00) >> 8;
+	M_uvc_processing.bmControls[2] = (g_uvc_processing_controlbit & 0xff0000) >> 16;
+	descformatcnt = 0;
+	if(g_uvc_mjpeg_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+	if(g_uvc_h264_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+	if(g_uvc_yuv_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+	if(g_uvc_nv12_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+	if(g_uvc_i420_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+	if(g_uvc_m420_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+
+	switch(descformatcnt)
+	{
+		case FORMAT_COUNT1:
+			M_uvc_input_header = &M_uvc_input_header1;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header1);
+			M_uvc_input_header->bTerminalLink = 4;
+			fsg_hs_function[INPUT_HEADER_IDX] = (struct usb_descriptor_header *) &M_uvc_input_header1;
+			break;
+		case FORMAT_COUNT2:
+			M_uvc_input_header = &M_uvc_input_header2;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header2);
+			M_uvc_input_header->bTerminalLink = 4;
+			fsg_hs_function[INPUT_HEADER_IDX] = (struct usb_descriptor_header *) &M_uvc_input_header2;
+			break;
+		case FORMAT_COUNT3:
+			M_uvc_input_header = &M_uvc_input_header3;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header3);
+			M_uvc_input_header->bTerminalLink = 4;
+			fsg_hs_function[INPUT_HEADER_IDX] = (struct usb_descriptor_header *) &M_uvc_input_header3;
+			break;
+		case FORMAT_COUNT4:
+			M_uvc_input_header = &M_uvc_input_header4;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header4);
+			M_uvc_input_header->bTerminalLink = 4;
+			fsg_hs_function[INPUT_HEADER_IDX] = (struct usb_descriptor_header *) &M_uvc_input_header4;
+			break;
+		case FORMAT_COUNT5:
+			M_uvc_input_header = &M_uvc_input_header5;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header5);
+			M_uvc_input_header->bTerminalLink = 4;
+			fsg_hs_function[INPUT_HEADER_IDX] = (struct usb_descriptor_header *) &M_uvc_input_header5;
+			break;
+		case FORMAT_COUNT6:
+			M_uvc_input_header = &M_uvc_input_header6;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header6);
+			M_uvc_input_header->bTerminalLink = 4;
+			fsg_hs_function[INPUT_HEADER_IDX] = (struct usb_descriptor_header *) &M_uvc_input_header6;
+			break;
+	}
+	descarrayidx = INPUT_FORMAT_IDX;
+
+	if(g_uvc_mjpeg_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_mjpg);//mjpeg
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_mjpg;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_mjpeg_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_mjpg_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_mjpg_320p;
+			//M_uvc_format_mjpg.bDefaultFrameIndex = M_uvc_frame_mjpg_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_mjpeg_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_mjpg_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_mjpg_480p;
+			//M_uvc_format_mjpg.bDefaultFrameIndex = M_uvc_frame_mjpg_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_mjpeg_res_bitflag & RESOLUTION_720p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_mjpg_720p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_mjpg_720p;
+			//M_uvc_format_mjpg.bDefaultFrameIndex = M_uvc_frame_mjpg_720p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_mjpeg_res_bitflag & RESOLUTION_1080p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_mjpg_1080p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_mjpg_1080p;
+			//M_uvc_format_mjpg.bDefaultFrameIndex = M_uvc_frame_mjpg_1080p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_mjpg.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_mjpeg);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_mjpeg;
+		descarrayidx++;
+	}
+
+
+	if(g_uvc_h264_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_h264);//h264
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_h264;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_h264_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_h264_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_h264_320p;
+			//M_uvc_format_h264.bDefaultFrameIndex = M_uvc_frame_h264_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_h264_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_h264_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_h264_480p;
+			//M_uvc_format_h264.bDefaultFrameIndex = M_uvc_frame_h264_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_h264_res_bitflag & RESOLUTION_720p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_h264_720p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_h264_720p;
+			//M_uvc_format_h264.bDefaultFrameIndex = M_uvc_frame_h264_720p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_h264_res_bitflag & RESOLUTION_1080p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_h264_1080p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_h264_1080p;
+			//M_uvc_format_h264.bDefaultFrameIndex = M_uvc_frame_h264_1080p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_h264_res_bitflag & RESOLUTION_4k)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_h264_4k);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_h264_4k;
+			//M_uvc_format_h264.bDefaultFrameIndex = M_uvc_frame_h264_1080p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_h264.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_h264);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_h264;
+		descarrayidx++;
+	}
+
+
+	if(g_uvc_yuv_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_yuv);//yuv
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_yuv;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_yuv_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_yuv_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_yuv_320p;
+			//M_uvc_format_yuv.bDefaultFrameIndex = M_uvc_frame_yuv_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_yuv_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_yuv_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_yuv_480p;
+			//M_uvc_format_yuv.bDefaultFrameIndex = M_uvc_frame_yuv_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_yuv.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_yuv);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_yuv;
+		descarrayidx++;
+	}
+
+
+	if(g_uvc_nv12_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_nv12);//nv12
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_nv12;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_nv12_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_nv12_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_nv12_320p;
+			//M_uvc_format_nv12.bDefaultFrameIndex = M_uvc_frame_nv12_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_nv12_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_nv12_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_nv12_480p;
+			//M_uvc_format_nv12.bDefaultFrameIndex = M_uvc_frame_nv12_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_nv12.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_nv12);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_nv12;
+		descarrayidx++;
+	}
+
+
+	if(g_uvc_i420_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_i420);//i420
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_i420;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_i420_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_i420_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_i420_320p;
+			//M_uvc_format_i420.bDefaultFrameIndex = M_uvc_frame_i420_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_i420_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_i420_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_i420_480p;
+			//M_uvc_format_i420.bDefaultFrameIndex = M_uvc_frame_i420_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_i420.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_i420);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_i420;
+		descarrayidx++;
+	}
+
+
+	if(g_uvc_m420_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_m420);//m420
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_m420;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_m420_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_m420_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_m420_320p;
+			//M_uvc_format_m420.bDefaultFrameIndex = M_uvc_frame_m420_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_m420_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_m420_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_m420_480p;
+			//M_uvc_format_m420.bDefaultFrameIndex = M_uvc_frame_m420_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_m420.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_m420);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_m420;
+		descarrayidx++;
+	}
+	
+	fsg_hs_function[descarrayidx] = NULL;
+	descarrayidx++;
+	//M_uvc_input_header.wTotalLength = sizeof(M_uvc_input_header) + sizeof(M_uvc_format_mjpg) + sizeof(M_uvc_frame_mjpg_720p) + sizeof(M_uvc_frame_mjpg_1080p) + sizeof(M_uvc_color_matching_mjpeg) + sizeof(M_uvc_format_h264) + sizeof(M_uvc_frame_h264_720p) + sizeof(M_uvc_frame_h264_1080p) + sizeof(M_uvc_color_matching_h264);
+}
+
+unsigned int myVcDesc_len = 0;
+char myVcDesc[2048];
+__u16 currentbcdUVC = 0;
+
+void uvc_change_desc(void)
+{
+	int   descarrayidx, descformatcnt, descframecnt;
+	int vcbufidx = 0;
+	struct uvc_header_descriptor *vcdescheader;
+	int camera_output_TerminalID;
+	struct uvc_output_terminal_descriptor *vcdescheader1;
+
+	vcdescheader = &myVcDesc[0];
+	vcdescheader->dwClockFrequency = cpu_to_le32(48000000);
+	descarrayidx = VC_START_IDX;
+
+	while(vcbufidx < myVcDesc_len)
+	{
+		vcdescheader1 = &myVcDesc[vcbufidx];
+		if(vcdescheader1->bLength == UVC_DT_OUTPUT_TERMINAL_SIZE && vcdescheader1->bDescriptorType == USB_DT_CS_INTERFACE && vcdescheader1->bDescriptorSubType == UVC_VC_OUTPUT_TERMINAL)
+		{
+			camera_output_TerminalID = vcdescheader1->bTerminalID;
+		}
+
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &myVcDesc[vcbufidx];
+		vcbufidx = vcbufidx + myVcDesc[vcbufidx];
+		descarrayidx++;
+	}
+
+	fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &hidg0_hs_in_ep_desc;
+	descarrayidx++;
+	fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_control_cs_ep;
+	descarrayidx++;
+	fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_streaming_intf_alt0;
+	descarrayidx++;
+	fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &fsg_hs_bulk_in_desc;
+	descarrayidx++;
+
+	//M_uvc_control_header.wTotalLength = sizeof(M_uvc_control_header) + sizeof(M_uvc_camera_terminal) + sizeof(M_uvc_processing) + sizeof(M_uvc_output_terminal) + sizeof(M_uvc_extension1);
+	//M_uvc_camera_terminal.bmControls[0] = g_uvc_camera_terminal_controlbit & 0xff;
+	//M_uvc_camera_terminal.bmControls[1] = (g_uvc_camera_terminal_controlbit & 0xff00) >> 8;
+	//M_uvc_camera_terminal.bmControls[2] = (g_uvc_camera_terminal_controlbit & 0xff0000) >> 16;
+	//M_uvc_processing.bmControls[0] = g_uvc_processing_controlbit & 0xff;
+	//M_uvc_processing.bmControls[1] = (g_uvc_processing_controlbit & 0xff00) >> 8;
+	//M_uvc_processing.bmControls[2] = (g_uvc_processing_controlbit & 0xff0000) >> 16;
+	descformatcnt = 0;
+	if(g_uvc_mjpeg_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+	if(g_uvc_h264_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+	if(g_uvc_yuv_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+	if(g_uvc_nv12_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+	if(g_uvc_i420_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+	if(g_uvc_m420_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		descformatcnt++;
+	}
+
+	switch(descformatcnt)
+	{
+		case FORMAT_COUNT1:
+			M_uvc_input_header = &M_uvc_input_header1;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header1);
+			M_uvc_input_header->bTerminalLink = camera_output_TerminalID;
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_input_header1;
+			break;
+		case FORMAT_COUNT2:
+			M_uvc_input_header = &M_uvc_input_header2;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header2);
+			M_uvc_input_header->bTerminalLink = camera_output_TerminalID;
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_input_header2;
+			break;
+		case FORMAT_COUNT3:
+			M_uvc_input_header = &M_uvc_input_header3;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header3);
+			M_uvc_input_header->bTerminalLink = camera_output_TerminalID;
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_input_header3;
+			break;
+		case FORMAT_COUNT4:
+			M_uvc_input_header = &M_uvc_input_header4;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header4);
+			M_uvc_input_header->bTerminalLink = camera_output_TerminalID;
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_input_header4;
+			break;
+		case FORMAT_COUNT5:
+			M_uvc_input_header = &M_uvc_input_header5;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header5);
+			M_uvc_input_header->bTerminalLink = camera_output_TerminalID;
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_input_header5;
+			break;
+		case FORMAT_COUNT6:
+			M_uvc_input_header = &M_uvc_input_header6;
+			M_uvc_input_header->wTotalLength = sizeof(M_uvc_input_header6);
+			M_uvc_input_header->bTerminalLink = camera_output_TerminalID;
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_input_header6;
+			break;
+	}
+	descarrayidx++;
+
+	if(g_uvc_mjpeg_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_mjpg);//mjpeg
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_mjpg;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_mjpeg_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_mjpg_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_mjpg_320p;
+			//M_uvc_format_mjpg.bDefaultFrameIndex = M_uvc_frame_mjpg_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_mjpeg_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_mjpg_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_mjpg_480p;
+			//M_uvc_format_mjpg.bDefaultFrameIndex = M_uvc_frame_mjpg_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_mjpeg_res_bitflag & RESOLUTION_720p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_mjpg_720p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_mjpg_720p;
+			//M_uvc_format_mjpg.bDefaultFrameIndex = M_uvc_frame_mjpg_720p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_mjpeg_res_bitflag & RESOLUTION_1080p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_mjpg_1080p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_mjpg_1080p;
+			//M_uvc_format_mjpg.bDefaultFrameIndex = M_uvc_frame_mjpg_1080p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_mjpg.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_mjpeg);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_mjpeg;
+		descarrayidx++;
+	}
+
+
+	if(g_uvc_h264_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_h264);//h264
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_h264;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_h264_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_h264_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_h264_320p;
+			//M_uvc_format_h264.bDefaultFrameIndex = M_uvc_frame_h264_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_h264_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_h264_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_h264_480p;
+			//M_uvc_format_h264.bDefaultFrameIndex = M_uvc_frame_h264_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_h264_res_bitflag & RESOLUTION_720p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_h264_720p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_h264_720p;
+			//M_uvc_format_h264.bDefaultFrameIndex = M_uvc_frame_h264_720p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_h264_res_bitflag & RESOLUTION_1080p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_h264_1080p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_h264_1080p;
+			//M_uvc_format_h264.bDefaultFrameIndex = M_uvc_frame_h264_1080p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_h264_res_bitflag & RESOLUTION_4k)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_h264_4k);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_h264_4k;
+			//M_uvc_format_h264.bDefaultFrameIndex = M_uvc_frame_h264_1080p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_h264.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_h264);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_h264;
+		descarrayidx++;
+	}
+
+
+	if(g_uvc_yuv_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_yuv);//yuv
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_yuv;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_yuv_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_yuv_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_yuv_320p;
+			//M_uvc_format_yuv.bDefaultFrameIndex = M_uvc_frame_yuv_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_yuv_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_yuv_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_yuv_480p;
+			//M_uvc_format_yuv.bDefaultFrameIndex = M_uvc_frame_yuv_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_yuv.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_yuv);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_yuv;
+		descarrayidx++;
+	}
+
+
+	if(g_uvc_nv12_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_nv12);//nv12
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_nv12;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_nv12_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_nv12_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_nv12_320p;
+			//M_uvc_format_nv12.bDefaultFrameIndex = M_uvc_frame_nv12_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_nv12_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_nv12_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_nv12_480p;
+			//M_uvc_format_nv12.bDefaultFrameIndex = M_uvc_frame_nv12_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_nv12.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_nv12);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_nv12;
+		descarrayidx++;
+	}
+
+
+	if(g_uvc_i420_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_i420);//i420
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_i420;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_i420_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_i420_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_i420_320p;
+			//M_uvc_format_i420.bDefaultFrameIndex = M_uvc_frame_i420_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_i420_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_i420_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_i420_480p;
+			//M_uvc_format_i420.bDefaultFrameIndex = M_uvc_frame_i420_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_i420.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_i420);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_i420;
+		descarrayidx++;
+	}
+
+
+	if(g_uvc_m420_res_bitflag & RESOLUTION_BIT_MASK)
+	{
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength + sizeof(M_uvc_format_m420);//m420
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_format_m420;
+		descframecnt = 0;
+		descarrayidx++;
+		if(g_uvc_m420_res_bitflag & RESOLUTION_320p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_m420_320p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_m420_320p;
+			//M_uvc_format_m420.bDefaultFrameIndex = M_uvc_frame_m420_320p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		if(g_uvc_m420_res_bitflag & RESOLUTION_480p)
+		{
+			M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_frame_m420_480p);
+			fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_frame_m420_480p;
+			//M_uvc_format_m420.bDefaultFrameIndex = M_uvc_frame_m420_480p.bFrameIndex;
+			descframecnt++;
+			descarrayidx++;
+		}
+		M_uvc_format_m420.bNumFrameDescriptors = descframecnt;
+		M_uvc_input_header->wTotalLength = M_uvc_input_header->wTotalLength +sizeof(M_uvc_color_matching_m420);
+		fsg_hs_function[descarrayidx] = (struct usb_descriptor_header *) &M_uvc_color_matching_m420;
+		descarrayidx++;
+	}
+	
+	fsg_hs_function[descarrayidx] = NULL;
+	descarrayidx++;
+	//M_uvc_input_header.wTotalLength = sizeof(M_uvc_input_header) + sizeof(M_uvc_format_mjpg) + sizeof(M_uvc_frame_mjpg_720p) + sizeof(M_uvc_frame_mjpg_1080p) + sizeof(M_uvc_color_matching_mjpeg) + sizeof(M_uvc_format_h264) + sizeof(M_uvc_frame_h264_720p) + sizeof(M_uvc_frame_h264_1080p) + sizeof(M_uvc_color_matching_h264);
+}
+
+void uvc_get_bcdUVC(void)
+{
+	struct uvc_header_descriptor *vcdescheader;
+
+	vcdescheader = &myVcDesc[0];
+	currentbcdUVC = vcdescheader->bcdUVC;
+}
+
+struct usb_function *g_desc_change_f;
+
+void uvc_copy_desc(void)
+{
+	if (g_desc_change_f->hs_descriptors) {
+		kfree(g_desc_change_f->hs_descriptors);
+	}
+	g_desc_change_f->hs_descriptors = usb_copy_descriptors(fsg_hs_function);
+}
 
 static int fsg_bind(struct usb_configuration *c, struct usb_function *f)
 {
-	struct fsg_dev		*fsg = fsg_from_func(f);
-	struct usb_gadget	*gadget = c->cdev->gadget;
-	int			i;
-	struct usb_ep		*ep;
+	struct fsg_dev          *fsg = fsg_from_func(f);
+	struct usb_gadget       *gadget = c->cdev->gadget;
+	int                     i, descarrayidx, descformatcnt, descframecnt;
+	struct usb_ep           *ep;
 
 	fsg->gadget = gadget;
 
@@ -4672,13 +5397,13 @@ static int fsg_bind(struct usb_configuration *c, struct usb_function *f)
 	ep = usb_ep_autoconfig(gadget, &fsg_fs_bulk_in_desc);
 	if (!ep)
 		goto autoconf_fail;
-	ep->driver_data = fsg->common;	/* claim the endpoint */
+	ep->driver_data = fsg->common;  /* claim the endpoint */
 	fsg->bulk_in = ep;
 
 	ep = usb_ep_autoconfig(gadget, &fsg_fs_bulk_out_desc);
 	if (!ep)
 		goto autoconf_fail;
-	ep->driver_data = fsg->common;	/* claim the endpoint */
+	ep->driver_data = fsg->common;  /* claim the endpoint */
 	fsg->bulk_out = ep;
 
 	/* Copy descriptors */
@@ -4692,8 +5417,10 @@ static int fsg_bind(struct usb_configuration *c, struct usb_function *f)
 			fsg_fs_bulk_in_desc.bEndpointAddress;
 		fsg_hs_bulk_out_desc.bEndpointAddress =
 			fsg_fs_bulk_out_desc.bEndpointAddress;
-		M_uvc_control_header.wTotalLength = sizeof(M_uvc_control_header) + sizeof(M_uvc_camera_terminal) + sizeof(M_uvc_processing) + sizeof(M_uvc_output_terminal) + sizeof(M_uvc_extension);
-		M_uvc_input_header.wTotalLength = sizeof(M_uvc_input_header) + sizeof(M_uvc_format_mjpg) + sizeof(M_uvc_frame_mjpg_720p) + sizeof(M_uvc_frame_mjpg_1080p) + sizeof(M_uvc_color_matching_mjpeg) + sizeof(M_uvc_format_h264) + sizeof(M_uvc_frame_h264_720p) + sizeof(M_uvc_frame_h264_1080p) + sizeof(M_uvc_color_matching_h264);
+
+		uvc_change_desc_compatable();
+		g_desc_change_f = f;
+
 		f->hs_descriptors = usb_copy_descriptors(fsg_hs_function);
 		if (unlikely(!f->hs_descriptors)) {
 			usb_free_descriptors(f->descriptors);
@@ -4707,7 +5434,6 @@ autoconf_fail:
 	ERROR(fsg, "unable to autoconfigure all endpoints\n");
 	return -ENOTSUPP;
 }
-
 
 /****************************** ADD FUNCTION ******************************/
 

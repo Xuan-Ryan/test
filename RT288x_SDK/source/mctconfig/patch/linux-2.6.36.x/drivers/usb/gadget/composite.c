@@ -84,13 +84,28 @@
 #define UVC_GET_INFO					0x86
 #define UVC_GET_DEF					0x87
 #define UVC_GET_STAT					0x88
+#define UVC_CLIENT_LOST					0x89
 #define QUERY_SETUP_DATA				0xF0
 #define CAMERA_STS_CHANGE				0xF1
 #define APPLY_DESC_CHANGE				0xF2
+#define INTREP_WRITE					0xF3
+#define UVC_SET_MANUFACTURER				0xF4
+#define UVC_SET_PRODUCT_NAME				0xF5
+#define UVC_SET_PIDVID					0xF6
+#define CTRLEP_WRITE					0xF7
+#define UVC_EP0_SET_HALT				0xF8
+#define UVC_EP0_CLEAR_HALT				0xF9
+#define UVC_SET_VC_DESC					0xFA
+#define UVC_GET_UVC_VER					0xFB
+
+extern __u16 currentbcdUVC;
+extern void uvc_change_desc_compatable(void);
+extern void uvc_get_bcdUVC(void);
 
 //End UVC COMMAND
 
 //  Tiger
+__u32 client_connected = 0;
 __u8 current_b_request;
 unsigned current_w_value;
 
@@ -105,14 +120,22 @@ unsigned int g_uvc_camera_terminal_controlbit = 0x0;
 unsigned int g_uvc_processing_controlbit = 0x0;
 
 module_param(g_uvc_mjpeg_res_bitflag, uint, S_IRWXU|S_IRWXG);
+MODULE_PARM_DESC(g_uvc_mjpeg_res_bitflag, "resolution for mjpeg");
 module_param(g_uvc_h264_res_bitflag, uint, S_IRWXU|S_IRWXG);
+MODULE_PARM_DESC(g_uvc_h264_res_bitflag, "resolution for h264");
 module_param(g_uvc_yuv_res_bitflag, uint, S_IRWXU|S_IRWXG);
+MODULE_PARM_DESC(g_uvc_yuv_res_bitflag, "resolution for yuv");
 module_param(g_uvc_nv12_res_bitflag, uint, S_IRWXU|S_IRWXG);
+MODULE_PARM_DESC(g_uvc_nv12_res_bitflag, "resolution for nv12");
 module_param(g_uvc_i420_res_bitflag, uint, S_IRWXU|S_IRWXG);
+MODULE_PARM_DESC(g_uvc_i420_res_bitflag, "resolution for i420");
 module_param(g_uvc_m420_res_bitflag, uint, S_IRWXU|S_IRWXG);
+MODULE_PARM_DESC(g_uvc_m420_res_bitflag, "resolution for m420");
 
 module_param(g_uvc_camera_terminal_controlbit, uint, S_IRWXU|S_IRWXG);
+MODULE_PARM_DESC(g_uvc_mjpeg_res_bitflag, "camera capability");
 module_param(g_uvc_processing_controlbit, uint, S_IRWXU|S_IRWXG);
+MODULE_PARM_DESC(g_uvc_processing_controlbit, "camera capability");
 
 /*
  * The code in this file is utility code, used to build a gadget driver
@@ -166,17 +189,9 @@ module_param(skip_rate_control, uint, S_IRWXU|S_IRWXG);
 /*-------------------------------------------------------------------------*/
 
 extern unsigned char g_incomplete;
-unsigned char g_ioctlincomplete = 0;
+unsigned char g_ioctlincomplete = 1;
 
-static struct work_struct ioctl_bottem_work;
-
-#define CY_FX_UVC_MAX_PROBE_SETTING     34
-
-struct uvc_state {
-	unsigned char setuptoken_8byte[8];
-	__u32 status;
-	unsigned char prob_ctrl[CY_FX_UVC_MAX_PROBE_SETTING];
-} mct_uvc_data;
+extern ssize_t my_f_hidg_write(const char __user *buffer, size_t count);
 
 /**
  * usb_add_function() - add a function to a configuration
@@ -891,11 +906,52 @@ extern void wakeup_thread(struct fsg_common *common);
 extern unsigned int udp_send_total_bytes;
 extern unsigned char shapeusbin[10];
 
+static struct work_struct ioctl_bottem_work;
+static struct work_struct setcfg_bottem_work;
+
+#define MANUFACTORER_RAW                "/etc/manufactorer"
+#define PRODUCT_RAW                     "/etc/product"
+#define VC_DESC                         "/etc/vc_desc"
+#define UVC_SETCONF_DONE                "/etc/uvc_setconf_done"
+
+#define UVC_CONF_FILE                   "/etc/uvc.conf"
+#define CY_FX_UVC_MAX_PROBE_SETTING     34
+
+struct uvc_state {
+	unsigned char setuptoken_8byte[8];
+	__u32 status;
+	unsigned char prob_ctrl[CY_FX_UVC_MAX_PROBE_SETTING];
+} mct_uvc_data;
+
 void ioctl_bottem_notify(struct work_struct *work)
 {
 	g_ioctlincomplete = 1;
 	wake_up(&gUVCioctl);//for user
 }
+
+struct file *file_open(const char *path, int flags, int rights);
+void file_close(struct file *file);
+int file_read(struct file *file, unsigned long long offset, unsigned char *data, unsigned int size);
+int file_write(struct file *file, unsigned long long offset, unsigned char *data, unsigned int size);
+int file_sync(struct file *file);
+
+void setcfg_bottem_notify(struct work_struct *work)
+{
+	struct file * setconf_fp = NULL;
+
+	setconf_fp =filp_open(UVC_SETCONF_DONE, O_RDWR | O_CREAT, 0666);
+	if (setconf_fp) {
+		file_write(setconf_fp, 0, "1", 1);
+		file_sync(setconf_fp);
+		file_close(setconf_fp);
+	}
+}
+
+#define MCT_UVC_NOTIFY_SIZE 256
+unsigned char gCurItfnum;
+unsigned char gSetDirBuff[MCT_UVC_NOTIFY_SIZE];
+unsigned char gGetDirBuff[MCT_UVC_NOTIFY_SIZE];
+struct usb_gadget *g_uvc_gadget;
 
 unsigned char glProbeCtrl[CY_FX_UVC_MAX_PROBE_SETTING] = {
     0x00,0x00,                       /* bmHint : No fixed parameters */
@@ -909,11 +965,43 @@ unsigned char glProbeCtrl[CY_FX_UVC_MAX_PROBE_SETTING] = {
     0x00,0x00,                       /* Internal video streaming i/f latency in ms */
     0x00,0x30,0x2A,0x00,             /* Max video frame size in bytes */
     0x00,0x30,0x2A,0x00,             /* No. of bytes device can transmit in single payload */
-    0x00,0x6C,0xDC,0x02,
-    0x03,0x01,0x01,0x02,
+    0x00,0x6C,0xDC,0x02,             /* The device clock frequency in Hz for the specified format. 48M*/
+    0x03,                            /* bmFramingInfo */
+    0x01,                            /* bPreferedVersion */
+    0x01,                            /* bMinVersion based on bFormatIndex */
+    0x02,                            /* bMaxVersion based on bFormatIndex */
+};
+
+unsigned char glProbeCtrlYUV[CY_FX_UVC_MAX_PROBE_SETTING] = {
+    0x00,0x00,                       /* bmHint : No fixed parameters */
+    0x03,                            /* Use 1st Video format index */
+    0x01,                            /* Use 1st Video frame index */
+    0x15,0x16,0x05,0x00,             /* Desired frame interval in 100ns */
+    0x00,0x00,                       /* Key frame rate in key frame/video frame units */
+    0x00,0x00,                       /* PFrame rate in PFrame / key frame units */
+    0x00,0x00,                       /* Compression quality control */
+    0x00,0x00,                       /* Window size for average bit rate */
+    0x00,0x00,                       /* Internal video streaming i/f latency in ms */
+    0x00,0x58,0x02,0x00,             /* Max video frame size in bytes */
+    0x00,0x02,0x00,0x00,             /* No. of bytes device can transmit in single payload */
+    0x00,0x6C,0xDC,0x02,             /* The device clock frequency in Hz for the specified format. 48M*/
+    0x03,                            /* bmFramingInfo */
+    0x03,                            /* bPreferedVersion */
+    0x01,                            /* bMinVersion based on bFormatIndex */
+    0x03,                            /* bMaxVersion based on bFormatIndex */
 };
 
 #define MCT_UVC_DATA_SIZE                     CY_FX_UVC_MAX_PROBE_SETTING+12
+
+#define MAX_SETUP_QUEUE 5
+
+typedef struct _mct_uvc_setup_queue {
+	unsigned char setupcmd[MCT_UVC_NOTIFY_SIZE];
+	unsigned char *next;
+} MCT_UVC_SETUP_QUEUE;
+MCT_UVC_SETUP_QUEUE g_mct_uvc_setup_queue[MAX_SETUP_QUEUE];
+MCT_UVC_SETUP_QUEUE *g_mct_uvc_setup_insert;
+MCT_UVC_SETUP_QUEUE *g_mct_uvc_setup_remove;
 
 static void composite_setup_complete(struct usb_ep *ep, struct usb_request *req)
 {
@@ -925,14 +1013,46 @@ static void composite_setup_complete(struct usb_ep *ep, struct usb_request *req)
 	}
 	else//set
 	{
-		if (req->length > 4) {
-			glProbeCtrl[2] = *((char *)(req->buf)+2);
-			glProbeCtrl[3] = *((char *)(req->buf)+3);
+		if( (gCurItfnum == 0 && (((ep0_setup_dir)&USB_TYPE_CLASS) == USB_TYPE_CLASS)) && client_connected == 1)
+		{
+			memcpy(&gSetDirBuff[8], req->buf, req->length);
+			memcpy(&g_mct_uvc_setup_insert->setupcmd[8], req->buf, req->length);
+			g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+			schedule_work(&ioctl_bottem_work);
+		} else {
+			if (*((char *)(req->buf)+2) != 3) {
+				if (req->length > 4) {
+					glProbeCtrl[2] = *((char *)(req->buf)+2);
+					glProbeCtrl[3] = *((char *)(req->buf)+3);
+				}
+				memcpy(mct_uvc_data.prob_ctrl, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+			} else {
+				if (req->length > 4) {
+					glProbeCtrlYUV[2] = *((char *)(req->buf)+2);
+					glProbeCtrlYUV[3] = *((char *)(req->buf)+3);
+				}
+				memcpy(mct_uvc_data.prob_ctrl, glProbeCtrlYUV, CY_FX_UVC_MAX_PROBE_SETTING);
+			}
+			schedule_work(&ioctl_bottem_work);
 		}
-		memcpy(mct_uvc_data.prob_ctrl, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
-		schedule_work(&ioctl_bottem_work);
+		if ( ((((ep0_setup_dir)&USB_TYPE_STANDARD) == USB_TYPE_STANDARD) && current_b_request == USB_REQ_CLEAR_FEATURE) ||
+		     ((((ep0_setup_dir)&USB_TYPE_CLASS) == USB_TYPE_CLASS) && current_b_request == UVC_SET_CUR) ) {
+			if (*((char *)(req->buf)+2) != 3) {
+				if (req->length > 4) {
+					glProbeCtrl[2] = *((char *)(req->buf)+2);
+					glProbeCtrl[3] = *((char *)(req->buf)+3);
+				}
+				memcpy(mct_uvc_data.prob_ctrl, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+			} else {
+				if (req->length > 4) {
+					glProbeCtrlYUV[2] = *((char *)(req->buf)+2);
+					glProbeCtrlYUV[3] = *((char *)(req->buf)+3);
+				}
+				memcpy(mct_uvc_data.prob_ctrl, glProbeCtrlYUV, CY_FX_UVC_MAX_PROBE_SETTING);
+			}
+			schedule_work(&ioctl_bottem_work);
+		}
 	}
-
 	if (req->status || req->actual != req->length)
 		DBG((struct usb_composite_dev *) ep->driver_data,
 				"setup complete --> %d, %d/%d\n",
@@ -1150,6 +1270,108 @@ unsigned char t6rom[128] = {
 
 extern struct fsg_common *g_userspaceUVC_common;
 extern unsigned char g_start_transfer;
+
+unsigned short myidVendor = cpu_to_le16(HIDG_VENDOR_NUM);
+unsigned short myidProduct = cpu_to_le16(HIDG_PRODUCT_NUM);
+unsigned char myiManufacturer;
+unsigned char myiProduct;
+char myManufacturer[256];
+unsigned int myManufacturer_len = 0;
+char myProduct[256];
+unsigned int myProduct_len = 0;
+
+struct file *file_open(const char *path, int flags, int rights) 
+{
+	struct file *filp = NULL;
+	mm_segment_t oldfs;
+	int err = 0;
+
+	oldfs = get_fs();
+	set_fs(get_ds());
+	filp = filp_open(path, flags, rights);  //  O_RDWR|O_RDONLY
+	set_fs(oldfs);
+	if (IS_ERR(filp)) {
+		err = PTR_ERR(filp);
+		return NULL;
+	}
+	return filp;
+}
+
+void file_close(struct file *file) 
+{
+	filp_close(file, NULL);
+}
+
+int file_read(struct file *file, unsigned long long offset, unsigned char *data, unsigned int size) 
+{
+	mm_segment_t oldfs;
+	int ret;
+	oldfs = get_fs();
+	set_fs(get_ds());
+	ret = vfs_read(file, data, size, &offset);
+	set_fs(oldfs);
+	return ret;
+}
+
+int file_write(struct file *file, unsigned long long offset, unsigned char *data, unsigned int size) 
+{
+	mm_segment_t oldfs;
+	int ret;
+
+	oldfs = get_fs();
+	set_fs(get_ds());
+
+	ret = vfs_write(file, data, size, &offset);
+
+	set_fs(oldfs);
+	return ret;
+}
+
+int file_sync(struct file *file) 
+{
+	vfs_fsync(file, 0);
+	return 0;
+}
+
+extern char myVcDesc[2048];
+extern unsigned int myVcDesc_len;
+
+int read_property(int type)
+{
+	struct file * raw_fp = NULL;
+	char buffer[2048];
+	int len = 0;
+
+	memset(buffer, '\0', sizeof(buffer));
+	if (type == 1) {
+		raw_fp = file_open(MANUFACTORER_RAW, O_RDONLY, 0);
+		if (raw_fp) {
+			len = file_read(raw_fp, 0, buffer, 256);
+			memcpy(myManufacturer, buffer, len);
+			myManufacturer_len = len;
+			file_close(raw_fp);
+		}
+	} else if (type == 2) {
+		raw_fp = file_open(PRODUCT_RAW, O_RDONLY, 0);
+		if (raw_fp) {
+			len = file_read(raw_fp, 0, buffer, 256);
+			memcpy(myProduct, buffer, len);
+			myProduct_len = len;
+			file_close(raw_fp);
+		}
+	} else if (type == 3) {
+		raw_fp = file_open(VC_DESC, O_RDONLY, 0);
+		if (raw_fp) {
+			len = file_read(raw_fp, 0, buffer, 2048);
+			memset(myVcDesc, '\0', sizeof(myVcDesc));
+			memcpy(myVcDesc, buffer, len);
+			myVcDesc_len = len;
+			file_close(raw_fp);
+		}
+	}
+
+	return len;
+}
 
 /*
  * The setup() callback implements all the ep0 functionality that's
@@ -1773,44 +1995,208 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 				value = 0x00;
 				break;
 			case UVC_SET_CUR:
-				switch(w_value)
+				printk("UVC_SET_CUR, %02x\n", w_value);
+				//hex_dump(req->buf, CY_FX_UVC_MAX_PROBE_SETTING);
+				gCurItfnum = w_index & 0xff;
+				if(gCurItfnum == 0)
 				{
-					case 0x200://start streaming
-						printk("Start Streaming\n");
-						//wakeup_thread(g_userspaceUVC_common);//for kernel
-						current_b_request = ctrl->bRequest;
-						current_w_value = w_value;
-						mct_uvc_data.status = 0x01;
-						break;
-					case 0x100:
-						
-						break;
-					default:
-						break;
+					if (client_connected == 1) {
+						memcpy(gSetDirBuff, ctrl, 8);
+						memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
+					} else {
+						switch(w_value)
+						{
+							case 0x200://start streaming
+								printk("Start Streaming on interface 0\n");
+								//memcpy(mct_uvc_data.setuptoken_8byte, ctrl, 8);
+								memset(mct_uvc_data.setuptoken_8byte, '\0', 8);
+								current_b_request = ctrl->bRequest;
+								current_w_value = w_value;
+								mct_uvc_data.status = 0x01;
+								break;
+							case 0x100:
+								break;
+							default:
+								break;
+						}
+					}
+				}
+				else
+				{
+					switch(w_value)
+					{
+						case 0x200://start streaming
+							printk("Start Streaming\n");
+//hex_dump(ctrl, 8);
+							//memcpy(mct_uvc_data.setuptoken_8byte, ctrl, 8);
+							memset(mct_uvc_data.setuptoken_8byte, '\0', 8);
+							current_b_request = ctrl->bRequest;
+							current_w_value = w_value;
+							mct_uvc_data.status = 0x01;
+//printk("start: mct_uvc_data.status  = %x\n", mct_uvc_data.status);
+							break;
+						case 0x100:
+							break;
+						default:
+							break;
+					}
 				}
 				value = w_length;
 				break;
 			case UVC_GET_CUR:
-				memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
-				value = w_length;
+//				printk("UVC_GET_CUR\n");
+				//hex_dump(req->buf, CY_FX_UVC_MAX_PROBE_SETTING);
+				gCurItfnum = w_index & 0xff;
+				if(gCurItfnum == 0 && client_connected == 1)
+				{
+					g_uvc_gadget = gadget;
+					memcpy(&gGetDirBuff[0], ctrl, 8);
+					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
+					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					value = w_length;
+					schedule_work(&ioctl_bottem_work);
+					goto done;
+				}
+				else
+				{
+					if (*((char *)(req->buf)+2) != 3)
+						memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+					else
+						memcpy(req->buf, glProbeCtrlYUV, CY_FX_UVC_MAX_PROBE_SETTING);
+					value = w_length;
+				}
 				break;
 			case UVC_GET_MIN:
-				memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
-				value = w_length;
+				printk("UVC_GET_MIN\n");
+				//hex_dump(req->buf, CY_FX_UVC_MAX_PROBE_SETTING);
+				gCurItfnum = w_index & 0xff;
+				if(gCurItfnum == 0 && client_connected == 1)
+				{
+					g_uvc_gadget = gadget;
+					memcpy(&gGetDirBuff[0], ctrl, 8);
+					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
+					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					value = w_length;
+					schedule_work(&ioctl_bottem_work);
+					goto done;
+				}
+				else
+				{
+					//memcpy(mct_uvc_data.prob_ctrl, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+					if (*((char *)(req->buf)+2) != 3)
+						memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+					else
+						memcpy(req->buf, glProbeCtrlYUV, CY_FX_UVC_MAX_PROBE_SETTING);
+					*((char *)(req->buf)+3) = 1;
+					value = w_length;
+				}
+hex_dump(req->buf, 8);
 				break;
 			case UVC_GET_MAX:
-				memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
-				value = w_length;
+				printk("UVC_GET_MAX\n");
+				//hex_dump(req->buf, CY_FX_UVC_MAX_PROBE_SETTING);
+				gCurItfnum = w_index & 0xff;
+				if(gCurItfnum == 0 && client_connected == 1)
+				{
+					g_uvc_gadget = gadget;
+					memcpy(&gGetDirBuff[0], ctrl, 8);
+					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
+					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					value = w_length;
+					schedule_work(&ioctl_bottem_work);
+					goto done;
+				}
+				else
+				{
+					//memcpy(mct_uvc_data.prob_ctrl, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+					if (*((char *)(req->buf)+2) != 3)
+						memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+					else
+						memcpy(req->buf, glProbeCtrlYUV, CY_FX_UVC_MAX_PROBE_SETTING);
+
+					if (*((char *)(req->buf)+2) == 2)
+						*((char *)(req->buf)+3) = 5;
+					else
+						*((char *)(req->buf)+3) = 4;
+					value = w_length;
+				}
+hex_dump(req->buf, 8);
 				break;
 			case UVC_GET_RES:
+//				printk("UVC_GET_RES\n");
+				gCurItfnum = w_index & 0xff;
+				if(gCurItfnum == 0 && client_connected == 1)
+				{
+					g_uvc_gadget = gadget;
+					memcpy(&gGetDirBuff[0], ctrl, 8);
+					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
+					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					value = w_length;
+					schedule_work(&ioctl_bottem_work);
+					goto done;
+				}
+				else
+				{
+
+				}
 				break;
 			case UVC_GET_LEN:
+//				printk("UVC_GET_LEN\n");
+				gCurItfnum = w_index & 0xff;
+				if(gCurItfnum == 0 && client_connected == 1)
+				{
+					g_uvc_gadget = gadget;
+					memcpy(&gGetDirBuff[0], ctrl, 8);
+					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
+					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					value = w_length;
+					schedule_work(&ioctl_bottem_work);
+					goto done;
+				}
+				else
+				{
+
+				}
 				break;
 			case UVC_GET_INFO:
+//				printk("UVC_GET_INFO\n");
+				gCurItfnum = w_index & 0xff;
+				if(gCurItfnum == 0 && client_connected == 1)
+				{
+					g_uvc_gadget = gadget;
+					memcpy(&gGetDirBuff[0], ctrl, 8);
+					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
+					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					value = w_length;
+					schedule_work(&ioctl_bottem_work);
+					goto done;
+				}
+				else
+				{
+
+				}
 				break;
 			case UVC_GET_DEF:
-				memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
-				value = w_length;
+//				printk("UVC_GET_DEF\n");
+				gCurItfnum = w_index & 0xff;
+				if(gCurItfnum == 0 && client_connected == 1)
+				{
+					g_uvc_gadget = gadget;
+					memcpy(&gGetDirBuff[0], ctrl, 8);
+					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
+					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					value = w_length;
+					schedule_work(&ioctl_bottem_work);
+					goto done;
+				}
+				else
+				{
+					if (*((char *)(req->buf)+2) != 3)
+						memcpy(req->buf, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+					else
+						memcpy(req->buf, glProbeCtrlYUV, CY_FX_UVC_MAX_PROBE_SETTING);
+					value = w_length;
+				}
 				break;
 			default:
 				VDBG(cdev,
@@ -1868,6 +2254,8 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 				cdev->desc.bNumConfigurations =
 					count_configs(cdev, USB_DT_DEVICE);
 				value = min(w_length, (u16) sizeof cdev->desc);
+				cdev->desc.idVendor = myidVendor;
+				cdev->desc.idProduct = myidProduct;
 				memcpy(req->buf, &cdev->desc, value);
 				break;
 			case USB_DT_DEVICE_QUALIFIER:
@@ -1888,8 +2276,30 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 				break;
 			case USB_DT_STRING:
 				value = get_string(cdev, req->buf, w_index, w_value & 0xff);
-				if (value >= 0)
+				if (value >= 0) {
 					value = min(w_length, (u16) value);
+					if ((w_value&0xff) == 1) {
+						//  manufactorer
+						if (myManufacturer_len > 0) {
+							memcpy(req->buf, myManufacturer, myManufacturer_len);
+							value = min(w_length, (u16)myManufacturer_len);
+						}
+					} else if ((w_value&0xff) == 2) {
+						//  product
+						if (myProduct_len > 0) {
+							memcpy(req->buf, myProduct, myProduct_len);
+							value = min(w_length, (u16)myProduct_len);
+						}
+					}
+				} else {
+					if (myProduct_len > 0) {
+						memcpy(req->buf, myProduct, myProduct_len);
+						value = min(w_length, (u16)myProduct_len);
+					} else {
+						memcpy(req->buf, "UVC Camera", strlen("UVC Camera"));
+						value = strlen("UVC Camera");
+					}
+				}
 				break;
 			case USB_DT_BOS:
 				memcpy(req->buf, fsg_bos_desc, sizeof(fsg_bos_desc));
@@ -1929,6 +2339,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 			}
 			spin_lock(&cdev->lock);
 			value = set_config(cdev, ctrl, w_value);
+			schedule_work(&setcfg_bottem_work);
 			spin_unlock(&cdev->lock);
 			break;
 		case USB_REQ_GET_CONFIGURATION:
@@ -1980,6 +2391,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 				if(w_index == 0x82)//stop UVC bulk streaming
 				{
 					printk("Stop Streaming\n");
+					memset(mct_uvc_data.setuptoken_8byte, '\0', 8);
 					current_b_request = ctrl->bRequest;
 					current_w_value = w_value;
 					mct_uvc_data.status = 0x02;
@@ -2211,9 +2623,11 @@ static int composite_bind(struct usb_gadget *gadget)
 	/* strings can't be assigned before bind() allocates the
 	 * releavnt identifiers
 	 */
+	myiManufacturer = cdev->desc.iManufacturer;
 	if (cdev->desc.iManufacturer && iManufacturer)
 		string_override(composite->strings,
 			cdev->desc.iManufacturer, iManufacturer);
+	myiProduct = cdev->desc.iProduct;
 	if (cdev->desc.iProduct && iProduct)
 		string_override(composite->strings,
 			cdev->desc.iProduct, iProduct);
@@ -2313,6 +2727,23 @@ static struct usb_gadget_driver composite_driver = {
  * while it was binding.  That would usually be done in order to wait for
  * some userspace participation.
  */
+void my_ctrlep_write(const char __user *buffer, size_t count)
+{
+	struct usb_composite_dev	*cdev = get_gadget_data(g_uvc_gadget);
+	struct usb_request		*req = cdev->req;
+	memcpy(req->buf, buffer, count);
+	req->length = count;
+	if(count%64 == 0)
+	{
+		req->zero = 1;
+	}
+	else
+	{
+		req->zero = 0;
+	}
+	usb_ep_queue(g_uvc_gadget->ep0, req, GFP_ATOMIC);
+}
+
 
 int WebUVCMajor;
 
@@ -2351,10 +2782,13 @@ extern int send_UVB_bulk_usr(struct fsg_common *common, unsigned int length, uns
 int device_write(struct file *filp, const char __user *buf, size_t count, loff_t *offset)
 {
 	unsigned char UVC_Buff[512];
-	g_incomplete = 0;
-	copy_from_user(UVC_Buff, buf, count);
-	send_UVB_bulk_usr(g_userspaceUVC_common, count, UVC_Buff);
-	wait_event_interruptible(gUVCwq, g_incomplete);
+	if (mct_uvc_data.status == 0x1) {
+		g_incomplete = 0;
+		copy_from_user(UVC_Buff, buf, count);
+		send_UVB_bulk_usr(g_userspaceUVC_common, count, UVC_Buff);
+		wait_event_interruptible(gUVCwq, g_incomplete);
+	}
+
 	return 0;
 }
 
@@ -2368,17 +2802,48 @@ typedef struct _uvc_capabilities_data{
 	unsigned int camera;
 	unsigned int process;
 }UVC_CAPABILITIES_DATA;
+extern void uvc_change_desc(void);
+extern void uvc_copy_desc(void);
 
 long device_ioctl(struct file *file, unsigned int cmd, unsigned long data)
 {
 	UVC_CAPABILITIES_DATA capabilities;
+	unsigned char UVC_INTR_Buff[16];
+	unsigned char UVC_CTRL_Buff[MCT_UVC_NOTIFY_SIZE];
+	char string_buf[256];
+
+	//printk("device_ioctl event\n");
 
 	switch (cmd) {
 	case UVC_GET_STAT:
 		//printk("UVC_GET_STAT:    ");
 		wait_event_interruptible(gUVCioctl, g_ioctlincomplete);
 		g_ioctlincomplete = 0;
-		copy_to_user((char*)data, &mct_uvc_data, MCT_UVC_DATA_SIZE);
+		if((gCurItfnum == 0 && (((ep0_setup_dir)&USB_TYPE_CLASS) == USB_TYPE_CLASS)) && client_connected == 1)
+		{
+			if((g_mct_uvc_setup_remove->setupcmd[0]) & 0x80)//get
+			{
+				copy_to_user((char*)data, &gGetDirBuff[0], MCT_UVC_NOTIFY_SIZE);
+			}
+			else
+			{
+				copy_to_user((char*)data, &g_mct_uvc_setup_remove->setupcmd[0], MCT_UVC_NOTIFY_SIZE);
+			}
+			g_mct_uvc_setup_remove = g_mct_uvc_setup_remove->next;
+			if(g_mct_uvc_setup_remove != g_mct_uvc_setup_insert)
+			{
+				g_ioctlincomplete = 1;
+				wake_up(&gUVCioctl);//for user
+			}
+		}
+		else
+		{
+			//printk("mct_uvc_data.status = %x\n", mct_uvc_data.status);
+			copy_to_user((char*)data, &mct_uvc_data, MCT_UVC_DATA_SIZE);
+		}
+		break;
+	case UVC_CLIENT_LOST:
+		client_connected = 0;
 		break;
 	case CAMERA_STS_CHANGE:
 		copy_from_user(&capabilities, data, sizeof(capabilities));
@@ -2390,11 +2855,62 @@ long device_ioctl(struct file *file, unsigned int cmd, unsigned long data)
 		g_uvc_nv12_res_bitflag = capabilities.nv12;
 		g_uvc_i420_res_bitflag = capabilities.i420;
 		g_uvc_m420_res_bitflag = capabilities.m420;
+		if(currentbcdUVC == 0x0150)
+		{
+			uvc_change_desc_compatable();
+		}
+		else
+		{
+			uvc_change_desc();
+		}
+		uvc_copy_desc();
+		client_connected = 1;
 		break;
 	case APPLY_DESC_CHANGE:
+		if(currentbcdUVC == 0x0150)
+		{
+			uvc_change_desc_compatable();
+		}
+		else
+		{
+			uvc_change_desc();
+		}
+		uvc_copy_desc();
 		break;
 	case QUERY_SETUP_DATA:
 		break;
+	case CTRLEP_WRITE:
+		copy_from_user(UVC_CTRL_Buff, data, 256);
+		my_ctrlep_write(&UVC_CTRL_Buff[1], UVC_CTRL_Buff[0]);
+		break;
+	case INTREP_WRITE:
+		copy_from_user(UVC_INTR_Buff, data, 16);
+		my_f_hidg_write(UVC_INTR_Buff, 16);
+		break;
+	case UVC_SET_MANUFACTURER:
+		read_property(1);
+		break;
+	case UVC_SET_PRODUCT_NAME:
+		read_property(2);
+		break;
+	case UVC_SET_VC_DESC:
+		read_property(3);
+		break;
+	case UVC_GET_UVC_VER:
+		uvc_get_bcdUVC();
+		break;
+	case UVC_SET_PIDVID:
+		myidVendor = (data >> 16) & 0xffff;
+		myidProduct = (data & 0xffff);
+		break;
+	case UVC_EP0_SET_HALT:
+		usb_ep_set_halt(g_uvc_gadget->ep0);
+		break;
+	case UVC_EP0_CLEAR_HALT:
+		usb_ep_clear_halt(g_uvc_gadget->ep0);
+		break;
+	default :
+		printk("device_ioctl: command format error\n");
 	}
 	return 0;
 }
@@ -2406,12 +2922,15 @@ struct file_operations webUVCfops = {
   open : device_open,
   release : device_release,
   unlocked_ioctl : device_ioctl,
+  //ioctl : device_ioctl,
 };
 
 #define WEBUVC_DEVICE_NAME "Web_UVC0"
 
 int usb_composite_register(struct usb_composite_driver *driver)
 {
+	//struct file * conf_fp = NULL;
+	int i;
 	if (!driver || !driver->dev || !driver->bind || composite)
 		return -EINVAL;
 
@@ -2423,9 +2942,30 @@ int usb_composite_register(struct usb_composite_driver *driver)
 
 	WebUVCMajor = register_chrdev(255, WEBUVC_DEVICE_NAME, &webUVCfops);
 
+	//conf_fp = file_open(UVC_CONF_FILE, O_RDONLY, 0);
+	//if (conf_fp) {
+	//     file_read(conf_fp, 0, glProbeCtrl, CY_FX_UVC_MAX_PROBE_SETTING);
+	//     file_close(conf_fp);
+	//}
+
 	init_waitqueue_head(&gUVCwq);
 	init_waitqueue_head(&gUVCioctl);
 	INIT_WORK(&ioctl_bottem_work, ioctl_bottem_notify);
+	INIT_WORK(&setcfg_bottem_work, setcfg_bottem_notify);
+
+	for(i=0;i<MAX_SETUP_QUEUE;i++)
+	{
+		if(i == (MAX_SETUP_QUEUE-1))
+		{
+			g_mct_uvc_setup_queue[i].next = &g_mct_uvc_setup_queue[0];
+		}
+		else
+		{
+			g_mct_uvc_setup_queue[i].next = &g_mct_uvc_setup_queue[i+1];
+		}
+	}
+	g_mct_uvc_setup_insert = &g_mct_uvc_setup_queue[0];
+	g_mct_uvc_setup_remove = &g_mct_uvc_setup_queue[0];
 
 	//printk("reg Web_UVC0\n");
 	if (WebUVCMajor < 0) {
