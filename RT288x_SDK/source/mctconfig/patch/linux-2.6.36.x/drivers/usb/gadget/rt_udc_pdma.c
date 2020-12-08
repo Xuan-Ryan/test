@@ -1054,7 +1054,7 @@ static int copy_data_to_ep(void *src, int length, int ep_num)
     }
 	if(length != req->req.length)
 	{
-		printk("%d,%d,%d\n",length, req->req.length, req->req.actual);
+		//printk("%d,%d,%d\n",length, req->req.length, req->req.actual);
 	}
     if(length > req_bufferspace){
         FATAL_ERROR("buffer overflow");
@@ -1193,7 +1193,7 @@ static int rt_udc_dma_init(void)
 		if(!USBRxPackets[i]){
 			for(i=i-1; i>=0; i--)
 				kfree((void *)USBRxPackets[i]);
-			printk("No mem.");
+			//printk("No mem.");
 			return -1;
 		}
 	}
@@ -1201,9 +1201,9 @@ static int rt_udc_dma_init(void)
 	tx_ring0_cache = dma_alloc_coherent(NULL, sizeof(struct PDMA_txdesc) * NUM_TX_DESC, &tx_ring_bus_addr, GFP_KERNEL);
 	rx_ring0_cache = dma_alloc_coherent(NULL, sizeof(struct PDMA_rxdesc) * NUM_RX_DESC, &rx_ring_bus_addr, GFP_KERNEL);
 
-	printk("USB PDMA mode enabled.\n");
-	printk("tx_ring=%p\n", tx_ring0_cache);
-	printk("rx_ring=%p\n", rx_ring0_cache);
+	//printk("USB PDMA mode enabled.\n");
+	//printk("tx_ring=%p\n", tx_ring0_cache);
+	//printk("rx_ring=%p\n", rx_ring0_cache);
 
 	tx_ring0_noncache = tx_ring0_cache;
 	rx_ring0_noncache = rx_ring0_cache;
@@ -1231,7 +1231,7 @@ static int rt_udc_dma_init(void)
 	//OUTL(cpu_to_le32((u32) UDMA_Init_Setting), RTUSB_UDMA_CTRL);
 
 	if(sm){
-		printk("Storage mode enabled.\n");
+		//printk("Storage mode enabled.\n");
 		reg_write(RTUSB_UDMA_CTRL, 0x3F000063);	/* enable storage mode */
 	}else
 	reg_write(RTUSB_UDMA_CTRL, 0x3F000003);
@@ -1302,15 +1302,15 @@ static int rt_ep_enable(struct usb_ep *usb_ep, const struct usb_endpoint_descrip
 	DBG;
 
 	if (!usb_ep || !desc || !EP_NO(rt_ep) || desc->bDescriptorType != USB_DT_ENDPOINT || rt_ep->bEndpointAddress != desc->bEndpointAddress) {
-		printk("<%s> bad ep or descriptor\n", __func__);
+		//printk("<%s> bad ep or descriptor\n", __func__);
 		return -EINVAL;
 	}
 	if (rt_ep->bmAttributes != desc->bmAttributes) {
-		printk("<%s> %s type mismatch, 0x%x, 0x%x\n", __func__, usb_ep->name, rt_ep->bmAttributes, desc->bmAttributes);
+		//printk("<%s> %s type mismatch, 0x%x, 0x%x\n", __func__, usb_ep->name, rt_ep->bmAttributes, desc->bmAttributes);
 		return -EINVAL;
 	}
 	if (!rt_usb->driver || rt_usb->gadget.speed == USB_SPEED_UNKNOWN) {
-		printk("<%s> bogus device state\n", __func__);
+		//printk("<%s> bogus device state\n", __func__);
 		return -ESHUTDOWN;
 	}
 	local_irq_save(flags);
@@ -1419,7 +1419,7 @@ static int rt_ep_queue(struct usb_ep *usb_ep, struct usb_request *req, gfp_t gfp
 	xprintk("<eq> ep%d%s %p %dB\n",  EP_NO(rt_ep), ((!EP_NO(rt_ep) && rt_ep->rt_usb->ep0state == EP0_IN_DATA_PHASE) || (EP_NO(rt_ep) && EP_DIR(rt_ep) == EP_IN  )) ? "IN" : "OUT", &rt_req->req,  req->length);
 
 	if (rt_ep->stopped) {
-		printk("EP%d %d -> stopped.\n",  EP_NO(rt_ep), EP_DIR(rt_ep));
+		//printk("EP%d %d -> stopped.\n",  EP_NO(rt_ep), EP_DIR(rt_ep));
 		req->status = -ESHUTDOWN;
 		return -ESHUTDOWN;
 	}
@@ -1755,7 +1755,7 @@ static void handle_setup(struct rt_udc_struct *rt_usb)
 	}
 
 	if(!rt_usb->driver){
-		printk("<%s> please insert gadget driver/module.\n", __func__);
+		//printk("<%s> please insert gadget driver/module.\n", __func__);
 		goto stall;
 	}
 
@@ -1765,7 +1765,7 @@ static void handle_setup(struct rt_udc_struct *rt_usb)
 	i = rt_usb->driver->setup(&rt_usb->gadget, &u.r); // gadget would queue more usb req here
 
 	if (i < 0) {
-		printk("<%s> device setup error %d\n", __func__, i);
+		//printk("<%s> device setup error %d\n", __func__, i);
 		goto stall;
 	}
 
@@ -1777,7 +1777,7 @@ static void handle_setup(struct rt_udc_struct *rt_usb)
 
 	return;
 stall:
-	printk("<%s> protocol STALL\n", __func__);
+	//printk("<%s> protocol STALL\n", __func__);
 	rt_ep_stall(rt_ep, 1);
 	ep0_chg_stat(__func__, rt_usb, EP0_STALL);
 	return;
@@ -1931,7 +1931,7 @@ DBG;
 	// clear ep interrupt
 	irq |= 1 << epoutirq; 
 	usb_write(OUT07IRQ, irq);
-	printk("ep2out done\n");
+	//printk("ep2out done\n");
 	done(rt_ep, req, 0);
 	return;
 }
@@ -2561,7 +2561,7 @@ static int __init udc_init(void)
 	tasklet_init(&tx_tasklet, tx_do_tasklet, 0);
 
 	if(dma){
-		printk("DMA TXMAXCAP=%d\n", TXMAXCAP);
+		//printk("DMA TXMAXCAP=%d\n", TXMAXCAP);
 		tasklet_init(&rx_dma_tasklet, rx_dma_done_do_tasklet, 0);
 		tasklet_init(&tx_dma_tasklet, tx_dma_done_do_tasklet, 0);
 	}

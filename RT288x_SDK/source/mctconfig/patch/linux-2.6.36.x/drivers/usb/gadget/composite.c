@@ -1995,7 +1995,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 				value = 0x00;
 				break;
 			case UVC_SET_CUR:
-				printk("UVC_SET_CUR, %02x\n", w_value);
+				//printk("UVC_SET_CUR, %02x\n", w_value);
 				//hex_dump(req->buf, CY_FX_UVC_MAX_PROBE_SETTING);
 				gCurItfnum = w_index & 0xff;
 				if(gCurItfnum == 0)
@@ -2007,7 +2007,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 						switch(w_value)
 						{
 							case 0x200://start streaming
-								printk("Start Streaming on interface 0\n");
+								//printk("Start Streaming on interface 0\n");
 								//memcpy(mct_uvc_data.setuptoken_8byte, ctrl, 8);
 								memset(mct_uvc_data.setuptoken_8byte, '\0', 8);
 								current_b_request = ctrl->bRequest;
@@ -2026,14 +2026,12 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 					switch(w_value)
 					{
 						case 0x200://start streaming
-							printk("Start Streaming\n");
-//hex_dump(ctrl, 8);
+							//printk("Start Streaming\n");
 							//memcpy(mct_uvc_data.setuptoken_8byte, ctrl, 8);
 							memset(mct_uvc_data.setuptoken_8byte, '\0', 8);
 							current_b_request = ctrl->bRequest;
 							current_w_value = w_value;
 							mct_uvc_data.status = 0x01;
-//printk("start: mct_uvc_data.status  = %x\n", mct_uvc_data.status);
 							break;
 						case 0x100:
 							break;
@@ -2044,7 +2042,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 				value = w_length;
 				break;
 			case UVC_GET_CUR:
-//				printk("UVC_GET_CUR\n");
+				//printk("UVC_GET_CUR\n");
 				//hex_dump(req->buf, CY_FX_UVC_MAX_PROBE_SETTING);
 				gCurItfnum = w_index & 0xff;
 				if(gCurItfnum == 0 && client_connected == 1)
@@ -2067,7 +2065,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 				}
 				break;
 			case UVC_GET_MIN:
-				printk("UVC_GET_MIN\n");
+				//printk("UVC_GET_MIN\n");
 				//hex_dump(req->buf, CY_FX_UVC_MAX_PROBE_SETTING);
 				gCurItfnum = w_index & 0xff;
 				if(gCurItfnum == 0 && client_connected == 1)
@@ -2090,10 +2088,9 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 					*((char *)(req->buf)+3) = 1;
 					value = w_length;
 				}
-hex_dump(req->buf, 8);
 				break;
 			case UVC_GET_MAX:
-				printk("UVC_GET_MAX\n");
+				//printk("UVC_GET_MAX\n");
 				//hex_dump(req->buf, CY_FX_UVC_MAX_PROBE_SETTING);
 				gCurItfnum = w_index & 0xff;
 				if(gCurItfnum == 0 && client_connected == 1)
@@ -2120,10 +2117,9 @@ hex_dump(req->buf, 8);
 						*((char *)(req->buf)+3) = 4;
 					value = w_length;
 				}
-hex_dump(req->buf, 8);
 				break;
 			case UVC_GET_RES:
-//				printk("UVC_GET_RES\n");
+				//printk("UVC_GET_RES\n");
 				gCurItfnum = w_index & 0xff;
 				if(gCurItfnum == 0 && client_connected == 1)
 				{
@@ -2141,7 +2137,7 @@ hex_dump(req->buf, 8);
 				}
 				break;
 			case UVC_GET_LEN:
-//				printk("UVC_GET_LEN\n");
+				//printk("UVC_GET_LEN\n");
 				gCurItfnum = w_index & 0xff;
 				if(gCurItfnum == 0 && client_connected == 1)
 				{
@@ -2159,7 +2155,7 @@ hex_dump(req->buf, 8);
 				}
 				break;
 			case UVC_GET_INFO:
-//				printk("UVC_GET_INFO\n");
+				//printk("UVC_GET_INFO\n");
 				gCurItfnum = w_index & 0xff;
 				if(gCurItfnum == 0 && client_connected == 1)
 				{
@@ -2177,7 +2173,7 @@ hex_dump(req->buf, 8);
 				}
 				break;
 			case UVC_GET_DEF:
-//				printk("UVC_GET_DEF\n");
+				//printk("UVC_GET_DEF\n");
 				gCurItfnum = w_index & 0xff;
 				if(gCurItfnum == 0 && client_connected == 1)
 				{
@@ -2390,7 +2386,7 @@ hex_dump(req->buf, 8);
 			{
 				if(w_index == 0x82)//stop UVC bulk streaming
 				{
-					printk("Stop Streaming\n");
+					//printk("Stop Streaming\n");
 					memset(mct_uvc_data.setuptoken_8byte, '\0', 8);
 					current_b_request = ctrl->bRequest;
 					current_w_value = w_value;
@@ -2969,7 +2965,7 @@ int usb_composite_register(struct usb_composite_driver *driver)
 
 	//printk("reg Web_UVC0\n");
 	if (WebUVCMajor < 0) {
-		printk("Register char device Web_UVC0 fail\n");
+		//printk("Register char device Web_UVC0 fail\n");
 		return WebUVCMajor;
 	}
 

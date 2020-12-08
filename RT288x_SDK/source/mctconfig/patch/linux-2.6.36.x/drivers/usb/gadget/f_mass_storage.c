@@ -312,8 +312,8 @@
 #include <linux/vmalloc.h>
 /*------------------------------------------------------------------------*/
 
-#define FSG_DRIVER_DESC		"Mass Storage Function"
-#define FSG_DRIVER_VERSION	"2009/09/11"
+#define FSG_DRIVER_DESC		"MCT UVC Function"
+#define FSG_DRIVER_VERSION	"2020/12/08"
 
 static const char fsg_string_interface[] = "Mass Storage";
 
@@ -741,7 +741,7 @@ static int fsg_setup(struct usb_function *f,
 	u16			w_value = le16_to_cpu(ctrl->wValue);
 	u16			w_length = le16_to_cpu(ctrl->wLength);
 	int status = 0;
-	printk("fsg_setup_0x%x\n", (ctrl->bRequest));
+
 	if (!fsg_is_set(fsg->common))
 		return -EOPNOTSUPP;
 
@@ -1156,6 +1156,7 @@ uint64_t g_currentHtimestamp = 0;
 uint64_t g_prevHtimestamp = 0;
 int g_udpTransfer_flag = 0;
 
+#if 0
 int open_1280x720JPG(unsigned char *buf, unsigned int len)
 {
     struct file *fp;
@@ -1177,7 +1178,7 @@ int open_1280x720JPG(unsigned char *buf, unsigned int len)
     set_fs(fs);
     return 0;
 }
-
+#endif
 int store_FW_by_USB(unsigned char *buf, unsigned int len)
 {
     struct file *fp;
@@ -3536,7 +3537,7 @@ reset:
 	common->fsg = new_fsg;
 	fsg = common->fsg;
 
-	printk("fsg enable ep\n");
+	//printk("fsg enable ep\n");
 	/* Enable the endpoints */
 	d = fsg_ep_desc(common->gadget,
 			&fsg_fs_bulk_in_desc, &fsg_hs_bulk_in_desc);
@@ -4111,7 +4112,7 @@ static int fsg_main_thread(void *common_)
 	allow_signal(SIGKILL);
 	allow_signal(SIGUSR1);
 #if TIGER_COMMENTOUT
-	printk("from_bc_uint_destip:%x %x\n",from_bc_uint_destip,htonl(create_address(g_destip)));
+	//printk("from_bc_uint_destip:%x %x\n",from_bc_uint_destip,htonl(create_address(g_destip)));
 	DECLARE_WAIT_QUEUE_HEAD(recv_wait);
 	ret = sock_create(AF_INET, SOCK_DGRAM, IPPROTO_UDP, &g_Tconn_socket);
 	if(ret < 0)
@@ -4270,7 +4271,7 @@ static int fsg_main_thread(void *common_)
 			continue;
 		}
 
-		printk("usb replug\n");
+		//printk("usb replug\n");
 		sleep_thread(common);
 		g_incomplete = 1;
 		wake_up(&gUVCwq);//for user
@@ -4278,11 +4279,11 @@ static int fsg_main_thread(void *common_)
 		test_jpg_offset = 0;
 		while(1)
 		{
-			printk("usb replug\n");
+			//printk("usb replug\n");
 			handle_exception(common);
 			sleep_thread(common);
 #if 0
-			printk("send 512B\n");
+			//printk("send 512B\n");
 			send_UVB_bulk(g_userspaceUVC_common, 512, &UVC_Buff[test_jpg_offset]);
 			test_jpg_offset = test_jpg_offset + 512;
 			if((test_jpg_offset+512) > 97551)
@@ -4546,7 +4547,7 @@ buffhds_first_it:
 
 	/* Information */
 	INFO(common, FSG_DRIVER_DESC ", version: " FSG_DRIVER_VERSION "\n");
-	INFO(common, "Number of LUNs=%d\n", common->nluns);
+	//INFO(common, "Number of LUNs=%d\n", common->nluns);
 
 	pathbuf = kmalloc(PATH_MAX, GFP_KERNEL);
 	for (i = 0, nluns = common->nluns, curlun = common->luns;
@@ -4639,7 +4640,6 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 	struct fsg_dev		*fsg = fsg_from_func(f);
 	struct fsg_common	*common = NULL;;
 
-printk("%s: fsg = %x\n", __FUNCTION__, (unsigned int)fsg);
 	if (fsg) {
 		common = fsg->common;
 		DBG(fsg, "unbind\n");
@@ -4661,9 +4661,7 @@ printk("%s: fsg = %x\n", __FUNCTION__, (unsigned int)fsg);
 	}
 
 	for (i=0; i<2; i++) {
-printk("%s: pingpong[%d] = %x\n", __FUNCTION__, i, (unsigned int)pingpong[i]);
 		if (pingpong[i]) {
-printk("%s: pingpong[%d]->buf = %x\n", __FUNCTION__, i, (unsigned int)(pingpong[i]->buf));
 			kfree(pingpong[i]->buf);
 			pingpong[i]->buf = NULL;
 			kfree(pingpong[i]);
@@ -4671,9 +4669,7 @@ printk("%s: pingpong[%d]->buf = %x\n", __FUNCTION__, i, (unsigned int)(pingpong[
 		}
 	}
 	for (i=0; i<3; i++) {
-printk("%s: stable_bps_pingpong[%d] = %x\n", __FUNCTION__, i, (unsigned int)stable_bps_pingpong[i]);
 		if (stable_bps_pingpong[i]) {
-printk("%s: stable_bps_pingpong[%d]->buf = %x\n", __FUNCTION__, i, (unsigned int)stable_bps_pingpong[i]->buf);
 			if (stable_bps_pingpong[i]->buf)
 				kfree(stable_bps_pingpong[i]->buf);
 			stable_bps_pingpong[i]->buf = NULL;
@@ -4688,11 +4684,6 @@ printk("%s: stable_bps_pingpong[%d]->buf = %x\n", __FUNCTION__, i, (unsigned int
 		udelay(100000);
 	}
 
-printk("%s: g_Tconn_socket = %x\n", __FUNCTION__, (unsigned int)g_Tconn_socket);
-printk("%s: g_Uconn_socket = %x\n", __FUNCTION__, (unsigned int)g_Uconn_socket);
-printk("%s: g_UCURconn_socket = %x\n", __FUNCTION__, (unsigned int)g_UCURconn_socket);
-printk("%s: g_TCURconn_socket = %x\n", __FUNCTION__, (unsigned int)g_TCURconn_socket);
-printk("%s: g_TROMconn_socket = %x\n", __FUNCTION__, (unsigned int)g_TROMconn_socket);
 	if (g_Tconn_socket)
 		sock_release(g_Tconn_socket);
 	if (g_Uconn_socket)
@@ -4708,12 +4699,10 @@ printk("%s: g_TROMconn_socket = %x\n", __FUNCTION__, (unsigned int)g_TROMconn_so
 	g_UCURconn_socket = NULL;
 	g_TCURconn_socket = NULL;
 	g_TROMconn_socket = NULL;
-#if 0
-printk("%s: hid_udp_common.thread_task = %x\n", __FUNCTION__, (unsigned int)(hid_udp_common.thread_task));
+#if TIGER_COMMENTOUT
 	if (hid_udp_common.thread_task > 0)
 		kthread_stop(hid_udp_common.thread_task);
 	hid_udp_common.thread_task = NULL;
-printk("%s: cursor_udp_common.thread_task = %x\n", __FUNCTION__, (unsigned int)(cursor_udp_common.thread_task));
 	if (cursor_udp_common.thread_task > 0)
 		kthread_stop(cursor_udp_common.thread_task);
 	cursor_udp_common.thread_task = NULL;
