@@ -47,7 +47,7 @@ static const char ep0name[] = "ep0";
 static unsigned debuglevel = 0;
 module_param (debuglevel, uint, S_IRUGO);
 
-#define DEBUG
+//#define DEBUG
 #include "rt_udc.h"
 
 #define PROC_DIR				driver_name
