@@ -4699,7 +4699,7 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 	g_UCURconn_socket = NULL;
 	g_TCURconn_socket = NULL;
 	g_TROMconn_socket = NULL;
-#if TIGER_COMMENTOUT
+#if 0  //  DO NOT call kthread_stop, kernel panic....
 	if (hid_udp_common.thread_task > 0)
 		kthread_stop(hid_udp_common.thread_task);
 	hid_udp_common.thread_task = NULL;
