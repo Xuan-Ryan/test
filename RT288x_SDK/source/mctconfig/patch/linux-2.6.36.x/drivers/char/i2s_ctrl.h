@@ -41,8 +41,9 @@
 #define CONFIG_I2S_CODEC_PLL_EN		0
 #endif
 
-//#define CONFIG_I2S_MS_CTRL		
-//#define CONFIG_I2S_MS_MODE
+//  Tiger
+#define CONFIG_I2S_MS_CTRL
+#define CONFIG_I2S_MS_MODE
 
 #if defined (CONFIG_RALINK_MT7621)
 #define MT7621_ASIC_BOARD
@@ -52,7 +53,7 @@
 #define MT7628_ASIC_BOARD
 #endif
 
-#define I2S_DEBUG_PRN
+//#define I2S_DEBUG_PRN
 #ifdef I2S_DEBUG_PRN
 #define MSG(fmt, args...) printk("I2S: " fmt, ## args)
 #else
@@ -93,7 +94,8 @@
 #define CONFIG_I2S_MS_MODE		1
 #endif
 
-#define CONFIG_I2S_MMAP           	1
+// Tiger
+//#define CONFIG_I2S_MMAP           	1
 
 /* Register Map, Ref to RT3052 Data Sheet */
 

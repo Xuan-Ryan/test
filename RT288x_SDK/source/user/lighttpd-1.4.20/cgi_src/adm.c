@@ -9,10 +9,10 @@
 #if (defined CONFIG_RALINK_WATCHDOG || defined CONFIG_RALINK_WATCHDOG_MODULE) && defined CONFIG_USER_WATCHDOG
 static void watchdog_restart(void)
 {
-	do_system("killall -9 watchdog 1>/dev/null");
-	do_system("rmmod ralink_wdt.o 1>/dev/null");
+	system("killall -9 watchdog 2>/dev/null");
+	system("rmmod ralink_wdt.o 2>/dev/null");
 	if (strcmp(nvram_get(RT2860_NVRAM, "WatchDogEnable"), "1") == 0) {
-		do_system("insmod -q ralink_wdt.o 1>/dev/null");
+		system("insmod -q ralink_wdt.o 2>/dev/null");
 		do_system("wdg.sh");
 		do_system("watchdog");
 	}

@@ -207,8 +207,8 @@ int ralink_gpio_led_set(ralink_gpio_led_info led)
 				ralink_gpio_led_data[led.gpio].rests,
 				ralink_gpio_led_data[led.gpio].times);
 		tmpgpiomode = *(volatile u32 *)(RALINK_REG_GPIOMODE);
-		*(volatile u32 *)(RALINK_REG_GPIOMODE) = tmpgpiomode | 0x10001C;
-		printk("mode:0x%x\n",*(volatile u32 *)(RALINK_REG_GPIOMODE));
+		//  Tiger
+		*(volatile u32 *)(RALINK_REG_GPIOMODE) = tmpgpiomode | 0x100018;  //  programed to GPIO and I21S
 		//set gpio direction to 'out'
 #if defined (RALINK_GPIO_HAS_2722)
 		if (led.gpio <= 21) {
@@ -2415,7 +2415,8 @@ void ralink_gpio_led_init_timer(void)
 			ralink_gpio_led_data[9].rests = 0;
 			ralink_gpio_led_data[9].times = 0;
 			tmpgpiomode = *(volatile u32 *)(RALINK_REG_GPIOMODE);
-			*(volatile u32 *)(RALINK_REG_GPIOMODE) = tmpgpiomode | 0x10001C;
+			//  Tiger
+			*(volatile u32 *)(RALINK_REG_GPIOMODE) = tmpgpiomode | 0x100018;  //  programed to GPIO and I2S
 			printk("mode:0x%x\n",*(volatile u32 *)(RALINK_REG_GPIOMODE));
 		}
 		else
@@ -2507,11 +2508,15 @@ int __init ralink_gpio_init(void)
 	gpiomode = le32_to_cpu(*(volatile u32 *)(RALINK_REG_GPIOMODE));
 #if !defined (CONFIG_RALINK_RT2880)
 	//gpiomode &= ~0x1C;  //clear bit[2:4]UARTF_SHARE_MODE
+	gpiomode &= ~0x1C;  //clear bit[2:4]UARTF_SHARE_MODE
+	//  Tiger
+	gpiomode |= 0x18;  //  programed to GPIO and I2S
 #endif
 #if defined (CONFIG_RALINK_MT7620)
 	gpiomode &= ~0x2000;  //clear bit[13] WLAN_LED
 #endif
 	gpiomode |= RALINK_GPIOMODE_DFT;
+	printk("%x\n", gpiomode);
 	*(volatile u32 *)(RALINK_REG_GPIOMODE) = cpu_to_le32(gpiomode);
 
 	//enable gpio interrupt

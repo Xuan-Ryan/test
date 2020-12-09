@@ -183,7 +183,7 @@ dir_$(CONFIG_USER_ISC_DHCP)		    += dhcp-4.2.5-P1
 
 #TEST
 dir_$(CONFIG_USER_HELLO_WORLD)		    += hello_world
-dir_$(CONFIG_USER_T6_DONGLE_SUPPORT)            += t6-dongle
+dir_$(CONFIG_MCT_GADGET)                     += mct_gadget
 #--
 
 # VoIP & TR069
