@@ -701,7 +701,7 @@ static void iptablesMaliciousFilterFlush(void)
 	do_system("iptables -A %s -p tcp --syn -j %s 1>/dev/null 2>&1", MALICIOUS_INPUT_FILTER_CHAIN, SYNFLOOD_INPUT_FILTER_CHAIN);
 	
 	/* disable tcp_syncookie capacity */
-	do_system("echo 0 > /proc/sys/net/ipv4/tcp_syncookies 2>&1 1>/dev/null");
+	system("echo 0 > /proc/sys/net/ipv4/tcp_syncookies 2>/dev/null");
 }
 
 static void iptablesDMZFlush(void)
@@ -2288,7 +2288,7 @@ static void iptablesAllFilterRun(void)
 }
 static void iptablesAllNATClear(void)
 {
-	do_system("/bin/super_dmz -f");
+	//do_system("/bin/super_dmz -f");
 	iptablesPortForwardClear();
 	iptablesDMZClear();
 	conntrack_flush();
