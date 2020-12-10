@@ -4535,7 +4535,7 @@ buffhds_first_it:
 	/* Tell the thread to start working */
 	common->thread_task =
 		kthread_create(fsg_main_thread, common,
-			       OR(cfg->thread_name, "t6dongle_udp"));
+			       OR(cfg->thread_name, "mct_uvc"));
 	if (IS_ERR(common->thread_task)) {
 		rc = PTR_ERR(common->thread_task);
 		goto error_release;
