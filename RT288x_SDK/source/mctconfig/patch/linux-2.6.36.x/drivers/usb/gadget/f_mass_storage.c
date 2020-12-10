@@ -3768,6 +3768,10 @@ static int stable_bps_ksocket_send_thread(struct fsg_common	*common)
 	struct usb_udp_pingpong* ksocket_send_pingpong = stable_bps_pingpong[0];
 	u32 i;
 	int udp_send_size;
+
+	/*  don't need this thread  */
+	return 0;
+
 	printk("start stable_bps_ksocket...\n");
 	while(1)
 	{
@@ -3857,6 +3861,10 @@ static int hid_udp_main_thread(void)
 {
 	int ret = 0;
 	unsigned int axis_x, axis_y;
+
+	/*  don't need this thread  */
+	return 0;
+
 	printk("start hid_udp...\n");
 	while(1)
 	{
@@ -3882,6 +3890,10 @@ static int cursor_udp_main_thread(void)
 	int ret = 0;
 	int udp_send_size;
 	struct fsg_common common;
+
+	/*  don't need this thread  */
+	return 0;
+
 	printk("start cursor_udp...\n");
 	while(1)
 	{
@@ -3906,6 +3918,10 @@ static int cursor_tcp_main_thread(void)
 	int i;
 	struct fsg_common common;
 	MNSPXACTHDR udp_hdr, tcp_hdr;
+
+	/*  don't need this thread  */
+	return 0;
+
 	printk("start cursor_tcp...\n");
 	while(1)
 	{
@@ -3964,9 +3980,13 @@ unsigned char g_led_blink_lv_prev = 0;
 static int led_blink_lv_main_thread(void)
 {
 	struct file *fp;
-    mm_segment_t fs;
-    loff_t pos;
+	mm_segment_t fs;
+	loff_t pos;
 	int ret;
+
+	/*  don't need this thread  */
+	return 0;
+
 	printk("start led_blink_lv...\n");
 	while(1)
 	{
