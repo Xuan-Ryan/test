@@ -1017,7 +1017,7 @@ static void composite_setup_complete(struct usb_ep *ep, struct usb_request *req)
 		{
 			memcpy(&gSetDirBuff[8], req->buf, req->length);
 			memcpy(&g_mct_uvc_setup_insert->setupcmd[8], req->buf, req->length);
-			g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+			g_mct_uvc_setup_insert = (MCT_UVC_SETUP_QUEUE*)g_mct_uvc_setup_insert->next;
 			schedule_work(&ioctl_bottem_work);
 		} else {
 			if (*((char *)(req->buf)+2) != 3) {
@@ -1292,6 +1292,7 @@ struct file *file_open(const char *path, int flags, int rights)
 	set_fs(oldfs);
 	if (IS_ERR(filp)) {
 		err = PTR_ERR(filp);
+		printk("the error code is %d\n", err);
 		return NULL;
 	}
 	return filp;
@@ -2050,7 +2051,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 					g_uvc_gadget = gadget;
 					memcpy(&gGetDirBuff[0], ctrl, 8);
 					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
-					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					g_mct_uvc_setup_insert = (MCT_UVC_SETUP_QUEUE*)g_mct_uvc_setup_insert->next;
 					value = w_length;
 					schedule_work(&ioctl_bottem_work);
 					goto done;
@@ -2073,7 +2074,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 					g_uvc_gadget = gadget;
 					memcpy(&gGetDirBuff[0], ctrl, 8);
 					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
-					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					g_mct_uvc_setup_insert = (MCT_UVC_SETUP_QUEUE*)g_mct_uvc_setup_insert->next;
 					value = w_length;
 					schedule_work(&ioctl_bottem_work);
 					goto done;
@@ -2098,7 +2099,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 					g_uvc_gadget = gadget;
 					memcpy(&gGetDirBuff[0], ctrl, 8);
 					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
-					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					g_mct_uvc_setup_insert = (MCT_UVC_SETUP_QUEUE*)g_mct_uvc_setup_insert->next;
 					value = w_length;
 					schedule_work(&ioctl_bottem_work);
 					goto done;
@@ -2126,7 +2127,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 					g_uvc_gadget = gadget;
 					memcpy(&gGetDirBuff[0], ctrl, 8);
 					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
-					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					g_mct_uvc_setup_insert = (MCT_UVC_SETUP_QUEUE*)g_mct_uvc_setup_insert->next;
 					value = w_length;
 					schedule_work(&ioctl_bottem_work);
 					goto done;
@@ -2144,7 +2145,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 					g_uvc_gadget = gadget;
 					memcpy(&gGetDirBuff[0], ctrl, 8);
 					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
-					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					g_mct_uvc_setup_insert = (MCT_UVC_SETUP_QUEUE*)g_mct_uvc_setup_insert->next;
 					value = w_length;
 					schedule_work(&ioctl_bottem_work);
 					goto done;
@@ -2162,7 +2163,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 					g_uvc_gadget = gadget;
 					memcpy(&gGetDirBuff[0], ctrl, 8);
 					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
-					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					g_mct_uvc_setup_insert = (MCT_UVC_SETUP_QUEUE*)g_mct_uvc_setup_insert->next;
 					value = w_length;
 					schedule_work(&ioctl_bottem_work);
 					goto done;
@@ -2180,7 +2181,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 					g_uvc_gadget = gadget;
 					memcpy(&gGetDirBuff[0], ctrl, 8);
 					memcpy(g_mct_uvc_setup_insert->setupcmd, ctrl, 8);
-					g_mct_uvc_setup_insert = g_mct_uvc_setup_insert->next;
+					g_mct_uvc_setup_insert = (MCT_UVC_SETUP_QUEUE*)g_mct_uvc_setup_insert->next;
 					value = w_length;
 					schedule_work(&ioctl_bottem_work);
 					goto done;
@@ -2825,7 +2826,7 @@ long device_ioctl(struct file *file, unsigned int cmd, unsigned long data)
 			{
 				copy_to_user((char*)data, &g_mct_uvc_setup_remove->setupcmd[0], MCT_UVC_NOTIFY_SIZE);
 			}
-			g_mct_uvc_setup_remove = g_mct_uvc_setup_remove->next;
+			g_mct_uvc_setup_remove = (MCT_UVC_SETUP_QUEUE*)g_mct_uvc_setup_remove->next;
 			if(g_mct_uvc_setup_remove != g_mct_uvc_setup_insert)
 			{
 				g_ioctlincomplete = 1;
@@ -2842,7 +2843,7 @@ long device_ioctl(struct file *file, unsigned int cmd, unsigned long data)
 		client_connected = 0;
 		break;
 	case CAMERA_STS_CHANGE:
-		copy_from_user(&capabilities, data, sizeof(capabilities));
+		copy_from_user(&capabilities, (char*)data, sizeof(capabilities));
 		g_uvc_camera_terminal_controlbit = capabilities.camera;
 		g_uvc_processing_controlbit = capabilities.process;
 		g_uvc_mjpeg_res_bitflag = capabilities.mjpeg;
@@ -2876,11 +2877,11 @@ long device_ioctl(struct file *file, unsigned int cmd, unsigned long data)
 	case QUERY_SETUP_DATA:
 		break;
 	case CTRLEP_WRITE:
-		copy_from_user(UVC_CTRL_Buff, data, 256);
+		copy_from_user(UVC_CTRL_Buff, (char*)data, 256);
 		my_ctrlep_write(&UVC_CTRL_Buff[1], UVC_CTRL_Buff[0]);
 		break;
 	case INTREP_WRITE:
-		copy_from_user(UVC_INTR_Buff, data, 16);
+		copy_from_user(UVC_INTR_Buff, (char*)data, 16);
 		my_f_hidg_write(UVC_INTR_Buff, 16);
 		break;
 	case UVC_SET_MANUFACTURER:

@@ -428,15 +428,15 @@ hid0_intf_desc = {
 	.iInterface =		0,
 };
 
-static struct hid_descriptor hidg0_desc = {
-	.bLength			= sizeof hidg_desc,
-	.bDescriptorType		= HID_DT_HID,
-	.bcdHID				= 0x0110,
-	.bCountryCode			= 0x00,
-	.bNumDescriptors		= 0x1,
-	.desc[0].bDescriptorType	= 0x22,
-	.desc[0].wDescriptorLength	= 0x379,
-};
+//static struct hid_descriptor hidg0_desc = {
+//	.bLength			= sizeof hidg_desc,
+//	.bDescriptorType		= HID_DT_HID,
+//	.bcdHID				= 0x0110,
+//	.bCountryCode			= 0x00,
+//	.bNumDescriptors		= 0x1,
+//	.desc[0].bDescriptorType	= 0x22,
+//	.desc[0].wDescriptorLength	= 0x379,
+//};
 
 /* High-Speed Support */
 
@@ -477,17 +477,17 @@ static struct hid_descriptor hidg1_desc = {
 
 /* High-Speed Support */
 
-static struct usb_endpoint_descriptor hidg1_hs_in_ep_desc = {
-	.bLength		= USB_DT_ENDPOINT_SIZE,
-	.bDescriptorType	= USB_DT_ENDPOINT,
-	.bEndpointAddress	= USB_DIR_IN,// | 0x01,
-	.bmAttributes		= USB_ENDPOINT_XFER_INT,
-	.wMaxPacketSize	= 8,
-	.bInterval		= 1, /* FIXME: Add this field in the
-				      * HID gadget configuration?
-				      * (struct hidg_func_descriptor)
-				      */
-};
+//static struct usb_endpoint_descriptor hidg1_hs_in_ep_desc = {
+//	.bLength		= USB_DT_ENDPOINT_SIZE,
+//	.bDescriptorType	= USB_DT_ENDPOINT,
+//	.bEndpointAddress	= USB_DIR_IN,// | 0x01,
+//	.bmAttributes		= USB_ENDPOINT_XFER_INT,
+//	.wMaxPacketSize	= 8,
+//	.bInterval		= 1, /* FIXME: Add this field in the
+//				      * HID gadget configuration?
+//				      * (struct hidg_func_descriptor)
+//				      */
+//};
 
 static struct usb_interface_descriptor
 hid2_intf_desc = {
@@ -514,17 +514,17 @@ static struct hid_descriptor hidg2_desc = {
 
 /* High-Speed Support */
 
-static struct usb_endpoint_descriptor hidg2_hs_in_ep_desc = {
-	.bLength		= USB_DT_ENDPOINT_SIZE,
-	.bDescriptorType	= USB_DT_ENDPOINT,
-	.bEndpointAddress	= USB_DIR_IN,// | 0x01,
-	.bmAttributes		= USB_ENDPOINT_XFER_INT,
-	.wMaxPacketSize	= 8,
-	.bInterval		= 1, /* FIXME: Add this field in the
-				      * HID gadget configuration?
-				      * (struct hidg_func_descriptor)
-				      */
-};
+//static struct usb_endpoint_descriptor hidg2_hs_in_ep_desc = {
+//	.bLength		= USB_DT_ENDPOINT_SIZE,
+//	.bDescriptorType	= USB_DT_ENDPOINT,
+//	.bEndpointAddress	= USB_DIR_IN,// | 0x01,
+//	.bmAttributes		= USB_ENDPOINT_XFER_INT,
+//	.wMaxPacketSize	= 8,
+//	.bInterval		= 1, /* FIXME: Add this field in the
+//				      * HID gadget configuration?
+//				      * (struct hidg_func_descriptor)
+//				      */
+//};
 
 /*
  * Three full-speed endpoint descriptors: bulk-in, bulk-out, and
@@ -1672,43 +1672,7 @@ static void fsg_lun_close(struct fsg_lun *curlun)
 	}
 }
 
-
 /*-------------------------------------------------------------------------*/
-
-/*
- * Sync the file data, don't bother with the metadata.
- * This code was copied from fs/buffer.c:sys_fdatasync().
- */
-static int fsg_lun_fsync_sub(struct fsg_lun *curlun)
-{
-	struct file	*filp = curlun->filp;
-
-	if (curlun->ro || !filp)
-		return 0;
-	return vfs_fsync(filp, 1);
-}
-
-static void store_cdrom_address(u8 *dest, int msf, u32 addr)
-{
-	if (msf) {
-		/* Convert to Minutes-Seconds-Frames */
-		addr >>= 2;		/* Convert to 2048-byte frames */
-		addr += 2*75;		/* Lead-in occupies 2 seconds */
-		dest[3] = addr % 75;	/* Frames */
-		addr /= 75;
-		dest[2] = addr % 60;	/* Seconds */
-		addr /= 60;
-		dest[1] = addr;		/* Minutes */
-		dest[0] = 0;		/* Reserved */
-	} else {
-		/* Absolute sector */
-		put_unaligned_be32(addr, dest);
-	}
-}
-
-
-/*-------------------------------------------------------------------------*/
-
 
 static ssize_t fsg_show_ro(struct device *dev, struct device_attribute *attr,
 			   char *buf)
@@ -1718,14 +1682,6 @@ static ssize_t fsg_show_ro(struct device *dev, struct device_attribute *attr,
 	return sprintf(buf, "%d\n", fsg_lun_is_open(curlun)
 				  ? curlun->ro
 				  : curlun->initially_ro);
-}
-
-static ssize_t fsg_show_nofua(struct device *dev, struct device_attribute *attr,
-			      char *buf)
-{
-	struct fsg_lun	*curlun = fsg_lun_from_dev(dev);
-
-	return sprintf(buf, "%u\n", curlun->nofua);
 }
 
 static ssize_t fsg_show_file(struct device *dev, struct device_attribute *attr,
@@ -1782,25 +1738,6 @@ static ssize_t fsg_store_ro(struct device *dev, struct device_attribute *attr,
 	}
 	up_read(filesem);
 	return rc;
-}
-
-static ssize_t fsg_store_nofua(struct device *dev,
-			       struct device_attribute *attr,
-			       const char *buf, size_t count)
-{
-	struct fsg_lun	*curlun = fsg_lun_from_dev(dev);
-	unsigned long	nofua;
-
-	if (strict_strtoul(buf, 2, &nofua))
-		return -EINVAL;
-
-	/* Sync data when switching from async mode to sync */
-	if (!nofua && curlun->nofua)
-		fsg_lun_fsync_sub(curlun);
-
-	curlun->nofua = nofua;
-
-	return count;
 }
 
 static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
