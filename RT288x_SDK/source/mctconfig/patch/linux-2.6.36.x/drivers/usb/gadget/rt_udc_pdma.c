@@ -406,57 +406,6 @@ static void done(struct rt_ep_struct *rt_ep, struct rt_request *req, int status)
 	req->req.complete(&rt_ep->ep, &req->req);
 }
 
-#if 0
-/* for reference */
-struct tasklet_struct rx_tasklet_tmp;
-static void rx_done_do_tasklet(unsigned long arg)
-{
-	struct rt_ep_struct 	*rt_ep;
-	struct rt_request 		*rt_req;
-	struct usb_request 		*usb_req;
-	struct usb_ep 			*ep;
-	int						i, rx_count, status = 0;
-	struct rt_udc_struct 	*rt_usb = &controller;
-
-	for (i = (IN_EP_NUM+1); i < RT_USB_NB_EP; i++) {
-		rt_ep = &rt_usb->rt_ep[i];
-		ep = &rt_ep->ep;
-
-		// shared by irq handler, protect it
-		spin_lock_irqsave(&rx_done_lock, rx_done_lock_flags);
-		rx_count = rt_ep->rx_done_count;
-
-		//spin_unlock_irqrestore(&rx_done_lock, rx_done_lock_flags);
-
-		for (;rx_count > 0; rx_count--) {
-			if(unlikely(list_empty(&rt_ep->queue)))
-				FATAL_ERROR("empty queue");
-
-			rt_req = list_entry(rt_ep->queue.next, struct rt_request, queue);
-			usb_req = &rt_req->req;
-
-			ep_del_request(rt_ep, rt_req);
-			rt_ep->rx_done_count--;
-
-			spin_unlock_irqrestore(&rx_done_lock, rx_done_lock_flags);
-
-			if (unlikely(rt_req->req.status == -EINPROGRESS))
-				rt_req->req.status = status;
-			else
-				status = rt_req->req.status;
-
-			if (unlikely(status && status != -ESHUTDOWN))
-				D_ERR(rt_ep->rt_usb->dev, "<%s> complete %s req %p stat %d len %u/%u\n", __func__, rt_ep->ep.name, &rt_req->req, status,rt_req->req.actual, rt_req->req.length);
-
-			// indicate gadget driver.
-			usb_req->complete(ep, usb_req);
-
-			spin_lock_irqsave(&rx_done_lock, rx_done_lock_flags);
-		}
-		spin_unlock_irqrestore(&rx_done_lock, rx_done_lock_flags);
-    }
-}
-#endif
 
 struct tasklet_struct tx_tasklet;
 static void tx_do_tasklet(unsigned long arg)
@@ -1668,49 +1617,6 @@ static void udc_stop_activity(struct rt_udc_struct *rt_usb, struct usb_gadget_dr
  */
 static void handle_config(unsigned long data)
 {
-	DBG;
-#if 0
-	struct imx_udc_struct *imx_usb = (void *)data;
-	struct usb_ctrlrequest u;
-	int temp, cfg, intf, alt;
-
-	local_irq_disable();
-
-	temp = __raw_readl(imx_usb->base + USB_STAT);
-	cfg  = (temp & STAT_CFG) >> 5;
-	intf = (temp & STAT_INTF) >> 3;
-	alt  =  temp & STAT_ALTSET;
-
-	xprintk("<%s> orig config C=%d, I=%d, A=%d / req config C=%d, I=%d, A=%d\n", __func__, imx_usb->cfg, imx_usb->intf, imx_usb->alt, cfg, intf, alt);
-
-	if (cfg == 1 || cfg == 2) {
-
-		if (imx_usb->cfg != cfg) {
-			u.bRequest = USB_REQ_SET_CONFIGURATION;
-			u.bRequestType = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
-			u.wValue = cfg;
-			u.wIndex = 0;
-			u.wLength = 0;
-			imx_usb->cfg = cfg;
-			imx_usb->driver->setup(&imx_usb->gadget, &u);
-
-		}
-		if (imx_usb->intf != intf || imx_usb->alt != alt) {
-			u.bRequest = USB_REQ_SET_INTERFACE;
-			u.bRequestType = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;
-			u.wValue = alt;
-			u.wIndex = intf;
-			u.wLength = 0;
-			imx_usb->intf = intf;
-			imx_usb->alt = alt;
-			imx_usb->driver->setup(&imx_usb->gadget, &u);
-		}
-	}
-
-	imx_usb->set_config = 0;
-
-	local_irq_enable();
-#endif
 }
 
 static void handle_setup(struct rt_udc_struct *rt_usb)

@@ -1156,29 +1156,6 @@ uint64_t g_currentHtimestamp = 0;
 uint64_t g_prevHtimestamp = 0;
 int g_udpTransfer_flag = 0;
 
-#if 0
-int open_1280x720JPG(unsigned char *buf, unsigned int len)
-{
-    struct file *fp;
-    mm_segment_t fs;
-    loff_t pos;
-	int ret;
-    printk("open jpg\n");
-    fp =filp_open("/home/KArtboardbg0A.jpg",O_RDWR | O_CREAT,0666);
-    if(IS_ERR(fp)){
-        printk("create file error\n");
-        return -1;
-    }
-    fs =get_fs();
-    set_fs(KERNEL_DS);
-    pos = 0;
-	ret = vfs_read(fp,(char __user *)buf, len, &pos);
-	printk("ret:%d\n",ret);
-    filp_close(fp,NULL);
-    set_fs(fs);
-    return 0;
-}
-#endif
 int store_FW_by_USB(unsigned char *buf, unsigned int len)
 {
     struct file *fp;
@@ -1203,22 +1180,6 @@ int store_FW_by_USB(unsigned char *buf, unsigned int len)
 
 int update_FW_by_USB(unsigned int len)
 {
-#if 0
-	char cmd[512];
-	int result = 0;
-	char *argv[] = {"/bin/mtd_write", cmd, NULL};
-	static char *envp[] = {
-	    "HOME=/",
-	    "TERM=linux",
-	    "PATH=/sbin:/bin:/usr/sbin:/usr/bin", NULL };
-
-	snprintf(cmd, sizeof(cmd), "-o %d -l %d write %s Kernel", 0, len, "/var/usbFW");
-
-	printk("Call user now \n");
-	result = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
-	printk("The result of call_usermodehelper is %d\n", result);  
-	return 0;
-#else
 	struct file *fp;
     mm_segment_t fs;
     loff_t pos;
@@ -1237,7 +1198,6 @@ int update_FW_by_USB(unsigned int len)
     filp_close(fp,NULL);
     set_fs(fs);
     return 0;
-#endif
 }
 
 uint64_t GetTimeStamp(void)
@@ -1507,23 +1467,6 @@ static int do_write(struct fsg_common *common)
 				}
 			}
 			//printk("60K ready %lld\n", GetTimeStamp());
-#if 0
-			if(g_temp_bps_pingpong->status == PINGPONG_IDLE && drop_frame == 0)
-			{
-				memcpy(&g_temp_bps_pingpong->buf[g_temp_bps_pingpong->validblockcount*UDP_DATABLOCK_SIZE], temppingpong->buf, UDP_DATABLOCK_SIZE);
-				g_temp_bps_pingpong->validblockcount++;
-			}
-			else
-			{
-				//reg_write(((0xB0120000) + 0x800), 0x3C000063);
-				//usb_ep_set_halt(common->fsg->bulk_out);
-				drop_frame = 1;
-				g_temp_bps_pingpong->prev->status = PINGPONG_IDLE;
-				memcpy(&g_temp_bps_pingpong->prev->buf[last_frame_block_count*UDP_DATABLOCK_SIZE], temppingpong->buf, UDP_DATABLOCK_SIZE);
-				last_frame_block_count++;
-				g_temp_bps_pingpong->prev->validblockcount = last_frame_block_count;
-			}
-#endif
 			//printk("size:%d\n", udp_send_size);
 			temppingpong = temppingpong->next;
 			//udp_hdr.Tag = MNSP_TAG;
@@ -1576,23 +1519,6 @@ static int do_write(struct fsg_common *common)
 				}
 			}
 			//printk("60K ready %lld\n", GetTimeStamp());
-#if 0
-			if(g_temp_bps_pingpong->status == PINGPONG_IDLE && drop_frame == 0)
-			{
-				memcpy(&g_temp_bps_pingpong->buf[g_temp_bps_pingpong->validblockcount*UDP_DATABLOCK_SIZE], temppingpong->buf, UDP_DATABLOCK_SIZE);
-				g_temp_bps_pingpong->validblockcount++;
-			}
-			else
-			{
-				//reg_write(((0xB0120000) + 0x800), 0x3C000063);
-				//usb_ep_set_halt(common->fsg->bulk_out);
-				drop_frame = 1;
-				g_temp_bps_pingpong->prev->status = PINGPONG_IDLE;
-				memcpy(&g_temp_bps_pingpong->prev->buf[last_frame_block_count*UDP_DATABLOCK_SIZE], temppingpong->buf, UDP_DATABLOCK_SIZE);
-				last_frame_block_count++;
-				g_temp_bps_pingpong->prev->validblockcount = last_frame_block_count;
-			}
-#endif
 			//printk("size:%d\n", udp_send_size);
 			temppingpong = temppingpong->next;
 			//udp_hdr.Tag = MNSP_TAG;
@@ -1609,27 +1535,6 @@ static int do_write(struct fsg_common *common)
 		bh->state = BUF_STATE_EMPTY;
 		//while(1)
 		//{}
-#if 0
-		if(amount_left_to_req == 0)
-		{
-			if(g_temp_bps_pingpong->status == PINGPONG_IDLE && drop_frame == 0)
-			{
-				printk("send id:%d, bs:%d\n", udp_hdr.XactId, g_temp_bps_pingpong->validblockcount);
-				g_temp_bps_pingpong->status = PINGPONG_BUSY;
-				g_temp_bps_pingpong = g_temp_bps_pingpong->next;
-			}
-			else if(drop_frame == 1)
-			{
-				printk("over id:%d, bs:%d\n", udp_hdr.XactId, g_temp_bps_pingpong->prev->validblockcount);
-				if(g_current_stall == 0)
-				{
-					//usb_ep_set_halt(common->fsg->bulk_out);
-					g_current_stall = 1;
-				}
-				g_temp_bps_pingpong->prev->status = PINGPONG_BUSY;
-			}
-		}
-#endif
 	}
 	//printk("type:%d\n",common->datatype);
 	if(common->datatype == 0x05)
@@ -1654,145 +1559,7 @@ static int do_write(struct fsg_common *common)
 	//msleep(5000);
 	//usb_ep_enable(common->fsg->bulk_out, &fsg_hs_bulk_out_desc);
 	//printk("frame E %lld\n", GetTimeStamp());
-#if 0
-	while (amount_left_to_write > 0) {
-		printk("do_write2\n");
-		/* Queue a request for more data from the host */
-		bh = common->next_buffhd_to_fill;
-		if (bh->state == BUF_STATE_EMPTY && get_some_more) {
-			printk("do_write3\n");
-			/* Figure out how much we want to get:
-			 * Try to get the remaining amount.
-			 * But don't get more than the buffer size.
-			 * And don't try to go past the end of the file.
-			 * If we're not at a page boundary,
-			 *	don't go past the next page.
-			 * If this means getting 0, then we were asked
-			 *	to write past the end of file.
-			 * Finally, round down to a block boundary. */
-			amount = min(amount_left_to_req, FSG_BUFLEN);
-			//amount = min((loff_t) amount, curlun->file_length -
-			//		usb_offset);
-			//partial_page = usb_offset & (PAGE_CACHE_SIZE - 1);
-			//if (partial_page > 0)
-			//	amount = min(amount,
-	//(unsigned int) PAGE_CACHE_SIZE - partial_page);
 
-			if (amount == 0) {
-				get_some_more = 0;
-				//curlun->sense_data =
-				//	SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
-				//curlun->sense_data_info = usb_offset >> 9;
-				//curlun->info_valid = 1;
-				continue;
-			}
-			amount -= (amount & 511);
-			if (amount == 0) {
-
-				/* Why were we were asked to transfer a
-				 * partial block? */
-				get_some_more = 0;
-				continue;
-			}
-
-			/* Get the next buffer */
-			//usb_offset += amount;
-			common->usb_amount_left -= amount;
-			amount_left_to_req -= amount;
-			if (amount_left_to_req == 0)
-				get_some_more = 0;
-
-			/* amount is always divisible by 512, hence by
-			 * the bulk-out maxpacket size */
-			bh->outreq->length = amount;
-			bh->bulk_out_intended_length = amount;
-			bh->outreq->short_not_ok = 1;
-			printk("I_Data%d,%d\n",bh->outreq->length, common->data_size);
-			START_TRANSFER_OR(common, bulk_out, bh->outreq,
-					  &bh->outreq_busy, &bh->state)
-				/* Don't know what to do if
-				 * common->fsg is NULL */
-				//return -EIO;
-			common->next_buffhd_to_fill = bh->next;
-			continue;
-		}
-
-		/* Write the received data to the backing file */
-		bh = common->next_buffhd_to_drain;
-		if (bh->state == BUF_STATE_EMPTY && !get_some_more)
-			break;			/* We stopped early */
-		if (bh->state == BUF_STATE_FULL) {
-			smp_rmb();
-			common->next_buffhd_to_drain = bh->next;
-			bh->state = BUF_STATE_EMPTY;
-
-			/* Did something go wrong with the transfer? */
-			if (bh->outreq->status != 0) {
-				curlun->sense_data = SS_COMMUNICATION_FAILURE;
-				curlun->sense_data_info = file_offset >> 9;
-				curlun->info_valid = 1;
-				break;
-			}
-
-			amount = bh->outreq->actual;
-			//if (curlun->file_length - file_offset < amount) {
-			//	LERROR(curlun,
-	//"write %u @ %llu beyond end %llu\n",
-	//amount, (unsigned long long) file_offset,
-	//(unsigned long long) curlun->file_length);
-	//			amount = curlun->file_length - file_offset;
-	//		}
-
-			/* Perform the write */
-			//file_offset_tmp = file_offset;
-
-			
-			//nwritten = vfs_write(curlun->filp,
-			//		(char __user *) bh->buf,
-			//		amount, &file_offset_tmp);
-			nwritten = amount;
-			VLDBG(curlun, "file write %u @ %llu -> %d\n", amount,
-					(unsigned long long) file_offset,
-					(int) nwritten);
-			if (signal_pending(current))
-				return -EINTR;		/* Interrupted! */
-
-			if (nwritten < 0) {
-				LDBG(curlun, "error in file write: %d\n",
-						(int) nwritten);
-				nwritten = 0;
-			} else if (nwritten < amount) {
-				LDBG(curlun, "partial file write: %d/%u\n",
-						(int) nwritten, amount);
-				nwritten -= (nwritten & 511);
-				/* Round down to a block */
-			}
-			file_offset += nwritten;
-			amount_left_to_write -= nwritten;
-			common->residue -= nwritten;
-
-			/* If an error occurred, report it and its position */
-			if (nwritten < amount) {
-				curlun->sense_data = SS_WRITE_ERROR;
-				curlun->sense_data_info = file_offset >> 9;
-				curlun->info_valid = 1;
-				break;
-			}
-
-			/* Did the host decide to stop early? */
-			if (bh->outreq->actual != bh->outreq->length) {
-				common->short_packet_received = 1;
-				break;
-			}
-			continue;
-		}
-
-		/* Wait for something to happen */
-		rc = sleep_thread(common);
-		if (rc)
-			return rc;
-	}
-#endif
 	return common->data_size_from_cmnd;		/* No default reply */
 }
 
@@ -1988,12 +1755,6 @@ static int do_request_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 	 *
 	 * FSG normally uses option a); enable this code to use option b).
 	 */
-#if 0
-	if (curlun && curlun->unit_attention_data != SS_NO_SENSE) {
-		curlun->sense_data = curlun->unit_attention_data;
-		curlun->unit_attention_data = SS_NO_SENSE;
-	}
-#endif
 
 	if (!curlun) {		/* Unsupported LUNs are okay */
 		common->bad_lun_okay = 1;
@@ -2537,14 +2298,6 @@ static int finish_reply(struct fsg_common *common)
 		 * bulk-out packets, in which case the host wouldn't see a
 		 * STALL.  Not realizing the endpoint was halted, it wouldn't
 		 * clear the halt -- leading to problems later on. */
-#if 0
-		} else if (common->can_stall) {
-			if (fsg_is_set(common))
-				fsg_set_halt(common->fsg,
-					     common->fsg->bulk_out);
-			raise_exception(common, FSG_STATE_ABORT_BULK_OUT);
-			rc = -EINTR;
-#endif
 
 		/* We can't stall.  Read in the excess data and throw it
 		 * all away. */
@@ -3369,97 +3122,7 @@ static int get_next_command(struct fsg_common *common)
 	//memcpy(&pingpong[0]->buf[sizeof(udp_hdr)], bh->outreq->buf, USB_BULK_CB_WRAP_LEN);
 	bh->state = BUF_STATE_EMPTY;
 	//printk("rc2:%d\n",rc);
-#if 0
-	amount_left_to_req = common->data_size;
-	//amount_left_to_write = common->data_size_from_cmnd;
-	printk("do_write12\n");
-	while(amount_left_to_req)
-	{
-		//bh = common->next_buffhd_to_fill;
-		rxsucc = 1;
-		if(bh->state == BUF_STATE_EMPTY)
-		{
-			rxsucc = 0;
-		}
-		else
-		{
-			rxsucc = 1;
-		}
-		while (rxsucc) {
-			rc = sleep_thread(common);
-			if (rc)
-				return rc;
-			if(bh->state == BUF_STATE_EMPTY)
-			{
-				rxsucc = 0;
-			}
-			else
-			{
-				rxsucc = 1;
-			}
-		}
 
-		/* Queue a request to read a Bulk-only CBW */
-		//set_bulk_out_req_length(common, bh, USB_BULK_CB_WRAP_LEN);
-		if(amount_left_to_req > FSG_BUFLEN)
-		{
-			amount_left_to_write = FSG_BUFLEN;
-		}
-		else
-		{
-			amount_left_to_write = amount_left_to_req;
-		}
-		bh->outreq->length = amount_left_to_write;
-		bh->outreq->short_not_ok = 0;
-		bh->outreq->zero = 1;
-		printk("I_DATA%d:%d\n",bh->outreq->length, bh->state);
-		START_TRANSFER_OR(common, bulk_out, bh->outreq,
-				  &bh->outreq_busy, &bh->state)
-		/* Don't know what to do if common->fsg is NULL */
-		//return -EIO;
-
-		/* We will drain the buffer in software, which means we
-		 * can reuse it for the next filling.  No need to advance
-		 * next_buffhd_to_fill. */
-
-		/* Wait for the CBW to arrive */
-		//while (bh->state != BUF_STATE_FULL) {
-		//	printk("123456\n");
-		//	rc = sleep_thread(common);
-		//	if (rc)
-		//		return rc;
-		//}
-		rxsucc = 1;
-		if(bh->state == BUF_STATE_FULL)
-		{
-			rxsucc = 0;
-		}
-		else
-		{
-			rxsucc = 1;
-		}
-		while (rxsucc) {
-			//printk("123456\n");
-			rc = sleep_thread(common);
-			if (rc)
-				return rc;
-			if(bh->state == BUF_STATE_FULL)
-			{
-				rxsucc = 0;
-			}
-			else
-			{
-				rxsucc = 1;
-			}
-		}
-		printk("rc3:%d,%d\n",rc, bh->state);
-		smp_rmb();
-		//rc = fsg_is_set(common) ? received_cbw(common->fsg, bh) : -EIO;
-		//deal net transfer
-		amount_left_to_req = amount_left_to_req - amount_left_to_write;
-		bh->state = BUF_STATE_EMPTY;
-	}
-#endif
 	return rc;
 }
 
@@ -3775,60 +3438,6 @@ static int stable_bps_ksocket_send_thread(struct fsg_common	*common)
 	printk("start stable_bps_ksocket...\n");
 	while(1)
 	{
-#if 0
-		if(prev_interval_total_bytes != interval_total_bytes)
-		{
-			if(interval_total_bytes == 1*1024*1024)
-			{
-				from_rx_current_bps = interval_total_bytes + 1*4*1024*1024;
-			}
-			else
-			{
-				if(interval_total_bytes > udp_send_total_bytes)
-				{
-					from_rx_current_bps = from_rx_current_bps + 1*2*1024*1024;
-					if(from_rx_current_bps > 10*2*1024*1024)
-					{
-						from_rx_current_bps = 10*2*1024*1024;
-					}
-				}
-				else if(interval_total_bytes == udp_send_total_bytes)
-				{
-					from_rx_current_bps = from_rx_current_bps + 1*2*1024*1024;
-					if(from_rx_current_bps > 10*2*1024*1024)
-					{
-						from_rx_current_bps = 10*2*1024*1024;
-					}
-				}
-				else if((udp_send_total_bytes - interval_total_bytes) < (1*1024*1024))
-				{
-					from_rx_current_bps = from_rx_current_bps + 1*1024*1024;
-					if(from_rx_current_bps > 10*2*1024*1024)
-					{
-						from_rx_current_bps = 10*2*1024*1024;
-					}
-				}
-				else if((udp_send_total_bytes - interval_total_bytes) > (1*2*1024*1024))
-				{
-					from_rx_current_bps = from_rx_current_bps - 1*1024*1024;
-					if(from_rx_current_bps < (1*1024*1024 + 1*4*1024*1024))
-					{
-						from_rx_current_bps = (1*1024*1024 + 1*4*1024*1024);
-					}
-				}
-				else
-				{
-					from_rx_current_bps = from_rx_current_bps - 1*512*1024;
-					if(from_rx_current_bps < (1*1024*1024 + 1*4*1024*1024))
-					{
-						from_rx_current_bps = (1*1024*1024 + 1*4*1024*1024);
-					}
-				}
-				udp_send_total_bytes = 0;
-			}
-			prev_interval_total_bytes = interval_total_bytes;
-		}
-#endif
 		//reg_write(((0xB0120000) + 0x800), 0x3F000060);
 		if(ksocket_send_pingpong->status == PINGPONG_BUSY)
 		{
@@ -4272,11 +3881,6 @@ static int fsg_main_thread(void *common_)
 	wake_up_process(led_blink_lv_thread_task);
 
 	g_userspaceUVC_common = common;
-#if 0
-	open_1280x720JPG(&UVC_Buff[2], 97549);
-	UVC_Buff[0] = 0x02;
-	UVC_Buff[1] = 0x82;
-#endif
 #endif
 	fsg_main_thread_running = 1;
 	/* The main loop */
@@ -4295,35 +3899,6 @@ static int fsg_main_thread(void *common_)
 		sleep_thread(common);
 		g_incomplete = 1;
 		wake_up(&gUVCwq);//for user
-#if 0
-		test_jpg_offset = 0;
-		while(1)
-		{
-			//printk("usb replug\n");
-			handle_exception(common);
-			sleep_thread(common);
-#if 0
-			//printk("send 512B\n");
-			send_UVB_bulk(g_userspaceUVC_common, 512, &UVC_Buff[test_jpg_offset]);
-			test_jpg_offset = test_jpg_offset + 512;
-			if((test_jpg_offset+512) > 97551)
-			{
-				//common->state = FSG_STATE_IDLE;
-				send_UVB_bulk(g_userspaceUVC_common, 97551-test_jpg_offset, &UVC_Buff[test_jpg_offset]);
-				if(UVC_Buff[1] == 0x82)
-				{
-					UVC_Buff[1] = 0x83;
-				}
-				else
-				{
-					UVC_Buff[1] = 0x82;
-				}
-				test_jpg_offset = 0;
-			}
-			//common->state = FSG_STATE_IDLE;
-#endif
-		}
-#endif
 
 		if (get_next_command(common))
 			continue;
@@ -4719,14 +4294,6 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 	g_UCURconn_socket = NULL;
 	g_TCURconn_socket = NULL;
 	g_TROMconn_socket = NULL;
-#if 0  //  DO NOT call kthread_stop, kernel panic....
-	if (hid_udp_common.thread_task > 0)
-		kthread_stop(hid_udp_common.thread_task);
-	hid_udp_common.thread_task = NULL;
-	if (cursor_udp_common.thread_task > 0)
-		kthread_stop(cursor_udp_common.thread_task);
-	cursor_udp_common.thread_task = NULL;
-#endif
 }
 
 void uvc_change_desc_compatable(void)

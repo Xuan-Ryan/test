@@ -69,48 +69,7 @@
 #include "f_hid.c"
 #include "f_mass_storage.c"
 #include "mnspdef.h"
-#if 0
-static struct hidg_func_descriptor my_hid_data = {
-	.subclass		= 0, /* No subclass */
-	.protocol		= 1, /* Keyboard */
-	.report_length		= 8,
-	.report_desc_length	= 63,
-	.report_desc		= {
-		0x05, 0x01,	/* USAGE_PAGE (Generic Desktop)	          */
-		0x09, 0x06,	/* USAGE (Keyboard)                       */
-		0xa1, 0x01,	/* COLLECTION (Application)               */
-		0x05, 0x07,	/*   USAGE_PAGE (Keyboard)                */
-		0x19, 0xe0,	/*   USAGE_MINIMUM (Keyboard LeftControl) */
-		0x29, 0xe7,	/*   USAGE_MAXIMUM (Keyboard Right GUI)   */
-		0x15, 0x00,	/*   LOGICAL_MINIMUM (0)                  */
-		0x25, 0x01,	/*   LOGICAL_MAXIMUM (1)                  */
-		0x75, 0x01,	/*   REPORT_SIZE (1)                      */
-		0x95, 0x08,	/*   REPORT_COUNT (8)                     */
-		0x81, 0x02,	/*   INPUT (Data,Var,Abs)                 */
-		0x95, 0x01,	/*   REPORT_COUNT (1)                     */
-		0x75, 0x08,	/*   REPORT_SIZE (8)                      */
-		0x81, 0x03,	/*   INPUT (Cnst,Var,Abs)                 */
-		0x95, 0x05,	/*   REPORT_COUNT (5)                     */
-		0x75, 0x01,	/*   REPORT_SIZE (1)                      */
-		0x05, 0x08,	/*   USAGE_PAGE (LEDs)                    */
-		0x19, 0x01,	/*   USAGE_MINIMUM (Num Lock)             */
-		0x29, 0x05,	/*   USAGE_MAXIMUM (Kana)                 */
-		0x91, 0x02,	/*   OUTPUT (Data,Var,Abs)                */
-		0x95, 0x01,	/*   REPORT_COUNT (1)                     */
-		0x75, 0x03,	/*   REPORT_SIZE (3)                      */
-		0x91, 0x03,	/*   OUTPUT (Cnst,Var,Abs)                */
-		0x95, 0x06,	/*   REPORT_COUNT (6)                     */
-		0x75, 0x08,	/*   REPORT_SIZE (8)                      */
-		0x15, 0x00,	/*   LOGICAL_MINIMUM (0)                  */
-		0x25, 0x65,	/*   LOGICAL_MAXIMUM (101)                */
-		0x05, 0x07,	/*   USAGE_PAGE (Keyboard)                */
-		0x19, 0x00,	/*   USAGE_MINIMUM (Reserved)             */
-		0x29, 0x65,	/*   USAGE_MAXIMUM (Keyboard Application) */
-		0x81, 0x00,	/*   INPUT (Data,Ary,Abs)                 */
-		0xc0		/* END_COLLECTION                         */
-	}
-};
-#endif
+
 /*
 static struct platform_device my_hid = {
 	.name			= "hidg",
@@ -298,61 +257,7 @@ static struct usb_configuration config_driver = {
 	/* .iConfiguration = DYNAMIC */
 	.bmAttributes		= USB_CONFIG_ATT_SELFPOWER,
 };
-#if 0
-static int __ref hid_bind(struct usb_composite_dev *cdev)
-{
-	struct usb_gadget *gadget = cdev->gadget;
-	struct list_head *tmp;
-	int status, gcnum, funcs = 0;
 
-	list_for_each(tmp, &hidg_func_list)
-		funcs++;
-
-	if (!funcs)
-		return -ENODEV;
-
-	/* set up HID */
-	status = ghid_setup(cdev->gadget, funcs);
-	if (status < 0)
-		return status;
-
-	gcnum = usb_gadget_controller_number(gadget);
-	if (gcnum >= 0)
-		device_desc.bcdDevice = cpu_to_le16(0x0300 | gcnum);
-	else
-		device_desc.bcdDevice = cpu_to_le16(0x0300 | 0x0099);
-
-
-	/* Allocate string descriptor numbers ... note that string
-	 * contents can be overridden by the composite_dev glue.
-	 */
-
-	/* device descriptor strings: manufacturer, product */
-	snprintf(manufacturer, sizeof manufacturer, "%s %s with %s",
-		init_utsname()->sysname, init_utsname()->release,
-		gadget->name);
-	status = usb_string_id(cdev);
-	if (status < 0)
-		return status;
-	strings_dev[STRING_MANUFACTURER_IDX].id = status;
-	device_desc.iManufacturer = status;
-
-	status = usb_string_id(cdev);
-	if (status < 0)
-		return status;
-	strings_dev[STRING_PRODUCT_IDX].id = status;
-	device_desc.iProduct = status;
-
-	/* register our configuration */
-	status = usb_add_config(cdev, &config_driver);
-	if (status < 0)
-		return status;
-
-	dev_info(&gadget->dev, DRIVER_DESC ", version: " DRIVER_VERSION "\n");
-
-	return 0;
-}
-#endif
 /****************************** Gadget Bind ******************************/
 
 static int __ref msg_bind(struct usb_composite_dev *cdev)
@@ -436,39 +341,7 @@ static int __ref msg_bind(struct usb_composite_dev *cdev)
 
 
 /****************************** Some noise ******************************/
-#if 0
-static int __init hidg_plat_driver_probe(struct platform_device *pdev)
-{
-	struct hidg_func_descriptor *func = pdev->dev.platform_data;
-	struct hidg_func_node *entry;
 
-	if (!func) {
-		dev_err(&pdev->dev, "Platform data missing\n");
-		return -ENODEV;
-	}
-
-	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-	if (!entry)
-		return -ENOMEM;
-
-	entry->func = func;
-	list_add_tail(&entry->node, &hidg_func_list);
-
-	return 0;
-}
-
-static int __devexit hidg_plat_driver_remove(struct platform_device *pdev)
-{
-	struct hidg_func_node *e, *n;
-
-	list_for_each_entry_safe(e, n, &hidg_func_list, node) {
-		list_del(&e->node);
-		kfree(e);
-	}
-
-	return 0;
-}
-#endif
 static struct usb_composite_driver msg_driver = {
 	.name		= "g_mass_storage",
 	.dev		= &msg_device_desc,
