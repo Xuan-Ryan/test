@@ -326,7 +326,7 @@ static const char fsg_string_interface[] = "Mass Storage";
 #include "storage_common.c"
 
 
-#define	TIGER_COMMENTOUT         1
+#define	TIGER_COMMENTOUT         0
 /*-------------------------------------------------------------------------*/
 
 struct fsg_dev;
@@ -3879,9 +3879,9 @@ static int fsg_main_thread(void *common_)
 	led_blink_lv_thread_task = kthread_create(led_blink_lv_main_thread, NULL, "led_blink_lv");
 	led_blink_lv_common.thread_task = led_blink_lv_thread_task;
 	wake_up_process(led_blink_lv_thread_task);
+#endif
 
 	g_userspaceUVC_common = common;
-#endif
 	fsg_main_thread_running = 1;
 	/* The main loop */
 	while (common->state != FSG_STATE_TERMINATED) {
