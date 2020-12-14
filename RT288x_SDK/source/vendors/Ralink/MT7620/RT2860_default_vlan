@@ -1,7 +1,10 @@
 #The word of "Default" must not be removed
 Default
 WebInit=1
-HostName=UVC
+ModelName=__MODEL__
+Version=__VERSION__
+QisInit=0
+HostName=J5_uninitial
 Login=admin
 Password=admin
 OperationMode=1

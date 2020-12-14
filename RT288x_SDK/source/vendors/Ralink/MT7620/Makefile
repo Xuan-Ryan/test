@@ -78,6 +78,8 @@ else
 	$(ROMFSINST) /etc_ro/Wireless/RT2860AP/RT2860_default_vlan
 	$(ROMFSINST) -e CONFIG_EXTEND_NVRAM /etc_ro/tr069_voip_default_settings
 	$(ROMFSINST) -e CONFIG_MTK_VOIP /etc_ro/voip_default_settings
+	sed -i "s/__MODEL__/$(__MODEL)/g" $(ROMFSDIR)/etc_ro/Wireless/RT2860AP/RT2860_default_vlan
+	sed -i "s/__VERSION__/$(__VERSION)/g" $(ROMFSDIR)/etc_ro/Wireless/RT2860AP/RT2860_default_vlan
 endif
 	$(ROMFSINST) /etc_ro/Wireless/iNIC/RT2860AP.dat
 	#for sigma test

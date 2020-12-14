@@ -15,13 +15,15 @@ echo 5 > /proc/sys/net/ipv4/tcp_keepalive_time
 echo 3 > /proc/sys/net/ipv4/tcp_keepalive_intvl
 echo 3 > /proc/sys/net/ipv4/tcp_keepalive_probes  
 
-
 iwpriv apcli0 set ApCliAutoConnect=3
 sleep 2
 iwpriv apcli0 set ApCliAutoConnect=1
 
 #for telnet debugging
-telnetd
+QisInit=`nvram_get QisInit`
+if [ "$QisInit" = "0" ]; then
+	telnetd
+fi
 
 #for syslogd
 mkdir -p /var/log
