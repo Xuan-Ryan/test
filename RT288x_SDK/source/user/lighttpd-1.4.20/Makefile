@@ -273,12 +273,13 @@ endif
 
 romfs:
 	$(ROMFSINST) /etc_ro/lighttpd/lighttpd.conf
-	rm -rf www_temp;cp -r www www_temp
-	find www_temp/ -name "*.asp" -exec rm {} \;
-	for i in $(REMOVE_WWW); do \
-		rm -rf www_temp/$$i; \
-	done
-	$(ROMFSINST) www_temp /etc_ro/lighttpd/www
+	#rm -rf www_temp;cp -r www www_temp
+	#find www_temp/ -name "*.asp" -exec rm {} \;
+	#for i in $(REMOVE_WWW); do \
+	#	rm -rf www_temp/$$i; \
+	#done
+	#$(ROMFSINST) www_temp /etc_ro/lighttpd/www
+	$(ROMFSINST) www.ext /etc_ro/lighttpd/www
 ifeq ($(CONFIG_USER_STORAGE), y)
 	$(ROMFSINST) lighttpd_webdav.conf /etc_ro/lighttpd/lighttpd_webdav.conf
 	$(ROMFSINST) webdav.sh /bin/webdav.sh
