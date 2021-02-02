@@ -1,0 +1,127 @@
+shmarea.lo: shmarea.c \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/stdio.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/features.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_config.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/cdefs.h \
+ /opt/buildroot-gcc463/usr/lib/gcc/mipsel-buildroot-linux-uclibc/4.6.3/include/stddef.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/types.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/wordsize.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/typesizes.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/pthreadtypes.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/sched.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_stdio.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/wchar.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/wchar.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_mutex.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/pthread.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sched.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/time.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/time.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_clk_tck.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/signal.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/sigset.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/initspin.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/sigthread.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_pthread.h \
+ /opt/buildroot-gcc463/usr/lib/gcc/mipsel-buildroot-linux-uclibc/4.6.3/include/stdarg.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/stdio_lim.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/malloc.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/string.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/errno.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/errno.h \
+ /home/wang/UVC/RT288x_SDK/source/linux-2.6.36.x/include/linux/errno.h \
+ /home/wang/UVC/RT288x_SDK/source/linux-2.6.36.x/include/asm/errno.h \
+ /home/wang/UVC/RT288x_SDK/source/linux-2.6.36.x/include/asm-generic/errno-base.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/poll.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/poll.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/mman.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/mman.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/shm.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/ipc.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/ipc.h \
+ /home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/shm.h \
+ ../include/list.h
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/stdio.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/features.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_config.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/cdefs.h:
+
+/opt/buildroot-gcc463/usr/lib/gcc/mipsel-buildroot-linux-uclibc/4.6.3/include/stddef.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/types.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/wordsize.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/typesizes.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/pthreadtypes.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/sched.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_stdio.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/wchar.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/wchar.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_mutex.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/pthread.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sched.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/time.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/time.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_clk_tck.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/signal.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/sigset.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/initspin.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/sigthread.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/uClibc_pthread.h:
+
+/opt/buildroot-gcc463/usr/lib/gcc/mipsel-buildroot-linux-uclibc/4.6.3/include/stdarg.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/stdio_lim.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/malloc.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/string.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/errno.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/errno.h:
+
+/home/wang/UVC/RT288x_SDK/source/linux-2.6.36.x/include/linux/errno.h:
+
+/home/wang/UVC/RT288x_SDK/source/linux-2.6.36.x/include/asm/errno.h:
+
+/home/wang/UVC/RT288x_SDK/source/linux-2.6.36.x/include/asm-generic/errno-base.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/poll.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/poll.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/mman.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/mman.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/shm.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/sys/ipc.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/ipc.h:
+
+/home/wang/UVC/RT288x_SDK/source/uClibc-0.9.33.2/app_headers/include/bits/shm.h:
+
+../include/list.h:
