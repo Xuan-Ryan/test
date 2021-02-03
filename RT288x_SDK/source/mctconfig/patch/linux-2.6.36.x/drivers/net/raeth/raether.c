@@ -2941,10 +2941,24 @@ int __init rather_probe(struct net_device *dev)
 	//If reading mtd failed or mac0 is empty, generate a mac address
 	if (i < 0 || ((memcmp(addr.sa_data, zero1, 6) == 0) || (addr.sa_data[0] & 0x1)) || 
 	    (memcmp(addr.sa_data, zero2, 6) == 0)) {
-		unsigned char mac_addr01234[5] = {0x00, 0x0C, 0x43, 0x28, 0x80};
+		//unsigned char mac_addr01234[5] = {0x00, 0x0C, 0x43, 0x28, 0x80};
+		//net_srandom(jiffies);
+		//memcpy(addr.sa_data, mac_addr01234, 5);
+		//addr.sa_data[5] = net_random()&0xFF;
+		//  Tiger, I DO NOT know why this code below not working here, I can't save MAC of LAN and WAN here, 
+		//  I move the related code to ee_flash.c(WIFI driver)
+		unsigned char mac_addr012[3] = {0x00, 0x05, 0x1B};
+		unsigned char mac3;
+		unsigned int new_mac;
+
+		memcpy(addr.sa_data, mac_addr012, 3);
 		net_srandom(jiffies);
-	memcpy(addr.sa_data, mac_addr01234, 5);
-	addr.sa_data[5] = net_random()&0xFF;
+		new_mac = net_random()&0x00FFFFFF;
+		mac3 = (new_mac>>16)&0x000000FF;
+		mac3 = (mac3&0x0F)|0x70;  //  00:05:1B:7X:XX:XX
+		addr.sa_data[3] = mac3;
+		addr.sa_data[4] = (new_mac>>8)&0x000000FF;
+		addr.sa_data[5] = !(new_mac&0x000000FF)?0x01:(new_mac&0x000000FF);
 	}
 
 #ifdef CONFIG_RAETH_NAPI
@@ -3121,10 +3135,24 @@ void RAETH_Init_PSEUDO(pEND_DEVICE pAd, struct net_device *net_dev)
 	//If reading mtd failed or mac0 is empty, generate a mac address
 	if (i < 0 || ((memcmp(addr.sa_data, zero1, 6) == 0) || (addr.sa_data[0] & 0x1)) || 
 	    (memcmp(addr.sa_data, zero2, 6) == 0)) {
-		unsigned char mac_addr01234[5] = {0x00, 0x0C, 0x43, 0x28, 0x80};
+		//unsigned char mac_addr01234[5] = {0x00, 0x0C, 0x43, 0x28, 0x80};
+		//net_srandom(jiffies);
+		//memcpy(addr.sa_data, mac_addr01234, 5);
+		//addr.sa_data[5] = net_random()&0xFF;
+		//  Tiger, I DO NOT know why this code below not working here, I can't save MAC of LAN and WAN here, 
+		//  I move the related code to ee_flash.c(WIFI driver)
+		unsigned char mac_addr012[3] = {0x00, 0x05, 0x1B};
+		unsigned char mac3;
+		unsigned int new_mac;
+
+		memcpy(addr.sa_data, mac_addr012, 3);
 		net_srandom(jiffies);
-		memcpy(addr.sa_data, mac_addr01234, 5);
-		addr.sa_data[5] = net_random()&0xFF;
+		new_mac = net_random()&0x00FFFFFF;
+		mac3 = (new_mac>>16)&0x000000FF;
+		mac3 = (mac3&0x0F)|0x70;  //  00:05:1B:7X:XX:XX
+		addr.sa_data[3] = mac3;
+		addr.sa_data[4] = (new_mac>>8)&0x000000FF;
+		addr.sa_data[5] = !(new_mac&0x000000FF)?0x01:(new_mac&0x000000FF);
 	}
 
 	ei_set_mac2_addr(dev, &addr);

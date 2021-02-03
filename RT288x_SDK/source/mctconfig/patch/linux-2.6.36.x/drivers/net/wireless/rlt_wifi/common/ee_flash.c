@@ -267,6 +267,54 @@ int	Set_EECMD_Proc(
 }
 #endif /* LINUX */
 
+static void hexdump(char *data, int size, char *caption)
+{
+	int i; // index in data...
+	int j; // index in line...
+	char temp[8];
+	char buffer[128];
+	char *ascii;
+
+	memset(buffer, 0, 128);
+
+	printk("---------> %s <--------- (%d bytes from %p)\n", caption, size, data);
+
+	// Printing the ruler...
+	printk("        +0          +4          +8          +c            0   4   8   c   \n");
+
+	// Hex portion of the line is 8 (the padding) + 3 * 16 = 52 chars long
+	// We add another four bytes padding and place the ASCII version...
+	ascii = buffer + 58;
+	memset(buffer, ' ', 58 + 16);
+	buffer[58 + 16] = '\n';
+	buffer[58 + 17] = '\0';
+	buffer[0] = '+';
+	buffer[1] = '0';
+	buffer[2] = '0';
+	buffer[3] = '0';
+	buffer[4] = '0';
+	for (i = 0, j = 0; i < size; i++, j++) {
+		if (j == 16) {
+			printk("%s", buffer);
+			memset(buffer, ' ', 58 + 16);
+
+			sprintf(temp, "+%04x", i);
+			memcpy(buffer, temp, 5);
+
+			j = 0;
+		}
+
+		sprintf(temp, "%02x", 0xff & data[i]);
+		memcpy(buffer + 8 + (j * 3), temp, 2);
+		if ((data[i] > 31) && (data[i] < 127))
+			ascii[j] = data[i];
+		else
+			ascii[j] = '.';
+	}
+
+	if (j != 0)
+		printk("%s", buffer);
+}
 
 static BOOLEAN  validFlashEepromID(RTMP_ADAPTER *pAd)
 {
@@ -301,12 +349,22 @@ static NDIS_STATUS rtmp_ee_flash_init(PRTMP_ADAPTER pAd, PUCHAR start)
 
 		/* Random number for the last bytes of MAC address*/
 		{
+			USHORT  Addr23;
 			USHORT  Addr45;
 			
-			rtmp_ee_flash_read(pAd, 0x08, &Addr45);
-			Addr45 = Addr45 & 0xff;
-			Addr45 = Addr45 | (RandomByte(pAd)&0xf8) << 8;
+			//rtmp_ee_flash_read(pAd, 0x08, &Addr45);
+			//Addr45 = Addr45 & 0xff;
+			//Addr45 = Addr45 | (RandomByte(pAd)&0xf8) << 8;
+			//  Tiger
+			rtmp_ee_flash_read(pAd, 0x06, &Addr23);
+			Addr23 = Addr23 & 0xF0FF;
+			Addr23 |= (RandomByte(pAd)&0x0F) << 8;
+			*(UINT16 *)(&pAd->EEPROMImage[0x06]) = le2cpu16(Addr23);
 
+			Addr45 = RandomByte(pAd)&0xFF;  //  high byte
+			Addr45 |= (RandomByte(pAd)&0xFF)<<8;  //  low byte
+			*(UINT16 *)(&pAd->EEPROMImage[0x08]) = le2cpu16(Addr45);
+			DBGPRINT(RT_DEBUG_ERROR, ("The EEPROM in Flash is wrong, use default\n"));
 #ifdef CAL_FREE_IC_SUPPORT
 			RTMP_CAL_FREE_IC_CHECK(pAd, bCalFree);
 
@@ -315,8 +373,32 @@ static NDIS_STATUS rtmp_ee_flash_init(PRTMP_ADAPTER pAd, PUCHAR start)
 				DBGPRINT(RT_DEBUG_TRACE, ("Load Cal Free data from e-fuse.\n"));
 			}
 #endif /* CAL_FREE_IC_SUPPORT */
+			if ((short)*(short *)pAd->EEPROMImage == 0x7620) {
+				//  These code below doing MAC of LAN and WAN saving here
+				//  LAN
+				rtmp_ee_flash_read(pAd, 0x2A, &Addr23);
+				Addr23 = Addr23 & 0xF0FF;
+				Addr23 |= (RandomByte(pAd)&0x0F) << 8;
+				*(UINT16 *)(&pAd->EEPROMImage[0x2A]) = le2cpu16(Addr23);
 
-			rtmp_ee_flash_write(pAd, 0x08, Addr45);
+				Addr45 = RandomByte(pAd)&0xFF;  //  high byte
+				Addr45 |= (RandomByte(pAd)&0xFF)<<8;  //  low byte
+				*(UINT16 *)(&pAd->EEPROMImage[0x2C]) = le2cpu16(Addr45);
+				
+				//  WAN
+				rtmp_ee_flash_read(pAd, 0x30, &Addr23);
+				Addr23 = Addr23 & 0xF0FF;
+				Addr23 |= (RandomByte(pAd)&0x0F) << 8;
+				*(UINT16 *)(&pAd->EEPROMImage[0x30]) = le2cpu16(Addr23);
+
+				Addr45 = RandomByte(pAd)&0xFF;  //  high byte
+				Addr45 |= (RandomByte(pAd)&0xFF)<<8;  //  low byte
+				*(UINT16 *)(&pAd->EEPROMImage[0x32]) = le2cpu16(Addr45);
+			}
+			hexdump((void*) pAd->EEPROMImage, 512, "eeprom"); 
+
+			/*write back  all to flash*/
+			rtmp_ee_flash_write_all(pAd,(USHORT *)pAd->EEPROMImage);
 			DBGPRINT(RT_DEBUG_ERROR, ("The EEPROM in Flash is wrong, use default\n"));
 		}
 
