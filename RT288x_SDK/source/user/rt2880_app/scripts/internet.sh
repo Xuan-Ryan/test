@@ -77,6 +77,7 @@ fi
 		echo "ttyHS0 0:0 0660 @/sbin/autoconn3G.sh connect" >> /etc/mdev.conf
 	fi
 fi
+	mknod /dev/Web_UVC0 c 255 0
 }
 
 setMDEV()
@@ -642,10 +643,9 @@ ifconfig br0 down
 brctl delbr br0
 
 # stop all
-iptables --flush
-iptables --flush -t nat
-iptables --flush -t mangle
-
+#iptables --flush
+#iptables --flush -t nat
+#iptables --flush -t mangle
 
 mdev -s
 setMDEV
