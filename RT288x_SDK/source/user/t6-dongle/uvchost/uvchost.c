@@ -2132,12 +2132,12 @@ int main(int argc, char **argv)
 */	
 
    
-/*
+
 	if (pthread_create(&uvc_audio, NULL,uvc_audio_system,&g_udev) != 0) {
 			printf("Error creating uvc_audio_system\n");
 			return -1;
 	}
-*/
+
 
 
 	if (pthread_create(&uvc_video, NULL,uvc_video_system,&g_udev) != 0) {
@@ -2153,8 +2153,8 @@ int main(int argc, char **argv)
 	pthread_join(uvc_cmd,   NULL); // 等待子執行緒執行完成
 	pthread_join(uvc_video, NULL); // 等待子執行緒執行完成
 	pthread_join(uvc_audio, NULL); // 等待子執行緒執行完成
-	pthread_join(uvc_audio_cap1,   NULL); // 等待子執行緒執行完成
-	pthread_join(uvc_audio_cap2,   NULL); // 等待子執行緒執行完成  
+	//pthread_join(uvc_audio_cap1,   NULL); // 等待子執行緒執行完成
+	//pthread_join(uvc_audio_cap2,   NULL); // 等待子執行緒執行完成  
 #endif	
     printf("Leave main \n");
 	kill(getpid(), SIGKILL);
