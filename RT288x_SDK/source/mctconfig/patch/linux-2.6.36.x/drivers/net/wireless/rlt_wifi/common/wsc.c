@@ -690,7 +690,6 @@ VOID WscEAPAction(
 	/* The first 6 bytes in Elem->Msg is the MAC address of wps peer. */
 	memmove(MacAddr, Elem->Msg, MAC_ADDR_LEN);
 	memmove(Elem->Msg, Elem->Msg+6, Elem->MsgLen);
-
 #ifdef DBG
     hex_dump("(WscEAPAction)Elem->MsgLen", Elem->Msg, Elem->MsgLen);
 #endif /* DBG */
@@ -1094,7 +1093,6 @@ VOID WscEAPAction(
 			bGoWPS = FALSE;
 #endif /* WSC_V2_SUPPORT */
 #endif /* CONFIG_AP_SUPPORT */
-		
 		if (((pWscControl->WscConfMode & WSC_ENROLLEE) != 0) &&              
 			bGoWPS &&
 			bNonceMatch)		
@@ -7945,7 +7943,9 @@ INT	WscGetConfWithoutTrigger(
  Notify user space application that WPS procedure will begin.
 */
     {
-#define WSC_SINGLE_TRIGGER_APPNAME  "goahead"
+//#define WSC_SINGLE_TRIGGER_APPNAME  "goahead"
+//  modified by Tiger
+#define WSC_SINGLE_TRIGGER_APPNAME  "nvram_daemon"
 
         struct task_struct *p;
         read_lock(&tasklist_lock);

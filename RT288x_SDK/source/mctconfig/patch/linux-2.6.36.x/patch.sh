@@ -21,22 +21,15 @@ cp drivers/media/video/uvc/uvc_video.c ../../../linux-2.6.36.x/drivers/media/vid
 cp drivers/media/video/uvc/uvc_v4l2.c ../../../linux-2.6.36.x/drivers/media/video/uvc/uvc_v4l2.c
 cp drivers/media/video/uvc/uvc_driver.c ../../../linux-2.6.36.x/drivers/media/video/uvc/uvc_driver.c
 cp drivers/media/video/uvc/uvcvideo.h ../../../linux-2.6.36.x/drivers/media/video/uvc/uvcvideo.h
-echo 'start patch network driver'
+echo 'start patch network related driver'
+echo 'start patch raeth'
 cp drivers/net/raeth/raether.c ../../../linux-2.6.36.x/drivers/net/raeth/raether.c
+echo 'start patch rlt_wifi'
 cp drivers/net/wireless/rlt_wifi/common/ee_flash.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/common/ee_flash.c
+cp drivers/net/wireless/rlt_wifi/common/wsc.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/common/wsc.c
 echo 'start patch include'
 cp include/linux/usb/video.h ../../../linux-2.6.36.x/include/linux/usb/video.h
 cp include/linux/videodev2.h ../../../linux-2.6.36.x/include/linux/videodev2.h
-#echo 'start patch rlt_wifi'
-#cp drivers/rlt_wifi/ap_cfg.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/ap/ap_cfg.c
-#cp drivers/rlt_wifi/ap_ioctl.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/os/linux/ap_ioctl.c
-#cp drivers/rlt_wifi/rt_os.h ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/include/os/rt_os.h
-#cp drivers/rlt_wifi/rtmp_cmd.h ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/include/rtmp_cmd.h
-#cp drivers/rlt_wifi/ee_flash.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/common/ee_flash.c
-#echo ''
-#echo 'start patch raeth'
-#cp drivers/raeth/raether.c ../../../linux-2.6.36.x/drivers/net/raeth/raether.c
-#echo ''
 #echo 'start patch mtd'
 #cp drivers/mtd/ralink_spi.c ../../../linux-2.6.36.x/drivers/mtd/ralink/ralink_spi.c
 echo ''
