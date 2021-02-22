@@ -207,8 +207,6 @@ int ralink_gpio_led_set(ralink_gpio_led_info led)
 				ralink_gpio_led_data[led.gpio].rests,
 				ralink_gpio_led_data[led.gpio].times);
 		tmpgpiomode = *(volatile u32 *)(RALINK_REG_GPIOMODE);
-		//  Tiger
-		*(volatile u32 *)(RALINK_REG_GPIOMODE) = tmpgpiomode | 0x100018;  //  programed to GPIO and I21S
 		//set gpio direction to 'out'
 #if defined (RALINK_GPIO_HAS_2722)
 		if (led.gpio <= 21) {
@@ -270,9 +268,29 @@ int ralink_gpio_led_set(ralink_gpio_led_info led)
 			*(volatile u32 *)(RALINK_REG_PIO3924DIR) = tmp;
 		}
 		else if (led.gpio <= 71) {
-			tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140DIR));
-			tmp |= RALINK_GPIO((led.gpio-40));
-			*(volatile u32 *)(RALINK_REG_PIO7140DIR) = tmp;
+			/*  It is a workaround.
+			 *  Modified by Tiger, Because of the HW design, we do not set the 
+			 *  direction of GPIO#52 as output when we lite the green LED off, 
+			 *  otherwise, the green LED leaves lite on.
+			 *  We don't need to care about the direction of GPIO#14, because 
+			 *  this pin is input only.
+			 *  the keywords are "push-pull" "open-drain" for GPIO
+			 */
+			if (led.gpio != 52) {
+				tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140DIR));
+				tmp |= RALINK_GPIO((led.gpio-40));
+				*(volatile u32 *)(RALINK_REG_PIO7140DIR) = tmp;
+			} else {
+				if(ralink_gpio_led_data[led.gpio].on > 1) {
+					tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140DIR));
+					tmp |= RALINK_GPIO((led.gpio-40));
+					*(volatile u32 *)(RALINK_REG_PIO7140DIR) = tmp;
+				} else {
+					tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140DIR));
+					tmp &= ~RALINK_GPIO((led.gpio-40));
+					*(volatile u32 *)(RALINK_REG_PIO7140DIR) = tmp;
+				}
+			}
 		}
 		else {
 #if defined (RALINK_GPIO_HAS_7224)
@@ -2404,25 +2422,31 @@ void ralink_gpio_led_init_timer(void)
 {
 	int i;
 
-	for (i = 0; i < RALINK_GPIO_NUMBER; i++)
-		if(i == 9)
+	for (i = 0; i < RALINK_GPIO_NUMBER; i++) {
+		//  we don't need the sample from MTK, keep these codes for reference.
+		/*if(i == 9)
 		{
-			unsigned int tmpgpiomode;
 			ralink_gpio_led_data[9].gpio = 9;
 			ralink_gpio_led_data[9].on = RALINK_GPIO_LED_INFINITY;
 			ralink_gpio_led_data[9].off = 0;
 			ralink_gpio_led_data[9].blinks = 0;
 			ralink_gpio_led_data[9].rests = 0;
 			ralink_gpio_led_data[9].times = 0;
-			tmpgpiomode = *(volatile u32 *)(RALINK_REG_GPIOMODE);
-			//  Tiger
-			*(volatile u32 *)(RALINK_REG_GPIOMODE) = tmpgpiomode | 0x100018;  //  programed to GPIO and I2S
-			printk("mode:0x%x\n",*(volatile u32 *)(RALINK_REG_GPIOMODE));
 		}
 		else
 		{
 			ralink_gpio_led_data[i].gpio = -1; //-1 means unused
+		}*/
+		if (i == 14) {
+			//  just leave these code for the future, once we need to 
+			//  do some LED operation here, modify these code.
+			ralink_gpio_led_data[i].gpio = -1; //-1 means unused
+		} else if (i == 52) {
+			ralink_gpio_led_data[i].gpio = -1; //-1 means unused
+		} else {
+			ralink_gpio_led_data[i].gpio = -1; //-1 means unused
 		}
+	}
 #if RALINK_GPIO_LED_LOW_ACT
 	ra_gpio_led_set = 0xfffffdff;
 #if defined (RALINK_GPIO_HAS_2722)
@@ -2476,10 +2500,13 @@ void ralink_gpio_led_init_timer(void)
 }
 #endif
 
+#define MCT_WPS_PIN		44
+
 int __init ralink_gpio_init(void)
 {
 	unsigned int i;
 	u32 gpiomode;
+	unsigned long tmp;
 
 #ifdef  CONFIG_DEVFS_FS
 	if (devfs_register_chrdev(ralink_gpio_major, RALINK_GPIO_DEVNAME,
@@ -2507,18 +2534,48 @@ int __init ralink_gpio_init(void)
 	//config these pins to gpio mode
 	gpiomode = le32_to_cpu(*(volatile u32 *)(RALINK_REG_GPIOMODE));
 #if !defined (CONFIG_RALINK_RT2880)
-	//gpiomode &= ~0x1C;  //clear bit[2:4]UARTF_SHARE_MODE
 	gpiomode &= ~0x1C;  //clear bit[2:4]UARTF_SHARE_MODE
-	//  Tiger
-	gpiomode |= 0x18;  //  programed to GPIO and I2S
 #endif
 #if defined (CONFIG_RALINK_MT7620)
 	gpiomode &= ~0x2000;  //clear bit[13] WLAN_LED
 #endif
 	gpiomode |= RALINK_GPIOMODE_DFT;
-	printk("%x\n", gpiomode);
+	/*  Tiger, This need to program in RX/TX
+	 *  [4:2]   110b dual color LED(red) -> GPIO#14
+	 *  [4:2]   110b programed to I2S
+	 *
+	 *  [19:18] 10b  dual color LED(green) -> GPIO#52
+	 *
+	 *  [19:18] 10b  USB HUB reset pin -> GPIO#53
+	 *
+	 *  [15]    1b   WPS -> GPIO#44
+	 *
+	 */
+	gpiomode |= 0x00088018;
+	printk("Current gpiomode = %x\n", gpiomode);
+
 	*(volatile u32 *)(RALINK_REG_GPIOMODE) = cpu_to_le32(gpiomode);
 
+	//  set EDGE of #44 to falling  
+	tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140EDGE));
+	tmp &= ~RALINK_GPIO(MCT_WPS_PIN-40);
+	printk("*********** EDGE register **********\n");
+	printk("************* %08X *************\n", tmp);
+	*(volatile u32 *)(RALINK_REG_PIO7140EDGE) = cpu_to_le32(tmp);
+	//  enable #44 rising edge INTERRUPT
+	tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140RENA));
+	tmp |= RALINK_GPIO(MCT_WPS_PIN-40);
+	printk("******** Interrupt register ********\n");
+	printk("************* %08X *************\n", RALINK_GPIO(MCT_WPS_PIN-40));
+	*(volatile u32 *)(RALINK_REG_PIO7140RENA) = cpu_to_le32(RALINK_GPIO(MCT_WPS_PIN-40));
+#if 0  //  don't need it now, just for reference
+	//  enable #44 falling edge INTERRUPT
+	tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140FENA));
+	tmp |= RALINK_GPIO(MCT_WPS_PIN-40);
+	printk("******** Interrupt register ********\n");
+	printk("************* %08X *************\n", RALINK_GPIO(MCT_WPS_PIN-40));
+	*(volatile u32 *)(RALINK_REG_PIO7140FENA) = cpu_to_le32(RALINK_GPIO(MCT_WPS_PIN-40));
+#endif
 	//enable gpio interrupt
 	*(volatile u32 *)(RALINK_REG_INTENA) = cpu_to_le32(RALINK_INTCTL_PIO);
 	for (i = 0; i < RALINK_GPIO_NUMBER; i++) {
@@ -2569,6 +2626,7 @@ void ralink_gpio_notify_user(int usr)
 	//don't send any signal if pid is 0 or 1
 	if ((int)ralink_gpio_info[ralink_gpio_irqnum].pid < 2)
 		return;
+
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,35)
 	p = find_task_by_vpid(ralink_gpio_info[ralink_gpio_irqnum].pid);
 #else
@@ -2970,10 +3028,9 @@ irqreturn_t ralink_gpio_irq_handler(int irq, void *irqaction)
 			continue;
 		ralink_gpio_irqnum = i;
 		if (ralink_gpio7140_edge & (1 << (i - 40))) {
-			if (record[i].rising != 0 && time_before_eq(now,
-						record[i].rising + 40L)) {
-			}
-			else {
+#if 0
+			if (record[i].rising != 0 && time_before_eq(now, record[i].rising + 40L)) {
+			} else {
 				record[i].rising = now;
 				if (time_before(now, record[i].falling + 200L)) {
 					printk("i=%d, one click\n", i);
@@ -2984,6 +3041,21 @@ irqreturn_t ralink_gpio_irq_handler(int irq, void *irqaction)
 					schedule_work(&gpio_event_hold);
 				}
 			}
+#else
+			//  FOR UVC, we have only one button for the click event and don't 
+			//  need to deal with a long press event. so just need to prevent too 
+			//  short click event.
+			if (record[i].rising != 0 && time_before_eq(now, record[i].rising + 40L)) {
+				/*
+				 * If the interrupt comes in a short period,
+				 * it might be floating. We ignore it.
+				 */
+			} else {
+				record[i].rising = now;
+				printk("one click, WPS on\n");
+				schedule_work(&gpio_event_click);
+			}
+#endif
 		}
 		else {
 			record[i].falling = now;
