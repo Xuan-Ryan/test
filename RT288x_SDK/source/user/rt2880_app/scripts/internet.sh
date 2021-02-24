@@ -383,6 +383,9 @@ configVIF()
 	fi
 }
 
+#  Added by Tiger for apclient_chkconn.sh
+rm /tmp/timeout 2>/dev/null
+
 # opmode adjustment:
 #   if AP client was not compiled and operation mode was set "3" -> set $opmode "1"
 #   if Station was not compiled and operation mode was set "2" -> set $opmode "1"
@@ -979,6 +982,7 @@ elif [ "$opmode" = "3" ]; then
 	APCLI=`nvram_get rtdev apClient`
 	if [ "$APCLI" == "1" ]; then
 		ifconfig apclii0 up
+		iwpriv apclii0 set ApCliEnable=1
 		brctl addif br0 apclii0
 	fi
 else
