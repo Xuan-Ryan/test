@@ -29,9 +29,7 @@ ln -s /etc_ro/init.d /etc/init.d
 ln -s /etc_ro/cron /etc/cron
 
 #  UVC
-insmod rt_udc_pdma
-#insmod g_mass_storage g_uvc_mjpeg_res_bitflag=0x0C g_uvc_h264_res_bitflag=0x1C g_uvc_yuv_res_bitflag=0x01
-#insmod g_mass_storage g_uvc_mjpeg_res_bitflag=0x0F g_uvc_h264_res_bitflag=0x0F g_uvc_yuv_res_bitflag=0x01 g_uvc_nv12_res_bitflag=0x01 g_uvc_i420_res_bitflag=0x01 g_uvc_m420_res_bitflag=0x01
-insmod g_mass_storage
-sleep 3
-mct_gadget
+uvcclient &
+
+#  for ap client
+apclient_chkconn.sh &

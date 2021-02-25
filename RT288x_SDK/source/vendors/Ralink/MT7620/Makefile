@@ -1,7 +1,8 @@
 KERNELZ = $(IMAGEDIR)/zImage
 RAMDISK  = $(IMAGEDIR)/ramdisk
 IMAGE = $(IMAGEDIR)/$(USER)_uImage
-FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)-$(__COMPANY)-$(__VERSION).bin
+__TYPE := $(shell [ -e $(ROOTDIR)/.type ] && cat $(ROOTDIR)/.type |awk 'NR==1')
+FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)-$(__COMPANY)-$(__TYPE)-$(__VERSION).bin
 ROMFS_DIR = $(ROOTDIR)/romfs
 
 RAMDISK_SIZE  := $(shell echo $(CONFIG_BLK_DEV_RAM_SIZE))
@@ -41,7 +42,11 @@ romfs:
 #	@if [ \! -d $(ROMFSDIR)/dev ];then mkdir -p $(ROMFSDIR)/dev;fi;
 #	./makedevlinks $(ROMFSDIR)
 #endif
-	$(ROMFSINST) /etc_ro/rcS
+	if [ "$(__TYPE)" = "RX" ]; then \
+		$(ROMFSINST) /etc_ro/rcS; \
+	else \
+		$(ROMFSINST) rcS.tx /etc_ro/rcS; \
+	fi
 	$(ROMFSINST) /etc_ro/inittab
 	$(ROMFSINST) /etc_ro/motd
 	$(ROMFSINST) /etc/fstab
@@ -75,13 +80,21 @@ ifeq    ($(CONFIG_CONFIG_SHRINK), y)
 	mv RT2860_default_vlan.tmp RT2860_default_vlan
 else
 	$(ROMFSINST) /etc_ro/Wireless/RT2860AP/RT2860_default_novlan
-	$(ROMFSINST) /etc_ro/Wireless/RT2860AP/RT2860_default_vlan
+	if [ "$(__TYPE)" = "RX" ]; then \
+		$(ROMFSINST) /etc_ro/Wireless/RT2860AP/RT2860_default_vlan; \
+	else \
+		$(ROMFSINST) RT2860_default_vlan.tx /etc_ro/Wireless/RT2860AP/RT2860_default_vlan; \
+	fi
 	$(ROMFSINST) -e CONFIG_EXTEND_NVRAM /etc_ro/tr069_voip_default_settings
 	$(ROMFSINST) -e CONFIG_MTK_VOIP /etc_ro/voip_default_settings
 	sed -i "s/__MODEL__/$(__MODEL)/g" $(ROMFSDIR)/etc_ro/Wireless/RT2860AP/RT2860_default_vlan
 	sed -i "s/__VERSION__/$(__VERSION)/g" $(ROMFSDIR)/etc_ro/Wireless/RT2860AP/RT2860_default_vlan
 endif
-	$(ROMFSINST) /etc_ro/Wireless/iNIC/RT2860AP.dat
+	if [ "$(__TYPE)" = "RX" ]; then \
+		$(ROMFSINST) /etc_ro/Wireless/iNIC/RT2860AP.dat; \
+	else \
+		$(ROMFSINST) RT2860AP.dat.tx /etc_ro/Wireless/iNIC/RT2860AP.dat; \
+	fi
 	#for sigma test
 	$(ROMFSINST) -e CONFIG_RALINKAPP_HOTSPOT /etc_ro/Wireless/iNIC/RT2860AP_hotspot.dat
 
@@ -139,7 +152,7 @@ romfs.post::
 	[ -d $(IMAGEDIR) ] || mkdir -p $(IMAGEDIR)
 
 	#Squash File System
-	rm -f $(RAMDISK)  
+	rm -f $(RAMDISK)
 ifeq ($(LINUXDIR),linux-2.4.x)
 	$(CONFIG_CROSS_COMPILER_PATH)/mksquashfs_lzma-3.0 $(ROMFSDIR) $(RAMDISK)
 else
@@ -238,6 +251,7 @@ ifeq	($(CONFIG_ROOTFS_IN_FLASH_NO_PADDING),y)
 	ENTRY=`readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}'` ; \
 	$(CUR_DIR)/mkimage -A mips -O linux -T kernel -C $(COMP) -a 80000000 -e $$ENTRY -k $$KRN_SIZE -n "Linux Kernel Image" -d $(KERNELZ).$(COMP) $(IMAGE)
 else
-	@cd $(IMAGEDIR) ; $(CUR_DIR)/mkimage -A mips -O linux -T kernel -C $(COMP) -a 80000000 -e $(shell readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}') -k `ls $(KERNELZ).$(COMP) -l | awk '{print $$5}'` -n '$(__MODEL)=$(__VERSION)' -d $(KERNELZ).$(COMP) $(IMAGE);cp $(IMAGE) $(FINAL_IMAGE)
+	@cd $(IMAGEDIR) ; $(CUR_DIR)/mkimage -A mips -O linux -T kernel -C $(COMP) -a 80000000 -e $(shell readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}') -k `ls $(KERNELZ).$(COMP) -l | awk '{print $$5}'` -n '$(__MODEL)=$(__VERSION)' -d $(KERNELZ).$(COMP) $(IMAGE);cp $(IMAGE) $(FINAL_IMAGE) ; \
+	echo 'Current Type is $(__TYPE)'
 endif
 

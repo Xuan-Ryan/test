@@ -139,6 +139,5 @@ VHT_BW_SIGNAL=0
 VHT_LDPC=0
 lang=en-us
 WatchDogEnable=1
-WPSEnable=1
-WscModeOption=7
-
+apClient=1
+ApCliEnable=1
