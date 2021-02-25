@@ -32,7 +32,10 @@ do
 			iwpriv apclii0 set ApCliAutoConnect=1
 		else
 			count=0
-			#  connected, don't to do anything
+			#  store the SSID from AP
+			#  ex: ApClii0 Connected AP : 00:05:1B:00:01:02   SSID:UVC-79366D
+			SSID=`iwpriv apclii0 conn_status|awk -F ' ' '{print $6}'|awk -F ':' '{print $2}'`
+			nvram_set rtdev ApCliSsid $SSID
 		fi
 	fi
 done
