@@ -1,7 +1,7 @@
 #
 SHELL:=/bin/bash
 #
-CFLAGS += -I$(ROOTDIR)/$(LINUXDIR)/include -I$(ROOTDIR)/lib/libnvram -I$(ROOTDIR)/config 
+CFLAGS += -I$(ROOTDIR)/$(LINUXDIR)/include -I$(ROOTDIR)/$(LINUXDIR)/drivers/char -I$(ROOTDIR)/lib/libnvram -I$(ROOTDIR)/config 
 ifeq ($(shell [[ "$(CONFIG_MTK_VOIP)" == "y" || "$(CONFIG_MTK_TR069)" == "y" ]] && echo true), true)
 CFLAGS += -I$(ROOTDIR)/user/openssl-0.9.8e/include
 endif

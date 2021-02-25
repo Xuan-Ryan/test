@@ -29,6 +29,10 @@
 #include <errno.h>
 #include "stapriv.h"
 #endif
+//  Added by Tiger
+#include <fcntl.h>
+#include "ralink_gpio.h"
+#define GPIO_DEV	"/dev/gpio"
 
 #define CMD_NVRAM_GET		0x1
 #define CMD_BUILD_GET		0x2
@@ -40,6 +44,7 @@
 #define CMD_AUTO_WAN_GET	0x8
 #define CMD_MEDIA_GET		0x9
 #define CMD_TEST_GET		0xa
+#define CMD_GPIO_SET		0xb
 
 #define TXBYTE		0
 #define TXPACKET	1
@@ -74,6 +79,7 @@ void get_usage(char *aout)
 	for (i = 0; i < getNvramNum(); i++){
 		DBG_MSG("\t%s %s nvram lan_ipaddr", aout, getNvramName(i));
 	}
+	DBG_MSG("\t%s gpio [gpio pin] [0/1]", aout);
 }
 
 int ap_oid_query_info(unsigned long OidQueryCode, int socket_id, char *DeviceName, void *ptr, unsigned long PtrLength)
@@ -7412,6 +7418,104 @@ void WebMediaGet(char *argv[])
 	} 
 }
 
+enum {
+	gpio_in,
+	gpio_out,
+};
+
+enum {
+	gpio2300,
+	gpio3924,
+	gpio7140,
+	gpio72
+};
+
+void gpio_set(char *argv[])
+{
+	int fd = 0;
+	int req = 0;
+	int wreq = 0;
+	int rreq = 0;
+	int gpio_num = 0;
+	int action = 0;
+	int dir = 0;
+	int value = 0;
+	
+	if (argv[2][0] == 'r') {
+		gpio_num = atoi(argv[3]);
+		dir = gpio_in;
+	} else {
+		dir = gpio_out;
+		gpio_num = atoi(argv[2]);
+		action = atoi(argv[3]);
+	}
+
+	fd = open(GPIO_DEV, O_RDONLY);
+	if (fd < 0) {
+		return;
+	}
+
+	if (gpio_num >= 24 && gpio_num <=39){
+		gpio_num = gpio_num - 24; 
+		if (dir == gpio_in) {
+			req = RALINK_GPIO3924_SET_DIR_IN;
+			rreq = RALINK_GPIO3924_READ;
+		} else {
+			req = RALINK_GPIO3924_SET_DIR_OUT;
+			rreq = RALINK_GPIO3924_READ;
+			wreq = RALINK_GPIO3924_WRITE;
+		}
+	}else if(gpio_num >=40 && gpio_num<=71){
+		gpio_num = gpio_num - 40; 
+		if (dir == gpio_in) {
+			req = RALINK_GPIO7140_SET_DIR_IN;
+			rreq = RALINK_GPIO7140_READ;
+		} else {
+			req = RALINK_GPIO7140_SET_DIR_OUT;
+			rreq = RALINK_GPIO7140_READ;
+			wreq = RALINK_GPIO7140_WRITE;
+		}
+	}else if(gpio_num == 72){
+		gpio_num = gpio_num - 72; 
+		if (dir == gpio_in) {
+			req = RALINK_GPIO72_SET_DIR_IN;
+			rreq = RALINK_GPIO72_READ;
+		} else {
+			req = RALINK_GPIO72_SET_DIR_OUT;
+			rreq = RALINK_GPIO72_READ;
+			wreq = RALINK_GPIO72_WRITE;
+		}
+	} else {
+		if (dir == gpio_in) {
+			req = RALINK_GPIO_SET_DIR_IN;
+			rreq = RALINK_GPIO_READ;
+		} else {
+			req = RALINK_GPIO_SET_DIR_OUT;
+			rreq = RALINK_GPIO_READ;
+			wreq = RALINK_GPIO_WRITE;
+		}
+	}
+		
+
+	//  set direction
+	ioctl(fd, req, (0xffffffff) & (1 << gpio_num));
+	if (dir == gpio_out) {
+		//  read first 
+		ioctl(fd, rreq, &value);
+		//  write data
+		if (action == 0)
+			value  &= ~(1 << gpio_num);
+		else
+			value |= (1 << gpio_num);
+		ioctl(fd, wreq, value);
+	} else {
+		ioctl(fd, rreq, &value);
+		printf("GPIO %s = %X\n", argv[3], value);
+	}
+
+	close(fd);
+}
+
 void usage(char *aout)
 {
 	//set_usage("STF");
@@ -7453,6 +7557,8 @@ int main(int argc, char *argv[])
 	else if (!strncmp(argv[2], "auto_wan", 5))
 		cmd = CMD_AUTO_WAN_GET;	
 #endif
+	else if (!strncmp(argv[1], "gpio", 4))
+		cmd = CMD_GPIO_SET;
 	else
 		cmd = 0;
 
@@ -7489,5 +7595,7 @@ int main(int argc, char *argv[])
 	case CMD_TEST_GET:
 		printf("SSID1\tSSID2\tSSID3\t\tSSID4\tSSID5\tSSID6\t\tSSID7\tSSID8\tSSID9");
 		break;
+	case CMD_GPIO_SET:
+		gpio_set(argv);
 	}
 }
