@@ -14465,7 +14465,7 @@ VOID Get_ApCli_Status(RTMP_ADAPTER *pAd, RTMP_IOCTL_INPUT_STRUCT *wrq)
  	}
  	else
  	{
-		sprintf(msg, "\nApCli%d Connected AP : Disconnect", ifIndex);
+		sprintf(msg, "\nApClii%d Connected AP : Disconnect", ifIndex);
  	}
 
 	wrq->u.data.length = strlen(msg);
