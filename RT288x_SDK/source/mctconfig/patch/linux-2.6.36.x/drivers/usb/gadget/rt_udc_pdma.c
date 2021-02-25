@@ -1471,7 +1471,7 @@ static int rt_ep_set_halt(struct usb_ep *usb_ep, int value)
 	rt_ep_stall(rt_ep, value);
 	if(value == 1 && (rt_ep == (&rt_ep->rt_usb->rt_ep[0])))
 	{
-		ep0_chg_stat(__func__, rt_ep->rt_usb, EP0_STALL);
+		ep0_chg_stat(__func__, rt_ep->rt_usb, EP0_IDLE);
 	}
 	else if(value == 0 && (rt_ep == (&rt_ep->rt_usb->rt_ep[0])))
 	{
