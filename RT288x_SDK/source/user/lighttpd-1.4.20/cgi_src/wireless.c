@@ -1392,16 +1392,20 @@ void set_wifi_wps_oob(int nvram, char *input)
 static void wps_ap_pbc_start_all(int nvram)
 {
 	const char *wsc_enable = nvram_bufget(nvram, "WscModeOption");
+	const char *opmode = nvram_bufget(RT2860_NVRAM, "OperationMode");
 	char iface[6];
+	char cliiface[16];
 
 #if ! defined CONFIG_FIRST_IF_NONE 
 	if (nvram == RT2860_NVRAM) {
 		strcpy(iface, "ra0");	
+		strcpy(cliiface, "apcli0");
 	}
 #endif
 #if ! defined CONFIG_SECOND_IF_NONE 
 	if (nvram == RTDEV_NVRAM) {
 		strcpy(iface, "rai0");	
+		strcpy(cliiface, "apclii0");
 	}
 #endif
 
@@ -1411,8 +1415,22 @@ static void wps_ap_pbc_start_all(int nvram)
 		return;
 	}
 
-	do_system("iwpriv %s set WscMode=2", iface);
-	do_system("iwpriv %s set WscGetConf=1", iface);
+	if (!strcmp(opmode, "1")) {
+		//  this is RX
+		do_system("iwpriv %s set WscConfMode=0", iface);
+		do_system("iwpriv %s set WscConfMode=7", iface);
+		sleep(1);
+		do_system("iwpriv %s set WscConfMode=4", iface);
+		do_system("iwpriv %s set WscMode=2", iface);
+		do_system("iwpriv %s set WscGetConf=1", iface);
+	} else {
+		//  this is TX
+		do_system("ifconfig %s down up", cliiface);
+		do_system("iwpriv %s set WscConfMode=1", cliiface);
+		do_system("iwpriv %s set WscMode=2", cliiface);
+		do_system("iwpriv %s set WscGetConf=1", cliiface);
+		do_system("brctl addif br0 %s", cliiface);
+	}
 
 	//resetTimerAll();
 	//setTimer(WPS_AP_CATCH_CONFIGURED_TIMER * 1000, WPSAPTimerHandler);
@@ -2565,8 +2583,7 @@ static void WPSSTAMode0(int nvram, char *input)
 }
 static void WPSSTAMode1(int nvram, char *input)
 {
-DBG_MSG("");
-		nvram_bufset(RT2860_NVRAM, "staWPSMode", "1");
+	nvram_bufset(RT2860_NVRAM, "staWPSMode", "1");
 
 	nvram_commit(RT2860_NVRAM);
 	//websWrite(wp, T("HTTP/1.1 200 OK\nContent-type: text/plain\nPragma: no-cache\nCache-Control: no-cache\n\n"));
@@ -3816,11 +3833,50 @@ static void AntennaDiversity(int nvram, char *input)
 }
 #endif
 
+static int mct_get_wifi_mac_last_three_bytes(int mode)
+{
+	char cmdline[64], buf[32];
+	FILE *pp;
+	unsigned int last_three_bytes = 0xFFFFFFFF;
+
+	if(mode == RT2860_NVRAM)
+		sprintf(cmdline,"/bin/flash -r 40007 -c 3"); //the last three bytes of MT7603 MAC address
+	else
+	if(mode == RTDEV_NVRAM)
+		sprintf(cmdline,"/bin/flash -r 48007 -c 3"); //the last three bytes of MT7615 MAC address
+	else
+		return last_three_bytes;
+
+	if( (pp = popen(cmdline, "r")) != NULL ) {
+		char *tmp;
+		unsigned int x = 0;
+
+		fgets(buf, sizeof(buf), pp);
+		sscanf(buf, "%*5X: %X", &x);
+		last_three_bytes = (x&0xFF) << 16;
+
+		fgets(buf, sizeof(buf), pp);
+		sscanf(buf, "%*5X: %X", &x);
+		last_three_bytes |= (x&0xFF) << 8;
+
+		fgets(buf, sizeof(buf), pp);
+		sscanf(buf, "%*5X: %X", &x);
+		last_three_bytes |= x&0xFF;
+
+		pclose(pp);
+	}
+
+	return last_three_bytes;
+}
+
 int main(int argc, char *argv[]) 
 {
 	char *page, *inStr;
 	int wps_enable, nvram_id;
 	long inLen;
+	char cmdline[128];
+	unsigned int last_three_bytes  = 0;
+	int reload = 0;
 
 	if ((argc > 1) && (!strcmp(argv[1], "init"))) {
 #if ! defined CONFIG_FIRST_IF_NONE 
@@ -3846,10 +3902,40 @@ int main(int argc, char *argv[])
 #if defined (RT2860_WAPI_SUPPORT) || defined (RTDEV_WAPI_SUPPORT)
 		restart_wapi();
 #endif
+		/*  5G  */
+		if(strstr(nvram_bufget(RTDEV_NVRAM, "SSID1"), "_uninitial") != NULL){
+			char *orig_ssid, *replace_str;
+			char newssid[64];
+			orig_ssid = (char *)nvram_bufget(RTDEV_NVRAM, "SSID1");
+			last_three_bytes = mct_get_wifi_mac_last_three_bytes(RTDEV_NVRAM) & 0x00FFFFFF;
+			replace_str = strstr(orig_ssid, "_uninitial");
+			*replace_str = 0; //add terminator at the end
+			sprintf(newssid, "%s-%06X", orig_ssid, last_three_bytes);
+			nvram_bufset(RTDEV_NVRAM, "SSID1", newssid);
+			nvram_commit(RTDEV_NVRAM);
+			sprintf(cmdline,"iwpriv rai0 set SSID=\"%s\"", newssid);
+			system(cmdline);
+			reload = 1;
+		}
+		{
+			int mode = atoi(nvram_bufget(RT2860_NVRAM, "OperationMode"));
+			if (mode != 1) {
+				do_system("ifconfig apclii0 down up");
+				do_system("iwpriv apclii0 set ApCliEnable=1");
+				do_system("iwpriv apclii0 set SiteSurvey=1");
+				do_system("sleep 1");
+				do_system("iwpriv apclii0 get_site_survey");
+				do_system("iwpriv apclii0 set ApCliAutoConnect=1");
+			} 
+		}
 		return;
 	} else if ((argc > 1) && (!strcmp(argv[1], "wps_pbc"))) {
 #if defined (RT2860_WSC_SUPPORT) || defined (RTDEV_WSC_SUPPORT)
+		nvram_init(RT2860_NVRAM);
+		nvram_init(RTDEV_NVRAM);
 		wps_ap_pbc_start_all(strtol(argv[2], NULL, 10));
+		nvram_close(RT2860_NVRAM);
+		nvram_close(RTDEV_NVRAM);
 #endif
 		return;
 	}
