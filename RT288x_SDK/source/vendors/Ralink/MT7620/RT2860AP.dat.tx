@@ -141,3 +141,6 @@ lang=en-us
 WatchDogEnable=1
 apClient=1
 ApCliEnable=1
+ApCliAuthMode=WPA2PSK
+ApCliEncrypType=AES
+ApCliWPAPSK=12345678

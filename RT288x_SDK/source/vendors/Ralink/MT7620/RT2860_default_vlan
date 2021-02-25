@@ -9,6 +9,7 @@ Login=admin
 Password=admin
 OperationMode=1
 Platform=MT7620
+WatchDogEnable=1
 wanConnectionMode=STATIC
 wan_ipaddr=192.168.1.1
 wan_netmask=255.255.255.0
