@@ -14420,6 +14420,60 @@ VOID RtmpHostapdSecuritySet(
 }
 #endif /* HOSTAPD_SUPPORT */
 
+#ifdef APCLI_SUPPORT
+VOID Get_ApCli_Status(RTMP_ADAPTER *pAd, RTMP_IOCTL_INPUT_STRUCT *wrq)
+{
+	INT i=0;
+	POS_COOKIE pObj;
+	UCHAR ifIndex;
+	BOOLEAN bConnect=FALSE;
+	char * msg;
+
+	pObj = (POS_COOKIE) pAd->OS_Cookie;
+
+	if (pObj->ioctl_if_type != INT_APCLI)
+		return;
+
+	ifIndex = pObj->ioctl_if;
+
+	os_alloc_mem(pAd, (UCHAR **)&msg, sizeof(CHAR)*(2048));
+	if (msg == NULL) {
+		return;
+	}
+	memset(msg, 0x00, 1600);
+
+	if((pAd->ApCfg.ApCliTab[ifIndex].CtrlCurrState == APCLI_CTRL_CONNECTED)
+ 		&& (pAd->ApCfg.ApCliTab[ifIndex].SsidLen != 0))
+ 	{
+		for (i=0; i<MAX_LEN_OF_MAC_TABLE; i++)
+ 		{
+			PMAC_TABLE_ENTRY pEntry = &pAd->MacTab.Content[i];
+
+			if ( IS_ENTRY_APCLI(pEntry)
+				&& (pEntry->Sst == SST_ASSOC)
+				&& (pEntry->PortSecured == WPA_802_1X_PORT_SECURED))
+ 			{
+				sprintf(msg, "\nApClii%d Connected AP : %02X:%02X:%02X:%02X:%02X:%02X   SSID:%s",
+						ifIndex, PRINT_MAC(pEntry->Addr), pAd->ApCfg.ApCliTab[ifIndex].Ssid);
+				bConnect=TRUE;
+			}
+ 		}
+
+		if (!bConnect) {
+			sprintf(msg, "\nApClii%d Connected AP : Disconnect", ifIndex);
+		}
+ 	}
+ 	else
+ 	{
+		sprintf(msg, "\nApCli%d Connected AP : Disconnect", ifIndex);
+ 	}
+
+	wrq->u.data.length = strlen(msg);
+	copy_to_user(wrq->u.data.pointer, msg, wrq->u.data.length);
+	os_free_mem(NULL, msg);
+ 	return;
+}
+#endif
 
 /*
 ========================================================================
@@ -14677,6 +14731,10 @@ INT RTMP_AP_IoctlHandle(
 
 		case CMD_RTPRIV_IOCTL_APC_REMOVE:
 			ApCli_Remove(pAd);
+			break;
+
+		case CMD_RTPRIV_IOCTL_SHOW_CONNSTATUS:
+			Get_ApCli_Status(pAd, wrq);
 			break;
 #endif /* APCLI_SUPPORT */
 

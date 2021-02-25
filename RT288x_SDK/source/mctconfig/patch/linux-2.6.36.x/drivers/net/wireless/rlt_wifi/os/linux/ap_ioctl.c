@@ -81,7 +81,12 @@ struct iw_priv_args ap_privtab[] = {
   "get_ba_table"},
 { RTPRIV_IOCTL_STATISTICS,
   IW_PRIV_TYPE_CHAR | 1024, IW_PRIV_TYPE_CHAR | 1024,
-  "stat"}
+  "stat"},
+#ifdef APCLI_SUPPORT
+{ RTPRIV_IOCTL_SHOW_CONNSTATUS,
+  IW_PRIV_TYPE_CHAR | 1024, IW_PRIV_TYPE_CHAR | 1024,
+  "conn_status"}
+#endif
 };
 
 
@@ -342,7 +347,11 @@ INT rt28xx_ap_ioctl(struct net_device *net_dev, struct ifreq *rq, int cmd)
 					Status = RTMP_AP_IoctlHandle(pAd, wrq, CMD_RTPRIV_IOCTL_SHOW, 0, NULL, 0);
 			}
 			break;	
-			
+#ifdef APCLI_SUPPORT
+		case RTPRIV_IOCTL_SHOW_CONNSTATUS:
+			RTMP_AP_IoctlHandle(pAd, wrq, CMD_RTPRIV_IOCTL_SHOW_CONNSTATUS, 0, NULL, 0);
+			break;
+#endif
 #if defined(INF_AR9) || defined(BB_SOC)
 #if defined(AR9_MAPI_SUPPORT) || defined(BB_SOC)
 		case RTPRIV_IOCTL_GET_AR9_SHOW:

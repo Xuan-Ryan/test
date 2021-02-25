@@ -136,6 +136,7 @@ typedef enum _CMD_RTPRIV_IOCTL_AP {
 	CMD_RTPRIV_IOCTL_AP_SIOCSIWGENIE,
 
 	/* can not exceed 0x5000 */
+	CMD_RTPRIV_IOCTL_SHOW_CONNSTATUS,
 } CMD_RTPRIV_IOCTL_AP;
 
 /* common commands */
