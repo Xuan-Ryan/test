@@ -55,6 +55,7 @@ static void init_internet(void)
 {
 	do_system("internet.sh");
 	do_system("/etc_ro/lighttpd/www/cgi-bin/wireless.cgi init");
+	do_system("apclient.sh");
 	//  we don't need the firewall function
 	//do_system("/etc_ro/lighttpd/www/cgi-bin/firewall.cgi init");
 	do_system("/etc_ro/lighttpd/www/cgi-bin/adm.cgi init");
