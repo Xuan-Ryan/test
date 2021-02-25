@@ -128,11 +128,12 @@ DIRS    =  $(ROOTDIR)/vendors include $(NEW_CPP_LIB) user $(NEW_LIB) lib
 __COMPANY = $(shell cat ver |awk 'NR==1')
 __MODEL = $(shell cat ver |awk 'NR==2')
 __VERSION = $(shell cat ver |awk 'NR==3')
-export __COMPANY __MODEL __VERSION
+__TYPE = $(shell [ -e .type ] && cat .type |awk 'NR==1')
+export __COMPANY __MODEL __VERSION __TYPE
 
-FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)-$(__COMPANY)-$(__VERSION).bin
-FINAL_KFS_IMAGE = $(KFSDIR)/$(__MODEL)-$(__COMPANY)-$(__VERSION).bin
-COMPLETE_IMAGE = $(KFSDIR)/factory/Factory-$(__MODEL)-$(__COMPANY)-$(__VERSION).bin
+FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)-$(__COMPANY)-$(__TYPE)-$(__VERSION).bin
+FINAL_KFS_IMAGE = $(KFSDIR)/$(__MODEL)-$(__COMPANY)-$(__TYPE)-$(__VERSION).bin
+COMPLETE_IMAGE = $(KFSDIR)/factory/Factory-$(__MODEL)-$(__COMPANY)-$(__TYPE)-$(__VERSION).bin
 
 export VENDOR PRODUCT ROOTDIR LINUXDIR HOSTCC CONFIG_SHELL
 export CONFIG_CONFIG BUSYBOX_CONFIG LINUX_CONFIG MODULES_CONFIG ROMFSDIR SCRIPTSDIR
@@ -142,7 +143,8 @@ export HOST_NCPU
 
 .PHONY: mct_init_script
 mct_init_script:
-	./mct_extra_init.sh
+	@echo 'Execute our extra action for MCT'
+	@./mct_extra_init.sh
 
 .PHONY: ucfront
 ucfront: tools/ucfront/*.c
@@ -377,6 +379,7 @@ image:
 	num_320K=$(shell echo 327680) ; \
 	dd if=$(ROOTDIR)/../Uboot/MT7620-uboot-512Mb-20190919.bin of=$(COMPLETE_IMAGE) ; \
 	dd if=$(FINAL_IMAGE) of=$(COMPLETE_IMAGE) obs=1 seek=$$num_320K ; \
+	echo $(FINAL_IMAGE) > $(__TYPE).log; \
 	fi \
 	fi
 
@@ -557,5 +560,13 @@ dist-prep:
 	-find $(ROOTDIR) -name 'Makefile*.bin' | while read t; do \
 		$(MAKEARCH) -C `dirname $$t` -f `basename $$t` $@; \
 	 done
+
+rx:
+	@echo 'RX' > .type
+	@echo "Switch to RX type"
+
+tx:
+	@echo 'TX' > .type
+	@echo "Switch to TX type"
 
 ############################################################################
