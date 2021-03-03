@@ -21,6 +21,7 @@ cp drivers/media/video/uvc/uvc_video.c ../../../linux-2.6.36.x/drivers/media/vid
 cp drivers/media/video/uvc/uvc_v4l2.c ../../../linux-2.6.36.x/drivers/media/video/uvc/uvc_v4l2.c
 cp drivers/media/video/uvc/uvc_driver.c ../../../linux-2.6.36.x/drivers/media/video/uvc/uvc_driver.c
 cp drivers/media/video/uvc/uvcvideo.h ../../../linux-2.6.36.x/drivers/media/video/uvc/uvcvideo.h
+cp drivers/usb/core/hub.c ../../../linux-2.6.36.x/drivers/usb/core/hub.c
 echo 'start patch network related driver'
 echo 'start patch raeth'
 cp drivers/net/raeth/raether.c ../../../linux-2.6.36.x/drivers/net/raeth/raether.c
