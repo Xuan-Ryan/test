@@ -481,8 +481,8 @@ dep_bool '   exFAT Tools'	CONFIG_UFSD_EXFAT_TOOL $CONFIG_UFSD_TOOL
 bool 'NFC Service Daemon'	CONFIG_USER_NFCSD
 bool 'NFC Handover Daemon'	CONFIG_USER_NFCHOD
 fi
-#bool 'T6 Dongle Support'	CONFIG_USER_T6_DONGLE_SUPPORT
 bool 'MCT Gadget'		CONFIG_MCT_GADGET
+bool 'UVC Camera Support'	CONFIG_UVC_CAMERA_SUPPORT
 
 endmenu
 
