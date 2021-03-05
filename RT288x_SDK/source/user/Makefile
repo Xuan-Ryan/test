@@ -183,8 +183,9 @@ dir_$(CONFIG_USER_ISC_DHCP)		    += dhcp-4.2.5-P1
 
 #TEST
 dir_$(CONFIG_USER_HELLO_WORLD)		    += hello_world
-dir_$(CONFIG_MCT_GADGET)                     += mct_gadget
 #--
+dir_$(CONFIG_MCT_GADGET)                    += mct_gadget
+dir_$(CONFIG_UVC_CAMERA_SUPPORT)            += t6-dongle
 
 # VoIP & TR069
 ifeq ($(shell [[ "$(CONFIG_MTK_VOIP)" == "y" || "$(CONFIG_MTK_TR069)" == "y" ]] && echo true), true)
