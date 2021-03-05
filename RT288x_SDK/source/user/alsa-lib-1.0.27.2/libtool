@@ -141,7 +141,7 @@ DLLTOOL="false"
 sharedlib_from_linklib_cmd="printf %s\\n"
 
 # The archiver.
-AR="/opt/buildroot-gcc342/bin/mipsel-linux-ar"
+AR="/opt/buildroot-gcc463/usr/bin/mipsel-linux-ar"
 
 # Flags to create an archive.
 AR_FLAGS="cru"
@@ -161,7 +161,7 @@ old_postuninstall_cmds=""
 lock_old_archive_extraction=no
 
 # A C compiler.
-LTCC="/opt/buildroot-gcc342/bin/mipsel-linux-gcc"
+LTCC="/opt/buildroot-gcc463/usr/bin/mipsel-linux-gcc"
 
 # LTCC compiler flags.
 LTCFLAGS=" -D_GNU_SOURCE"
