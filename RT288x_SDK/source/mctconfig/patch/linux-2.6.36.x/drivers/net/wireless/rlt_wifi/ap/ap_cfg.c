@@ -14421,6 +14421,7 @@ VOID RtmpHostapdSecuritySet(
 #endif /* HOSTAPD_SUPPORT */
 
 #ifdef APCLI_SUPPORT
+//  Tiger added
 VOID Get_ApCli_Status(RTMP_ADAPTER *pAd, RTMP_IOCTL_INPUT_STRUCT *wrq)
 {
 	INT i=0;
@@ -14454,7 +14455,9 @@ VOID Get_ApCli_Status(RTMP_ADAPTER *pAd, RTMP_IOCTL_INPUT_STRUCT *wrq)
 				&& (pEntry->PortSecured == WPA_802_1X_PORT_SECURED))
  			{
 				sprintf(msg, "\nApClii%d Connected AP : %02X:%02X:%02X:%02X:%02X:%02X   SSID:%s",
-						ifIndex, PRINT_MAC(pEntry->Addr), pAd->ApCfg.ApCliTab[ifIndex].Ssid);
+						ifIndex, 
+						PRINT_MAC(pEntry->Addr), 
+						pAd->ApCfg.ApCliTab[ifIndex].Ssid);
 				bConnect=TRUE;
 			}
  		}
