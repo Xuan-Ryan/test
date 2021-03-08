@@ -7498,7 +7498,7 @@ void gpio_set(char *argv[])
 		
 
 	//  set direction
-	ioctl(fd, req, (0xffffffff) & (1 << gpio_num));
+	ioctl(fd, req, (1 << gpio_num));
 	if (dir == gpio_out) {
 		//  read first 
 		ioctl(fd, rreq, &value);
