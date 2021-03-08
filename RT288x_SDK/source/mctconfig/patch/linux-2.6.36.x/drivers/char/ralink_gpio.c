@@ -165,8 +165,8 @@ void gpio_hold_notify(struct work_struct *work)
 
 int ralink_gpio_led_set(ralink_gpio_led_info led)
 {
-	unsigned int tmpgpiomode;
 #ifdef CONFIG_RALINK_GPIO_LED
+	//unsigned int tmpgpiomode;
 	unsigned long tmp;
 	if (0 <= led.gpio && led.gpio < RALINK_GPIO_NUMBER) {
 		if (led.on > RALINK_GPIO_LED_INFINITY)
@@ -206,7 +206,8 @@ int ralink_gpio_led_set(ralink_gpio_led_info led)
 				ralink_gpio_led_data[led.gpio].blinks,
 				ralink_gpio_led_data[led.gpio].rests,
 				ralink_gpio_led_data[led.gpio].times);
-		tmpgpiomode = *(volatile u32 *)(RALINK_REG_GPIOMODE);
+		//tmpgpiomode = *(volatile u32 *)(RALINK_REG_GPIOMODE);
+		//printk("gpiomode = 0x%08X\n", tmpgpiomode);
 		//set gpio direction to 'out'
 #if defined (RALINK_GPIO_HAS_2722)
 		if (led.gpio <= 21) {
@@ -2437,18 +2438,24 @@ void ralink_gpio_led_init_timer(void)
 		{
 			ralink_gpio_led_data[i].gpio = -1; //-1 means unused
 		}*/
+		//  just leave these codes for the future, once we need the
+		//  LED to lite when the system start, modify the value here.
 		if (i == 14) {
-			//  just leave these code for the future, once we need to 
-			//  do some LED operation here, modify these code.
-			ralink_gpio_led_data[i].gpio = -1; //-1 means unused
+			ralink_gpio_led_data[14].gpio = 14;
+			ralink_gpio_led_data[14].on = RALINK_GPIO_LED_INFINITY;
+			ralink_gpio_led_data[14].off = 0;
+			ralink_gpio_led_data[14].blinks = 0;
+			ralink_gpio_led_data[14].rests = 0;
+			ralink_gpio_led_data[14].times = 0;
 		} else if (i == 52) {
 			ralink_gpio_led_data[i].gpio = -1; //-1 means unused
 		} else {
 			ralink_gpio_led_data[i].gpio = -1; //-1 means unused
 		}
 	}
-#if RALINK_GPIO_LED_LOW_ACT
-	ra_gpio_led_set = 0xfffffdff;
+#if RALINK_GPIO_LED_LOW_ACT 
+	//  Modify by Tiger, set the pin#14 data to '0'
+	ra_gpio_led_set = 0xffffbfff;
 #if defined (RALINK_GPIO_HAS_2722)
 	ra_gpio2722_led_set = 0xff;
 #elif defined (RALINK_GPIO_HAS_4524)
@@ -2458,9 +2465,12 @@ void ralink_gpio_led_init_timer(void)
 	ra_gpio3924_led_set = 0xffff;
 	ra_gpio5140_led_set = 0xfff;
 #elif defined (RALINK_GPIO_HAS_9524) || defined (RALINK_GPIO_HAS_7224)
+	//  Here
 	ra_gpio3924_led_set = 0xffff;
-	ra_gpio7140_led_set = 0xffffffff;
+	//  Modify by Tiger, set the pin#52 data to '0'
+	ra_gpio7140_led_set = 0xfff7ffff;
 #if defined (RALINK_GPIO_HAS_7224)
+	//  Here, Tiger
 	ra_gpio72_led_set = 0xffffff;
 #else
 	ra_gpio9572_led_set = 0xffffff;
@@ -2506,7 +2516,7 @@ int __init ralink_gpio_init(void)
 {
 	unsigned int i;
 	u32 gpiomode;
-	unsigned long tmp;
+	u32 tmp;
 
 #ifdef  CONFIG_DEVFS_FS
 	if (devfs_register_chrdev(ralink_gpio_major, RALINK_GPIO_DEVNAME,
@@ -2542,6 +2552,7 @@ int __init ralink_gpio_init(void)
 	gpiomode |= RALINK_GPIOMODE_DFT;
 	/*  Tiger, This need to program in RX/TX
 	 *  [4:2]   110b dual color LED(red) -> GPIO#14
+	 *  [4:2]   110b CP2615 power pin -> GPIO#11
 	 *  [4:2]   110b programed to I2S
 	 *
 	 *  [19:18] 10b  dual color LED(green) -> GPIO#52
@@ -2553,29 +2564,68 @@ int __init ralink_gpio_init(void)
 	 */
 	gpiomode |= 0x00088018;
 	printk("Current gpiomode = %x\n", gpiomode);
-
 	*(volatile u32 *)(RALINK_REG_GPIOMODE) = cpu_to_le32(gpiomode);
 
+	//  set direction of pin #11 to OUT
+	tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIODIR));
+	tmp |= cpu_to_le32((1 << 11));
+	*(volatile u32 *)(RALINK_REG_PIODIR) = tmp;
+	//  set direction of pin #53 to OUT
+	tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140DIR));
+	tmp |= cpu_to_le32((1 << 53-40));
+	//  set direction of pin #44 to IN
+	tmp &= ~cpu_to_le32(1);
+	*(volatile u32 *)(RALINK_REG_PIO7140DIR) = tmp;
+#if 0
+	/*
+	 *  GPIO#p11 is for CP2615
+	 *  The pin of chip select of CP2615 is low active,
+	 *  we need to set this pin to low by RALINK_REG_PIORESET
+	 *  but we don't need to activate CP2615 when the system starts.
+	 *  so, I commented out these codes now and leave them here for reference.
+	 *  NOTE. not working
+	 */
+	//  configure the GPIO#14 data
+	tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIORESET));
+	printk("******** PIORESET register ********\n");
+	printk("************* %08X *************\n", (unsigned int)tmp);
+	tmp |= (1 << 11);
+	*(volatile u32 *)(RALINK_REG_PIORESET) = cpu_to_le32(tmp);
+#endif
+#if 0
+	/*
+	 *  GPIO#p53 is for USB hub
+	 *  The pin of reset of USB hub is low active.
+	 *  And I try to let it work, BUT, I can't control it here.
+	 *  Now I only can use 'web gpio 53 0' to reset the hub.
+	 *  KEEP TRYING later.....
+	 */
+	//  set the GPIO#53 data
+	tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140RESET));
+	printk("******** PIORESET register ********\n");
+	printk("************* %08X *************\n", (unsigned int)tmp);
+	tmp |= (1 << (53-40));
+	*(volatile u32 *)(RALINK_REG_PIO7140RESET) = cpu_to_le32(tmp);
+#endif
 	//  set EDGE of #44 to falling  
 	tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140EDGE));
-	tmp &= ~RALINK_GPIO(MCT_WPS_PIN-40);
+	tmp &= ~RALINK_GPIO((MCT_WPS_PIN-40));
 	printk("*********** EDGE register **********\n");
-	printk("************* %08X *************\n", tmp);
+	printk("************* %08X *************\n", (unsigned int)tmp);
 	*(volatile u32 *)(RALINK_REG_PIO7140EDGE) = cpu_to_le32(tmp);
 	//  enable #44 rising edge INTERRUPT
 	tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140RENA));
-	tmp |= RALINK_GPIO(MCT_WPS_PIN-40);
+	tmp |= RALINK_GPIO((MCT_WPS_PIN-40));
 	printk("******** Interrupt register ********\n");
-	printk("************* %08X *************\n", RALINK_GPIO(MCT_WPS_PIN-40));
-	*(volatile u32 *)(RALINK_REG_PIO7140RENA) = cpu_to_le32(RALINK_GPIO(MCT_WPS_PIN-40));
-#if 0  //  don't need it now, just for reference
+	printk("************* %08X *************\n", RALINK_GPIO((MCT_WPS_PIN-40)));
+	*(volatile u32 *)(RALINK_REG_PIO7140RENA) = cpu_to_le32(RALINK_GPIO((MCT_WPS_PIN-40)));
 	//  enable #44 falling edge INTERRUPT
 	tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO7140FENA));
-	tmp |= RALINK_GPIO(MCT_WPS_PIN-40);
+	tmp |= RALINK_GPIO((MCT_WPS_PIN-40));
 	printk("******** Interrupt register ********\n");
-	printk("************* %08X *************\n", RALINK_GPIO(MCT_WPS_PIN-40));
-	*(volatile u32 *)(RALINK_REG_PIO7140FENA) = cpu_to_le32(RALINK_GPIO(MCT_WPS_PIN-40));
-#endif
+	printk("************* %08X *************\n", RALINK_GPIO((MCT_WPS_PIN-40)));
+	*(volatile u32 *)(RALINK_REG_PIO7140FENA) = cpu_to_le32(RALINK_GPIO((MCT_WPS_PIN-40)));
+
 	//enable gpio interrupt
 	*(volatile u32 *)(RALINK_REG_INTENA) = cpu_to_le32(RALINK_INTCTL_PIO);
 	for (i = 0; i < RALINK_GPIO_NUMBER; i++) {
@@ -2639,15 +2689,54 @@ void ralink_gpio_notify_user(int usr)
 	}
 
 	if (usr == 1) {
-		printk(KERN_NOTICE NAME ": sending a SIGUSR1 to process %d\n",
-				ralink_gpio_info[ralink_gpio_irqnum].pid);
+		printk(KERN_NOTICE NAME ": sending a SIGUSR1 to process %d\n", ralink_gpio_info[ralink_gpio_irqnum].pid);
 		send_sig(SIGUSR1, p, 0);
 	}
 	else if (usr == 2) {
-		printk(KERN_NOTICE NAME ": sending a SIGUSR2 to process %d\n",
-				ralink_gpio_info[ralink_gpio_irqnum].pid);
+		printk(KERN_NOTICE NAME ": sending a SIGUSR2 to process %d\n", ralink_gpio_info[ralink_gpio_irqnum].pid);
 		send_sig(SIGUSR2, p, 0);
 	}
+}
+
+static int timer_start = 0;
+static int start_time = 0;
+struct timer_list long_press_report_timer;
+static void long_press_del_timer(void)
+{
+	if (timer_start == 1) {
+		timer_start = 0;
+		del_timer(&long_press_report_timer);
+	}
+}
+
+static int long_press_report(void)
+{
+	int end_time = jiffies;
+	int time_interval = end_time - start_time;
+	if (jiffies_to_msecs(time_interval) > 5000) {
+		printk("press over 5 seconds, get into WPS.\n");
+		schedule_work(&gpio_event_hold);
+		time_interval = 0;
+		start_time = 0;
+		return 0;
+	}
+	long_press_report_timer.expires = jiffies + 100L;
+	add_timer(&long_press_report_timer);
+	return 0;
+}
+
+static void long_press_init_timer(void)
+{
+	long_press_del_timer();
+	if (timer_start == 1)
+		return;
+	start_time = jiffies;
+	timer_start = 1;
+	init_timer(&long_press_report_timer);
+	long_press_report_timer.function = long_press_report;
+	long_press_report_timer.data = ((unsigned long) 0);
+	long_press_report_timer.expires = jiffies + 100L;
+	add_timer(&long_press_report_timer);
 }
 
 /*
@@ -2734,6 +2823,8 @@ irqreturn_t ralink_gpio_irq_handler(int irq, void *irqaction)
 	struct gpio_time_record {
 		unsigned long falling;
 		unsigned long rising;
+		unsigned long click;
+		unsigned long interval;
 	};
 	static struct gpio_time_record record[RALINK_GPIO_NUMBER];
 	unsigned long now;
@@ -3027,21 +3118,50 @@ irqreturn_t ralink_gpio_irq_handler(int irq, void *irqaction)
 		if (! (ralink_gpio7140_intp & (1 << (i - 40))))
 			continue;
 		ralink_gpio_irqnum = i;
-		if (ralink_gpio7140_edge & (1 << (i - 40))) {
-#if 0
-			if (record[i].rising != 0 && time_before_eq(now, record[i].rising + 40L)) {
+		if (ralink_gpio7140_edge & (1 << (i - 40))) { //  rising edge
+#if 1
+			/* SPEC. Tiger
+			 * 1. double click -> pause/play toggle or client switching
+			 * 2. long press over 5's -> WPS
+			 */
+			if (record[i].rising != 0 && time_before_eq(now, record[i].rising + 20L)) {
+				/*
+				 * If the interrupt comes in a short period,
+				 * it might be floating. We ignore it.
+				 */
+				 printk("Got the rising but too short\n");
+				 record[i].interval = now;
+				 record[i].click = 0;
 			} else {
+				printk("Got the rising\n");
+				long_press_del_timer();
 				record[i].rising = now;
-				if (time_before(now, record[i].falling + 200L)) {
-					printk("i=%d, one click\n", i);
-					schedule_work(&gpio_event_click);
-				}
-				else {
-					printk("i=%d, push several seconds\n", i);
-					schedule_work(&gpio_event_hold);
+				//  100L = 200ms
+				if (time_before(now, record[i].falling+100L)) { //  raising-(falling+100)>200ms = click
+					//printk("record[i].interval = %lu\n", record[i].interval);
+					//printk("now = %lu\n", now);
+					if (record[i].interval == 0) {
+						record[i].click++;
+					} else {
+						if (time_before(now, record[i].interval+150L))
+							record[i].click++;
+						else
+							record[i].click = 1;  // if interval > 400ms
+					}
+					//printk("record[i].click = %d\n", record[i].click);
+					if (record[i].click >= 2) { //  double click
+						printk("got a double click\n");
+						record[i].click = 0;
+						schedule_work(&gpio_event_click);
+					} else {
+						record[i].interval = now;
+					}
+				} else {
+					//printk("press several seconds\n");
 				}
 			}
 #else
+			//  Tiger
 			//  FOR UVC, we have only one button for the click event and don't 
 			//  need to deal with a long press event. so just need to prevent too 
 			//  short click event.
@@ -3052,13 +3172,22 @@ irqreturn_t ralink_gpio_irq_handler(int irq, void *irqaction)
 				 */
 			} else {
 				record[i].rising = now;
-				printk("one click, WPS on\n");
+				//printk("one click, WPS on\n");
 				schedule_work(&gpio_event_click);
 			}
 #endif
-		}
-		else {
-			record[i].falling = now;
+		} else {  //  falling edge
+			if (record[i].falling != 0 && time_before_eq(now, record[i].falling + 40L)) {
+				/*
+				 * If the interrupt comes in a short period,
+				 * it might be floating. We ignore it.
+				 */
+				//printk("Got the falling but too short\n");
+			} else {
+				printk("Got the falling\n");
+				long_press_init_timer();
+				record[i].falling = now;
+			}
 		}
 		break;
 	}
