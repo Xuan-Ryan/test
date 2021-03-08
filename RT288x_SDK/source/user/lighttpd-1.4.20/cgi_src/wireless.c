@@ -1417,6 +1417,9 @@ static void wps_ap_pbc_start_all(int nvram)
 
 	if (!strcmp(opmode, "1")) {
 		//  this is RX
+		do_system("ifconfig %s down", iface);
+		do_system("sleep 2");
+		do_system("ifconfig %s up", iface);
 		do_system("iwpriv %s set WscConfMode=0", iface);
 		do_system("iwpriv %s set WscConfMode=7", iface);
 		sleep(1);
@@ -1425,7 +1428,9 @@ static void wps_ap_pbc_start_all(int nvram)
 		do_system("iwpriv %s set WscGetConf=1", iface);
 	} else {
 		//  this is TX
-		do_system("ifconfig %s down up", cliiface);
+		do_system("ifconfig %s down", cliiface);
+		do_system("sleep 2");
+		do_system("ifconfig %s up", cliiface);
 		do_system("iwpriv %s set WscConfMode=1", cliiface);
 		do_system("iwpriv %s set WscMode=2", cliiface);
 		do_system("iwpriv %s set WscGetConf=1", cliiface);
