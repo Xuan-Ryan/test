@@ -5174,6 +5174,36 @@ void GetPINCode(char *argv[])
 	printf("%08d", data);
 }
 
+void ClnConnected(char *argv[])
+{
+	int s;
+	struct iwreq iwr;
+	RT_802_11_MAC_TABLE table = {0};
+
+	s = socket(AF_INET, SOCK_DGRAM, 0);
+	if (!strcmp(argv[1], WLAN2_CONF))
+		strncpy(iwr.ifr_name, "rai0", IFNAMSIZ);
+	else
+		strncpy(iwr.ifr_name, "ra0", IFNAMSIZ);
+	iwr.u.data.pointer = (caddr_t) &table;
+
+	if (s < 0) {
+		printf("0");
+		return;
+	}
+
+	if (ioctl(s, RTPRIV_IOCTL_GET_MAC_TABLE_STRUCT, &iwr) < 0) {
+		printf("0");
+		close(s);
+		return;
+	}
+
+	close(s);
+
+	printf("%d", table.Num);
+	return;
+}
+
 void WebWifiGet(char *argv[])
 {
 	if (!strcmp(argv[3], "version")) {
@@ -5186,6 +5216,8 @@ void WebWifiGet(char *argv[])
 		GetPINCode(argv);
 	} else if (!strcmp(argv[3], "staInfo")) {
 		StaInfo(argv);
+	} else if (!strcmp(argv[3], "clnConnected")) {
+		ClnConnected(argv);
 	} else if (!strcmp(argv[3], "apStats")) {
 		ApStats(argv);
 	} else if (!strcmp(argv[3], "apSNR")) {
