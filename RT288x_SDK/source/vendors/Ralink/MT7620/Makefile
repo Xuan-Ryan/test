@@ -64,8 +64,14 @@ else ifeq ($(CONFIG_EXTERNAL_PA_EXTERNAL_LNA),y)
 	ln -s "MT7620_AP_2T2R-4L_external LNA_external PA_V15.BIN" MT7620_AP_2T2R-4L_V15.BIN
 else
 	# no any config?! use iLAN+iPA as default.
-	ln -s "MT7620_AP_2T2R-4L_internal LNA_internal PA_V15.BIN" MT7620_AP_2T2R-4L_V15.BIN
+	#  Tiger
+	if [ "$(__TYPE)" = "RX" ]; then \
+		ln -s "MT7620_AP_2T2R-4L_internal LNA_internal PA_V15.BIN" MT7620_AP_2T2R-4L_V15.BIN; \
+	else \
+		ln -s "MT7620_AP_2T2R-4L_internal LNA_internal PA_V15.BIN.tx" MT7620_AP_2T2R-4L_V15.BIN; \
+	fi
 endif
+	$(ROMFSINST) "/etc_ro/wlan/MT7612E_EEPROM.bin"
 	$(ROMFSINST) "/etc_ro/wlan/MT7620_AP_2T2R-4L_V15.BIN"
 
 
@@ -106,8 +112,13 @@ ifneq	($(CONFIG_RT_SECOND_CARD),)
 ifeq	($(CONFIG_SECOND_CARD_EXTERNAL_PA),)
 ifeq	($(CONFIG_SECOND_CARD_EXTERNAL_LNA),)
 	# iPA/iLNA
-	ln -s "MT$(shell echo $(CONFIG_RT_SECOND_CARD) | tr a-z A-Z)_EEPROM_layout_20131121_5G_iPAiLNAcoclock_wTSSI default slope offset.bin" \
-		MT$(shell echo $(CONFIG_RT_SECOND_CARD) | tr a-z A-Z)_EEPROM.bin
+	if [ "$(__TYPE)" = "RX" ]; then \
+		ln -s "MT$(shell echo $(CONFIG_RT_SECOND_CARD) | tr a-z A-Z)_EEPROM_layout_20131121_5G_iPAiLNAcoclock_wTSSI default slope offset.bin" \
+			MT$(shell echo $(CONFIG_RT_SECOND_CARD) | tr a-z A-Z)_EEPROM.bin; \
+	else \
+		ln -s "MT$(shell echo $(CONFIG_RT_SECOND_CARD) | tr a-z A-Z)_EEPROM_layout_20131121_5G_iPAiLNAcoclock_wTSSI default slope offset.bin.tx" \
+			MT$(shell echo $(CONFIG_RT_SECOND_CARD) | tr a-z A-Z)_EEPROM.bin; \
+	fi
 else
 	# iPA/eLNA
 	ln -s "MT$(shell echo $(CONFIG_RT_SECOND_CARD) | tr a-z A-Z)_EEPROM_layout_20131121_5G_iPAeLNAcoclock_wTSSI default slope offset.bin" \
