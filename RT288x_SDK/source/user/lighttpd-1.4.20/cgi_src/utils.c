@@ -485,8 +485,7 @@ int getWscStatus(char *interface)
 	wrq.u.data.length = sizeof(data);
 	wrq.u.data.pointer = (caddr_t) &data;
 	wrq.u.data.flags = RT_OID_WSC_QUERY_STATUS;
-	if( ioctl(socket_id, RT_PRIV_IOCTL, &wrq) == -1)
-		DBG_MSG("ioctl error");
+	ioctl(socket_id, RT_PRIV_IOCTL, &wrq);
 	close(socket_id);
 //	DBG_MSG("[DBG]data=%d", data);
 
@@ -503,8 +502,7 @@ void getWscProfile(char *interface, WSC_PROFILE *wsc_profile)
 	wrq.u.data.length = sizeof(WSC_PROFILE);
 	wrq.u.data.pointer = (caddr_t) wsc_profile;
 	wrq.u.data.flags = RT_OID_802_11_WSC_QUERY_PROFILE;
-	if( ioctl(socket_id, RT_PRIV_IOCTL, &wrq) == -1)
-		DBG_MSG("ioctl error\n");
+	ioctl(socket_id, RT_PRIV_IOCTL, &wrq);
 	close(socket_id);
 }
 
