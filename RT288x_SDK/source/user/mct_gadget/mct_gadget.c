@@ -8,11 +8,13 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <sys/time.h>
 #include <syslog.h>
 #include <pthread.h>
 #include <sys/sem.h>
@@ -25,15 +27,21 @@
 #include "mct_gadget.h"
 #include "uvcdev.h"
 
+//  Added by Tiger
+#if 0
+#include "ralink_gpio.h"
+#define GPIO_DEV	"/dev/gpio"
+#endif
+
 sem_t video_write_mutex;
+
+#define AUDIO_USES_TCP                   0
 
 /*  I2S device  */
 int i2s_fd = -1;
 
 /*  tcp  */
 int tcp_ctrl_socket = -1;
-int tcp_mic_socket = -1;
-int tcp_spk_socket = -1;
 #ifdef  SUPPORT_H264_FOR_TCP
 int tcp_h264_socket = -1;
 #endif
@@ -43,6 +51,13 @@ static int client_connected = 0;
 /*  udp  */
 int udp_broadcast_socket = -1;
 int udp_video_socket = -1;
+#if 		AUDIO_USES_TCP
+int tcp_mic_socket = -1;
+int tcp_spk_socket = -1;
+#else
+int udp_mic_socket = -1;
+int udp_spk_socket = -1;
+#endif
 
 /*  thread  */
 pthread_t pthr_video_control;
@@ -173,6 +188,7 @@ static void close_socket()
 		close(tcp_ctrl_socket);
 		tcp_ctrl_socket = -1;
 	}
+#if AUDIO_USES_TCP
 	if (tcp_mic_socket > -1) {
 		close(tcp_mic_socket);
 		tcp_mic_socket = -1;
@@ -181,6 +197,16 @@ static void close_socket()
 		close(tcp_spk_socket);
 		tcp_spk_socket = -1;
 	}
+#else
+	if (udp_mic_socket > -1) {
+		close(udp_mic_socket);
+		udp_mic_socket = -1;
+	}
+	if (udp_spk_socket > -1) {
+		close(udp_spk_socket);
+		udp_spk_socket = -1;
+	}
+#endif
 #ifdef  SUPPORT_H264_FOR_TCP
 	if (tcp_h264_socket > -1) {
 		close(tcp_h264_socket);
@@ -216,7 +242,7 @@ static int init_tcp_socket(unsigned short port)
 	}
 
 	//setsockopt(tcp_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
+	setsockopt(tcp_socket, IPPROTO_TCP, TCP_NODELAY, (char *)&on, sizeof(on));
 	if(setsockopt(tcp_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on)) < 0) {
 		DBG_MSG("Server-setsockopt() error");
 		close(tcp_socket);
@@ -291,6 +317,11 @@ static int init_udp_socket(unsigned short port, int broadcast)
 	return udp_sock;
 }
 
+int send_command(unsigned char cmd, unsigned char format, unsigned char frame, unsigned int camera, unsigned int process);
+static int init_i2s_device(void);
+static int i2s_stop = 1;
+static int hub_enable = 0;
+
 static void signal_handler(int sig)
 {
 	if (sig == SIGINT) {
@@ -299,7 +330,8 @@ static void signal_handler(int sig)
 	} else if (sig == SIGALRM) {
 		DBG_MSG("mct_gadget: SIGALRM!\n");
 	} else if (sig == SIGUSR1) {
-		DBG_MSG("mct_gadget: SIGUSR1!\n");
+		DBG_MSG("mct_gadget: Stop/Start play(SIGUSR1)!\n");
+		send_command(JUVC_CONTROL_STOP_START, 0, 0, 0, 0);
 	} else if (sig == SIGUSR2) {
 		DBG_MSG("mct_gadget: SIGUSR2!\n");
 	}
@@ -539,6 +571,102 @@ int wait_setting_done()
 	return 0;
 }
 
+enum {
+	gpio_in,
+	gpio_out,
+};
+
+enum {
+	gpio2300,
+	gpio3924,
+	gpio7140,
+	gpio72
+};
+
+void cp2615_reset(int fd, int plugin)
+{
+	int value;
+	//  pin 11
+	//  set direction to out
+	ioctl(fd, RALINK_GPIO_SET_DIR_OUT, (1 << 11));
+	//  read
+	ioctl(fd, RALINK_GPIO_READ, &value);
+	//  push hi to disable CP2615
+	value |= (1 << 11);
+	ioctl(fd, RALINK_GPIO_WRITE, value);
+	if (plugin == 1) {
+		sleep(2);
+		//  pull low to enable CP2615
+		value &= ~(1 << 11);
+		ioctl(fd, RALINK_GPIO_WRITE, value);
+	}
+}
+#if 0
+void usb_hub_reset(int plugin)
+{
+	int fd = 0;
+	int gpio_num = 53;
+	int action = 0;
+	int dir = gpio_out;
+	int value = 0;
+
+	fd = open(GPIO_DEV, O_RDONLY);
+	if (fd < 0) {
+		return;
+	}
+
+	gpio_num = gpio_num - 40; 
+
+	//  set direction
+	ioctl(fd, RALINK_GPIO7140_SET_DIR_OUT, (1 << gpio_num));
+	
+	//  read
+	ioctl(fd, RALINK_GPIO7140_READ, &value);
+	//  pull low
+	value &= ~(1 << gpio_num);
+	ioctl(fd, RALINK_GPIO7140_WRITE, value);
+	//  7's????
+	sleep(2);
+	//  push hi
+	value |= (1 << gpio_num);
+	ioctl(fd, RALINK_GPIO7140_WRITE, value);
+
+	//cp2615_reset(fd, plugin);
+
+	close(fd);
+	PRINT_MSG("USB HUB Disabled\n");
+	hub_enable = 0;
+}
+#else
+void usb_hub_reset(int plugin)
+{
+	system("web gpio 53 0");  //  pull low to disable USB hub
+
+	if (plugin == 1)
+		sleep(7);
+	else
+		sleep(1);
+
+	system("web gpio 53 1");
+}
+#endif
+
+void LED_control(int type)
+{
+	switch(type) {
+	case 0:
+		//  show green and red
+		system("gpio l 14 4000 0 1 0 4000");
+		system("gpio l 52 4000 0 1 0 4000");
+		break;
+	case 1:
+		//  show green only
+		system("gpio l 14 0 4000 0 1 4000");
+		system("gpio l 52 4000 0 1 0 4000");
+		break;
+	}
+}
+
 static void * video_control_thread(void * arg)
 {
 	int ret = -1;
@@ -595,7 +723,6 @@ static void * video_control_thread(void * arg)
 				/*  process command  */
 				if (juvchdr.XactType == JUVC_TYPE_CONTROL) {
 					if (juvchdr.Flags == JUVC_CONTROL_CAMERAINFO) {
-
 						memset(&cap_data, '\0', sizeof(UVC_CAPABILITIES_DATA));
 						cap_data.mjpeg = juvchdr.CamaraInfo.mjpeg_res_bitfield;
 						cap_data.h264 = juvchdr.CamaraInfo.h264_res_bitfield;
@@ -616,6 +743,10 @@ static void * video_control_thread(void * arg)
 						//DBG_MSG("m420 : %x\n",  juvchdr.CamaraInfo.m420_res_bitfield);
 						//DBG_MSG("camera : %02x %02x %02x\n", juvchdr.CamaraInfo.camera[0]&0xff, juvchdr.CamaraInfo.camera[1]&0xff, juvchdr.CamaraInfo.camera[2]&0xff);
 						//DBG_MSG("process : %02x %02x %02x\n", juvchdr.CamaraInfo.process[0]&0xff, juvchdr.CamaraInfo.process[1]&0xff, juvchdr.CamaraInfo.process[2]&0xff);
+						system("web gpio 11 0");  //  pull low to enable CP2615
+						usb_hub_reset(1);
+						LED_control(1);
+						i2s_stop = 0;
 					} else if (juvchdr.Flags == JUVC_CONTROL_MANUFACTURER) {
 						char buffer[256];
 						read(tcp_control_clnsd, buffer, juvchdr.TotalLength);
@@ -653,6 +784,10 @@ static void * video_control_thread(void * arg)
 		PRINT_MSG("mct_gadget: client disconnected\n");
 		tcp_control_clnsd = -1;
 		client_connected = 0;
+		usb_hub_reset(0);
+		LED_control(0);
+		i2s_stop = 1;
+		system("web gpio 11 1");  //  push hi to disable CP2615
 	}
 
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
@@ -818,7 +953,7 @@ void * video_thread(void * arg)
 
 				if (period - pre_period >= 1000000) {
 					pre_period = period;
-					DBG_MSG("fps=%d (frames= %d), bps=%lld Kbps\n" \
+					PRINT_MSG("fps=%d (frames= %d), bps=%lld Kbps\n" \
 					, real_fps \
 					, count_num \
 					, (data_size>>7));  /*  this mean size/1024*8  */
@@ -854,6 +989,8 @@ void * video_thread(void * arg)
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
 }
 
+//  for tcp
+#if AUDIO_USES_TCP
 void * mic_thread(void * arg)
 {
 	int ret = 0;
@@ -865,7 +1002,9 @@ void * mic_thread(void * arg)
 
 	DBG_MSG("mct_gadget: %s go\n", __FUNCTION__);
 
-	ioctl(i2s_fd, I2S_TX_ENABLE, 0);
+	if (i2s_fd > 0) {
+		ioctl(i2s_fd, I2S_TX_ENABLE, 0);
+	}
 
 	while(exited == 0) {
 		if (tcp_mic_socket <= -1) {
@@ -905,9 +1044,9 @@ void * mic_thread(void * arg)
 
 				/*  write to i2s  */
 				if (i2s_fd > 0) {
-					ioctl(i2s_fd, I2S_PUT_AUDIO, mic_buffer);
+					if (i2s_stop == 0)
+						ioctl(i2s_fd, I2S_PUT_AUDIO, mic_buffer);
 				} else {
-					sleep(1);
 					continue;
 				}
 			}
@@ -920,7 +1059,9 @@ void * mic_thread(void * arg)
 	}
 	/*  NOTE
 	 *  before we leave this thread, we have to stop the TX, otherwise, the system will be crash.  */
-	ioctl(i2s_fd, I2S_TX_DISABLE, 0);
+	if (i2s_fd > 0) {
+		ioctl(i2s_fd, I2S_TX_DISABLE, 0);
+	}
 
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
 }
@@ -935,7 +1076,9 @@ void * spk_thread(void * arg)
 
 	DBG_MSG("mct_gadget: %s go\n", __FUNCTION__);
 
-	ioctl(i2s_fd, I2S_RX_ENABLE, 0);
+	if (i2s_fd > 0) {
+		ioctl(i2s_fd, I2S_RX_ENABLE, 0);
+	}
 
 	while(exited == 0) {
 		if (tcp_spk_socket <= -1) {
@@ -978,10 +1121,103 @@ void * spk_thread(void * arg)
 	}
 	/*  NOTE
 	 *  before we leave this thread, we have to stop the RX, otherwise, the system will be crash.  */
+	if (i2s_fd > 0) {
+		ioctl(i2s_fd, I2S_RX_DISABLE, 0);
+	}
+
+	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
+}
+#else
+void * mic_thread(void * arg)
+{
+	int n = 0;
+	struct sockaddr_in from;
+	int len = sizeof(from);
+	char mic_buffer[I2S_PAGE_SIZE];
+
+	DBG_MSG("mct_gadget: %s go\n", __FUNCTION__);
+
+	if (i2s_fd > 0) {
+		ioctl(i2s_fd, I2S_TX_ENABLE, 0);
+	}
+
+	while(exited == 0) {
+		if (udp_mic_socket <= -1) {
+			sleep(1);
+			continue;
+		}
+
+		if (client_connected == 1) {
+			/*  read form client  */
+			//DBG_MSG("read from client\n");
+			memset(&from, '\0', sizeof(struct sockaddr_in));
+			n = recvfrom(udp_mic_socket, mic_buffer, I2S_PAGE_SIZE, 0, (struct sockaddr*)&from, &len);
+			if (n <= 0) {
+				continue;
+			}
+
+			/*  write to i2s  */
+			if (i2s_fd > 0) {
+				if (i2s_stop == 0)
+					ioctl(i2s_fd, I2S_PUT_AUDIO, mic_buffer);
+			} else {
+				sleep(1);
+				continue;
+			}
+		}
+	}
+	/*  NOTE
+	 *  before we leave this thread, we have to stop the TX, otherwise, the system will be crash.  */
+	if (i2s_fd > 0) {
+		ioctl(i2s_fd, I2S_TX_DISABLE, 0);
+	}
+
+	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
+}
+
+void * spk_thread(void * arg)
+{
+	int n = 0;
+	struct sockaddr_in addr;
+	int addrlen = sizeof(addr);
+	int tcp_spk_clnsd = 0;
+	char spk_buffer[I2S_PAGE_SIZE];
+
+	DBG_MSG("mct_gadget: %s go\n", __FUNCTION__);
+
+	ioctl(i2s_fd, I2S_RX_ENABLE, 0);
+
+	while(exited == 0) {
+		if (udp_spk_socket <= -1) {
+			sleep(1);
+			continue;
+		}
+
+		if (client_connected == 1) {
+			/*  read from i2s  */
+			memset(spk_buffer, '\0', sizeof(spk_buffer));
+			if (i2s_fd > 0) {
+				ioctl(i2s_fd, I2S_GET_AUDIO, spk_buffer);
+			} else {
+				sleep(1);
+				continue;
+			}
+
+			/*  write to socket;  */
+			n = sendto(udp_spk_socket, spk_buffer, 0, I2S_PAGE_SIZE, &addr, addrlen);
+			if (n <= 0) {
+				sleep(1);
+				continue;
+			}
+		}
+	}
+	/*  NOTE
+	 *  before we leave this thread, we have to stop the RX, otherwise, the system will be crash.  */
 	ioctl(i2s_fd, I2S_RX_DISABLE, 0);
 
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
 }
+#endif
 
 #ifdef  SUPPORT_H264_FOR_TCP
 void * h264_thread(void * arg)
@@ -1140,8 +1376,8 @@ static int create_thread()
 
 static int initialize_procedure(int argc, char **argv)
 {
-	if (check_exist_inst() < 0)
-		return -1;
+	//if (check_exist_inst() < 0)
+	//	return -1;
 
 	load_bg();
 
@@ -1158,7 +1394,7 @@ static int initialize_procedure(int argc, char **argv)
 	if ((tcp_ctrl_socket=init_tcp_socket((unsigned short)GADGET_CONTROL_PORT)) < 0) {
 		return -1;
 	}
-
+#if AUDIO_USES_TCP
 	if ((tcp_mic_socket=init_tcp_socket((unsigned short)GADGET_MIC_PORT)) < 0) {
 		close_socket();
 		return -1;
@@ -1168,6 +1404,17 @@ static int initialize_procedure(int argc, char **argv)
 		close_socket();
 		return -1;
 	}
+#else
+	if ((udp_mic_socket=init_udp_socket((unsigned short)GADGET_MIC_PORT, 0)) < 0) {
+		close_socket();
+		return -1;
+	}
+
+	if ((udp_spk_socket=init_udp_socket((unsigned short)GADGET_SPK_PORT, 0)) < 0) {
+		close_socket();
+		return -1;
+	}
+#endif
 #ifdef  SUPPORT_H264_FOR_TCP
 	if ((tcp_h264_socket=init_tcp_socket((unsigned short)GADGET_H264_PORT)) < 0) {
 		close_socket();

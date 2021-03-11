@@ -36,14 +36,14 @@
 
 /*  ----------------  printf  ----------------  */
 #if 1
-#define PRINT_MSG(fmt, arg...)                   do { FILE *log_fp = fopen(LOGFILE, "w+"); \
+ #define PRINT_MSG(fmt, arg...)                   do { FILE *log_fp = fopen(LOGFILE, "w+"); \
                                                      fprintf(log_fp, fmt , ##arg); \
                                                      fclose(log_fp); \
                                                    } while(0)
 
-//#define GADGET_DEBUG                            1
-#ifdef GADGET_DEBUG
- #define DBG_MSG(fmt, arg...)                    do { FILE *log_fp = fopen(LOGFILE, "w+"); \
+ //#define GADGET_DEBUG                            1
+ #ifdef GADGET_DEBUG
+  #define DBG_MSG(fmt, arg...)                    do { FILE *log_fp = fopen(LOGFILE, "w+"); \
                                                      fprintf(log_fp, fmt , ##arg); \
                                                      fclose(log_fp); \
                                                    } while(0)
@@ -117,6 +117,7 @@ typedef struct juvc_hdr_packet {
 #define JUVC_CONTROL_SET                        8
 #define JUVC_CONTROL_GET                        9
 #define JUVC_CONTROL_GETVC                      10
+#define JUVC_CONTROL_STOP_START                 11
 
 /*  JUVC_RES_XXX  */
 #define JUVC_RESPONSE_ACK                       1
