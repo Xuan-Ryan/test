@@ -28,8 +28,8 @@
 #include "uvcdev.h"
 
 //  Added by Tiger
-#if 0
 #include "ralink_gpio.h"
+#if 0
 #define GPIO_DEV	"/dev/gpio"
 #endif
 
