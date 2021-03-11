@@ -80,7 +80,8 @@ void loadDefault(int chip_id)
 #endif
 
 #elif defined (CONFIG_RALINK_MT7620)
-#define WPS_AP_PBC_LED_GPIO     52      // MT7620 WPS LED
+#define WPS_AP_PBC_LED_GPIO_GREEN     52      // MT7620 WPS LED
+#define WPS_AP_PBC_LED_GPIO_RED       14
 
 #elif defined (CONFIG_RALINK_MT7628)
 #define WPS_AP_PBC_LED_GPIO     37       // MT7628 WPS LED
@@ -95,11 +96,11 @@ void loadDefault(int chip_id)
 #define WPS_LED_ERROR                   3
 #define WPS_LED_SESSION_OVERLAP         4
 #define WPS_LED_SUCCESS                 5
-#define LedReset()                  {ledWps(WPS_AP_PBC_LED_GPIO, WPS_LED_RESET);}
-#define LedInProgress()             {ledWps(WPS_AP_PBC_LED_GPIO, WPS_LED_PROGRESS);}
-#define LedError()                  {ledWps(WPS_AP_PBC_LED_GPIO, WPS_LED_ERROR);}
-#define LedSessionOverlapDetected() {ledWps(WPS_AP_PBC_LED_GPIO, WPS_LED_SESSION_OVERLAP);}
-#define LedSuccess()                {ledWps(WPS_AP_PBC_LED_GPIO, WPS_LED_SUCCESS);}
+#define LedReset()                  {ledWps(WPS_AP_PBC_LED_GPIO_GREEN, WPS_LED_RESET);ledWps(WPS_AP_PBC_LED_GPIO_RED, WPS_LED_SUCCESS);}
+#define LedInProgress()             {ledWps(WPS_AP_PBC_LED_GPIO_GREEN, WPS_LED_PROGRESS);ledWps(WPS_AP_PBC_LED_GPIO_RED, WPS_LED_PROGRESS);}
+#define LedError()                  {ledWps(WPS_AP_PBC_LED_GPIO_GREEN, WPS_LED_RESET);ledWps(WPS_AP_PBC_LED_GPIO_RED, WPS_LED_SUCCESS);}
+#define LedSessionOverlapDetected() {ledWps(WPS_AP_PBC_LED_GPIO_GREEN, WPS_LED_RESET);ledWps(WPS_AP_PBC_LED_GPIO_RED, WPS_LED_SESSION_OVERLAP);}
+#define LedSuccess()                {ledWps(WPS_AP_PBC_LED_GPIO_GREEN, WPS_LED_SUCCESS);ledWps(WPS_AP_PBC_LED_GPIO_RED, WPS_LED_SUCCESS);}
 #else
 #define LedReset()
 #define LedInProgress()
@@ -194,7 +195,7 @@ int ledWps(int gpio, int mode)
 		return gpioLedSet(gpio, 1, 1, 10, 5, RALINK_GPIO_LED_INFINITY);
 		break;
 	case WPS_LED_SUCCESS:
-		gpioLedSet(gpio, 3000, 1, 1, 1, 1);
+		gpioLedSet(gpio, RALINK_GPIO_LED_INFINITY, 1, 1, 1, 1); //  3000 = 300s
 		break;
 	}
 	return 0;
@@ -387,7 +388,7 @@ static void queryWPSStatus(int signo)
 	struct _WSC_CONFIGURED_VALUE *wsc_value;
 	char ifname[5];
 	const char *opmode = nvram_get(RT2860_NVRAM, "OperationMode");
-	
+
 	if (triggered_signal == SIGWINCH) {
 		if (!strcmp(opmode, "1")) {
 			//  this is RX
@@ -408,14 +409,21 @@ static void queryWPSStatus(int signo)
 		nvram_idx = RT2860_NVRAM;
 	}
 	WscStatus = getWscStatus(ifname);
+printf("%s: WscStatus = %x\n", __FUNCTION__, WscStatus);
 	wsc_timeout_counter += WPS_AP_CATCH_CONFIGURED_TIMER;
 	if (g_wps_timer_state == 0) {
 		resetTimerAll();
+		system("rm /tmp/doing_wps");
 		return;
 	}
-	if (wsc_timeout_counter > WPS_AP_TIMEOUT_SECS) {
+	if (wsc_timeout_counter > WPS_AP_TIMEOUT_SECS) {  //  timeout 120's
 		resetTimerAll();
-		LedError();
+		if (!strcmp(opmode, "1")) {
+			LedSuccess();
+		} else {
+			LedError();
+		}
+		system("rm /tmp/doing_wps");
 		return;
 	}
 
@@ -423,16 +431,17 @@ static void queryWPSStatus(int signo)
 	case 0x109:	/* PBC_SESSION_OVERLAP */
 		resetTimerAll();
 		LedSessionOverlapDetected();
+		system("rm /tmp/doing_wps");
 		break;
 	case 34:	/* CONFIGURED */
 		resetTimerAll();
 		LedSuccess();
 		if ((wsc_value = malloc(sizeof(struct _WSC_CONFIGURED_VALUE))) == NULL) {
 			perror("malloc wsc_value");
+			system("rm /tmp/doing_wps");
 			return;
 		}
-		//getCurrentWscProfile(ifname, wsc_value, sizeof(WSC_CONFIGURED_VALUE));
-		getCurrentWscProfile("rai0", wsc_value, sizeof(WSC_CONFIGURED_VALUE));
+		getCurrentWscProfile(ifname, wsc_value, sizeof(WSC_CONFIGURED_VALUE));
 		if (!strcmp(opmode, "1")) {
 			//  this is RX
 			if ((strcmp(nvram_bufget(nvram_idx, "WCNTest"), "1") == 0) ||
@@ -446,17 +455,23 @@ static void queryWPSStatus(int signo)
 			 *        I think the way we can do is only check it by SSID name here.
 			 *        But, not write related code yet, if you want to do this, 
 			 *        add the code here.
+			 *        MAYBE we need to do this via MAC address check.
 			 */
 			configAPClient(nvram_idx, wsc_value);
-			system("rm /tmp/doing_wps");
 		}
+		system("rm /tmp/doing_wps");
 		free(wsc_value);
 		//config_acl(ifname, nvram_idx);
 		break;
 	case 2:		/* FAIL */
 	case 1:		/* IDLE */
 		resetTimerAll();
-		LedReset();	
+		if (!strcmp(opmode, "1")) {
+			LedSuccess();
+		} else {
+			LedReset();
+		}
+		system("rm /tmp/doing_wps");
 	}
 }
 
@@ -466,9 +481,10 @@ static void triggerWPS(int signo)
 	resetTimerAll();
 	wsc_timeout_counter = 0;
 	g_wps_timer_state = 1;
-	setTimer(WPS_AP_CATCH_CONFIGURED_TIMER * 1000, queryWPSStatus);
-	LedInProgress();
-	system("echo '1' > /tmp/doing_wps");
+	setTimer(WPS_AP_CATCH_CONFIGURED_TIMER * 1000, queryWPSStatus);  //  100ms per check
+	//  this part of codes related to WEB cgi call
+	//LedInProgress();
+	system("date > /tmp/doing_wps");
 }
 
 #endif
@@ -535,6 +551,7 @@ static void doWPSHandler(int signo)
 	sprintf(cmd, "%s %d", 
 		"/etc_ro/lighttpd/www/cgi-bin/wireless.cgi wps_pbc",
 		RTDEV_NVRAM);
+	LedInProgress();
 	system(cmd);
 	triggerWPS(SIGWINCH);
 #endif
@@ -554,12 +571,52 @@ static void loadDefaultHandler(int signo)
 	system("reboot");
 }
 
+enum {
+	RX,
+	TX
+};
+
+static void send_signal(int type)
+{
+	FILE * pidfile = NULL;
+	char buf[16];
+	int pid = 0;
+	if (type == RX) {
+		pidfile = fopen("/var/run/mct_gadget.pid", "r");
+	} else {
+		pidfile = fopen("/var/run/uvcclient.pid", "r");
+	}
+	
+	if (pidfile) {
+		if (fread(buf, 1, sizeof(buf), pidfile) > 0) {
+			pid = atoi(buf);
+			kill(pid, SIGUSR1);
+		}
+		fclose(pidfile);
+	}
+}
+
+static void start_stop_play(int signo)
+{
+	const char *opmode = nvram_get(RT2860_NVRAM, "OperationMode");
+	if (!strcmp(opmode, "1")) {
+		//  RX
+		//  send signal to mct_gadget
+		send_signal(RX);
+	} else {
+		//  TX
+		//  send signal to uvcclient
+		send_signal(TX);
+	}
+}
+
 static void signal_handler(void)
 {
 	signal(SIGPIPE, SIG_IGN);
-	signal(SIGUSR2, loadDefaultHandler);
+	//signal(SIGUSR2, loadDefaultHandler);
+	signal(SIGUSR1, start_stop_play);
 #if defined WSC_SUPPORT
-	signal(SIGUSR1, doWPSHandler);
+	signal(SIGUSR2, doWPSHandler);
 #endif
 #if defined CONFIG_USER_LIGHTY
 	signal(SIGTSTP, dhcpcHandler);
@@ -702,6 +759,11 @@ int main(int argc,char **argv)
 	pid_t pid;
 	int fd;
 
+	nvram_init(RT2860_NVRAM);
+#if defined (CONFIG_RTDEV) || \
+	defined (CONFIG_RT2561_AP) || defined (CONFIG_RT2561_AP_MODULE)
+	nvram_init(RTDEV_NVRAM);
+#endif
 	if (strcmp(nvram_bufget(RT2860_NVRAM, "WebInit"),"1")) {
 		loadDefault(2860);
 	}
