@@ -244,13 +244,19 @@ void RunAudioCapture(struct audio_para *par)
 #endif	
     char buf[4096]; 
     char outbuf[4096]; 
+	char* udpptr; 
+	char* udpptrout;
 	int buffe_size = par->page_size ;
 
-
+    char udpbuf[2][3072]; 
+    int  udpindex = 0;
+	int  udpoffset = 0;
+	int  udpremain = 3072;
+    printf("open_stream start \n"); 
 	if ((ret = open_stream(&capture_handle,"hw:1,0",SND_PCM_STREAM_CAPTURE,par) < 0))
 			goto END;
 	
-	
+	printf("open_stream sucessful \n"); 
 	while(*par->run){
 		
 		r = snd_pcm_readi(capture_handle,buf,buffe_size);
@@ -290,26 +296,55 @@ void RunAudioCapture(struct audio_para *par)
 			r = audio_resample((ReSampleContext*)par->resampleEngine,(short *)outbuf,(short *)buf, r);
 			len = r * 4;
 #ifdef WRITE_FILE	
+            ret = len; 
 			fwrite(outbuf, len, 1, fp);
 		    fflush(fp);
 #else			
-			ret = TcpWrite(par->socket,outbuf,len);
+			udpptr = outbuf;
+			//ret = TcpWrite(par->socket,outbuf,len);
 #endif
 		}else{
        
 			len = r * 4 ;
 #ifdef WRITE_FILE	
+            ret = len; 
 			fwrite(buf, len, 1, fp);
 		    fflush(fp);
-#else				
-			ret = TcpWrite(par->socket,buf,len);//UdpWrite(par->socket,"10.10.10.254",GADGET_MIC_PORT,buf,len);
+#else			
+			udpptr = buf;
+			//ret = TcpWrite(par->socket,buf,len);
 #endif			
 		}
+		//ret = TcpWrite(par->socket,udpptr,len);
+		//ret = UdpWrite(par->socket,"10.10.10.254",GADGET_MIC_PORT,udpptr,len);
+
+		if(len >= udpremain ){
+		    int buflen = 0;
+		    memcpy(udpbuf[udpindex]+ udpoffset,udpptr ,udpremain);
+			//udp write
+            ret = UdpWrite(par->socket,"10.10.10.254",GADGET_MIC_PORT,udpbuf[udpindex],3072);
+			
+			if(udpindex == 0)
+				udpindex =1;
+			else
+				udpindex =0;
+			buflen = len - udpremain ;
+			memcpy(udpbuf[udpindex],udpptr+udpremain,buflen);
+			udpoffset = buflen;
+			udpremain = 3072 - buflen;
+
+		}else{
+			memcpy(udpbuf[udpindex]+udpoffset,udpptr,len);
+			udpoffset += len;
+            udpremain = udpremain - len;
+		}
+     
+
 		
-	    //printf("audio socket write r = %d  \n",len);
+	   // printf("audio socket write r = %d  \n",ret);
 	
-		if(ret <= 0){
-			printf("socket write failed \n");
+		if(ret < 0){
+			printf("audio socket write failed \n");
 			break;
 		}
 	

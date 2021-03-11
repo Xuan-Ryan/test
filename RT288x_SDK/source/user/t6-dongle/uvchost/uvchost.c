@@ -47,6 +47,10 @@ struct  timeval end;
 void mysignal(int signo)  
 {  
   printf("signeal = %d \n",signo);
+  if(signo == SIGUSR1){
+    printf("video start/stop \n");
+	return;
+  }
   g_exit_program = 1; 
   g_udev.audio_webcam_cap_active= 0;
   g_udev.audio_webcam_cap_run= 0;
@@ -526,14 +530,15 @@ static int read_frame(struct uvcdev *udev )
 {
 	struct v4l2_buffer buf;
 	unsigned int i;
-
+    int ret;
+	char cmd[256];
 
 	buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	buf.memory = V4L2_MEMORY_MMAP;
 
     if (-1 == xioctl(udev->fd, VIDIOC_DQBUF, &buf)) {
           
-       // printf("Error VIDIOC_DQBUF \n");
+        printf("Error VIDIOC_DQBUF \n");
 		return -1;
          
     }
@@ -563,6 +568,7 @@ static int read_frame(struct uvcdev *udev )
     }
  */   
 
+  
 	if(udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused)<0){
 		printf("udpImageWrite error \n");
 		return -1;
@@ -600,7 +606,7 @@ static int readframe(struct uvcdev *udev)
 	   return -1;
 	}else if ( r ==0) {
 	   printf("read time out \n")  ;
-	   return 0;
+	   return -1;
 	}
    
     ret = read_frame(udev) ;
@@ -699,7 +705,7 @@ int init_mmap(struct uvcdev *udev)
 		   udev->buffers[udev->n_buffers].start =
 				   mmap(NULL /* start anywhere */,
 						 buf.length,
-						 PROT_READ | PROT_WRITE /* required */,
+						 PROT_READ  /* required */,
 						 MAP_SHARED /* recommended */,
 						 udev->fd, buf.m.offset);
 
@@ -982,6 +988,8 @@ int init_device(struct uvcdev *udev)
     struct v4l2_cropcap cropcap;
     struct v4l2_crop crop;
     struct v4l2_format fmt;
+	struct v4l2_streamparm setfps;
+	
     unsigned int min;
 
     if (-1 == xioctl(udev->fd, VIDIOC_QUERYCAP, &cap)) {
@@ -1053,7 +1061,17 @@ int init_device(struct uvcdev *udev)
 
         }
     }
-    
+
+	memset(&setfps, 0, sizeof(struct v4l2_streamparm));
+	setfps.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	setfps.parm.capture.timeperframe.numerator = 1;
+	setfps.parm.capture.timeperframe.denominator =30;
+	if (-1 == xioctl(udev->fd, VIDIOC_S_PARM, &setfps)){
+        printf("Error VIDIOC_S_PARM \n");
+		return -1;
+
+    }
+		
 	return 1;
            
 }
@@ -1414,6 +1432,7 @@ void* uvc_cmd_system(void *lp)
 		CLEAR(fl);
 		CLEAR(uci);
         pudev->uvcver = 0;
+		
 		pudev->cmd_socket= TcpConnect("10.10.10.254",GADGET_CONTROL_PORT,0);//UdpInit();
 		if(pudev->cmd_socket < 0){
 			printf("Tcp cmd link failed\n");
@@ -1428,6 +1447,7 @@ void* uvc_cmd_system(void *lp)
 	        ret = TcpRead(pudev->cmd_socket,cmd,32);
 	        if(ret <= 0){
                 printf("cmd read sokcet failed \n");
+				system("gpio l 14 4000 0 1 0 4000");
 				break;
 	        }
             PJUVCHDR pjuvchdr = (PJUVCHDR)cmd;
@@ -1440,6 +1460,9 @@ void* uvc_cmd_system(void *lp)
 
 				//printf("pjuvchdr->Flags = %d \n",pjuvchdr->Flags);
 				switch(pjuvchdr->Flags){
+					case JUVC_CONTROL_VC_STOP:
+                        printf("video start/stop \n");
+						break;
 					case JUVC_CONTROL_CAMERACTRL:
 						printf("formatidx = %d \n",pjuvchdr->c.CamaraCtrl.formatidx);
 						printf("frameidx = %d \n",pjuvchdr->c.CamaraCtrl.frameidx);
@@ -1459,7 +1482,10 @@ void* uvc_cmd_system(void *lp)
 						 	printf("set SendUvcInfo failed \n");
 							break;
 			        	}
-
+                        
+						system("gpio l 52 4000 0 1 0 4000");
+						system("gpio l 14 0 4000 0 1 4000");
+						
 						break;
 
 
@@ -1786,15 +1812,18 @@ void* uvc_audio_system(void *lp)
 		}
 		
 #ifndef WRITE_FILE	
-		pudev->socket= TcpConnect("10.10.10.254",GADGET_MIC_PORT,3);//UdpInit();
+		pudev->socket= UdpInit(); //TcpConnect("10.10.10.254",GADGET_MIC_PORT,3); //UdpInit(); 
 		if(pudev->socket < 0){
 			printf("Tcp audio link failed\n");
 			sleep(3);
 			continue;
 		}
+
+		
 		ap.socket = pudev->socket;
 		printf("tcp audio link suncessful \n");
-#endif	
+#endif
+
 	    pudev->audio_active = 1; 
 		GetAudioStream(AUDIO_CARD1_STREAM,&ap,CAP);
 		DumpAudioParameter(&ap);
@@ -2083,6 +2112,41 @@ CARDRUN:
     printf("Leave uvc_audio_webcam_capture \n");
 
 }
+int PidfileCreate(const char *pidfile)
+{
+    int pidfd = 0;
+     char val[16];
+
+    int len = snprintf(val, sizeof(val), "%d\n",getpid());
+    if (len <= 0) {
+         printf("Pid error (%s)", strerror(errno));
+         return-1;
+    }
+ 
+     pidfd = open(pidfile, O_CREAT | O_WRONLY, 0644);
+     if (pidfd < 0) {
+         printf("unable to set pidfile ‘%s‘: %s",
+                    pidfile,
+                    strerror(errno));
+         return-1;
+     }
+ 
+     ssize_t r = write(pidfd, val, (unsigned int)len);
+     if (r == -1) {
+         printf("unable to write pidfile: %s", strerror(errno));
+         close(pidfd);
+         return-1;
+      } else if ((size_t)r != len) {
+          printf("unable to write pidfile: wrote"
+                 " %d of %d bytes.", r, len);
+         close(pidfd);
+         return -1;
+     }
+ 
+     close(pidfd);
+     return 0;
+ }
+
 
 int main(int argc, char **argv)
 {
@@ -2130,7 +2194,7 @@ int main(int argc, char **argv)
 			return -1;
 	}
 */	
-
+    PidfileCreate("/var/run/uvcclient.pid");
    
 
 	if (pthread_create(&uvc_audio, NULL,uvc_audio_system,&g_udev) != 0) {
@@ -2156,6 +2220,7 @@ int main(int argc, char **argv)
 	//pthread_join(uvc_audio_cap1,   NULL); // 等待子執行緒執行完成
 	//pthread_join(uvc_audio_cap2,   NULL); // 等待子執行緒執行完成  
 #endif	
+    system("rm /var/run/uvcclient.pid");
     printf("Leave main \n");
 	kill(getpid(), SIGKILL);
 
