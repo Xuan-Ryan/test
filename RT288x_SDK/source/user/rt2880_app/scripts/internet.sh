@@ -867,6 +867,10 @@ elif [ "$opmode" = "1" ]; then
 	wan.sh
 	lan.sh
 	nat.sh
+	
+	# light up all of LED for RX
+	gpio l 14 4000 0 1 0 4000
+	gpio l 52 4000 0 1 0 4000
 
 	# set the global ipv6 address for LAN/WAN, enable ipv6 forwarding,
 	# enable ecmh(multicast) daemon
@@ -982,7 +986,7 @@ elif [ "$opmode" = "3" ]; then
 	APCLI=`nvram_get rtdev apClient`
 	if [ "$APCLI" == "1" ]; then
 		ifconfig apclii0 up
-		iwpriv apclii0 set ApCliEnable=1
+		#iwpriv apclii0 set ApCliEnable=1
 		brctl addif br0 apclii0
 	fi
 else
