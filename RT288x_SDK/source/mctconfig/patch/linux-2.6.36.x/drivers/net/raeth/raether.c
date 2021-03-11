@@ -2955,7 +2955,13 @@ int __init rather_probe(struct net_device *dev)
 		net_srandom(jiffies);
 		new_mac = net_random()&0x00FFFFFF;
 		mac3 = (new_mac>>16)&0x000000FF;
-		mac3 = (mac3&0x0F)|0x70;  //  00:05:1B:7X:XX:XX
+#if defined(CONFIG_MCT_RX)
+		mac3 = (mac3&0x0F)|0x10;  //  00:05:1B:1X:XX:XX
+#elif defined(CONFIG_MCT_TX)
+		mac3 = (mac3&0x0F)|0x00;  //  00:05:1B:0X:XX:XX
+#else
+		mac3 = (mac3&0x0F)|0x10;  //  00:05:1B:1X:XX:XX
+#endif
 		addr.sa_data[3] = mac3;
 		addr.sa_data[4] = (new_mac>>8)&0x000000FF;
 		addr.sa_data[5] = !(new_mac&0x000000FF)?0x01:(new_mac&0x000000FF);
@@ -3149,7 +3155,13 @@ void RAETH_Init_PSEUDO(pEND_DEVICE pAd, struct net_device *net_dev)
 		net_srandom(jiffies);
 		new_mac = net_random()&0x00FFFFFF;
 		mac3 = (new_mac>>16)&0x000000FF;
-		mac3 = (mac3&0x0F)|0x70;  //  00:05:1B:7X:XX:XX
+#if defined(CONFIG_MCT_RX)
+		mac3 = (mac3&0x0F)|0x10;  //  00:05:1B:1X:XX:XX
+#elif defined(CONFIG_MCT_TX)
+		mac3 = (mac3&0x0F)|0x00;  //  00:05:1B:0X:XX:XX
+#else
+		mac3 = (mac3&0x0F)|0x10;  //  00:05:1B:1X:XX:XX
+#endif
 		addr.sa_data[3] = mac3;
 		addr.sa_data[4] = (new_mac>>8)&0x000000FF;
 		addr.sa_data[5] = !(new_mac&0x000000FF)?0x01:(new_mac&0x000000FF);

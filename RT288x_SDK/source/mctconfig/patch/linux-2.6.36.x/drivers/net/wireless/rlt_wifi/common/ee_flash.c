@@ -378,7 +378,15 @@ static NDIS_STATUS rtmp_ee_flash_init(PRTMP_ADAPTER pAd, PUCHAR start)
 				//  LAN
 				rtmp_ee_flash_read(pAd, 0x2A, &Addr23);
 				Addr23 = Addr23 & 0xF0FF;
-				Addr23 |= (RandomByte(pAd)&0x0F) << 8;
+				/*
+				 *  because we don't need the LAN and WAN activate for this product,
+				 *  but we still need to assign a MAC address for them,
+				 *  so, I assign a range which we don't use in this product.
+				 *  00:05:1B:FX:XX:XX
+				 */
+				Addr23 |= (RandomByte(pAd)&0xFF) << 8;
+				Addr23 |= 0xF0 << 8;
+				
 				*(UINT16 *)(&pAd->EEPROMImage[0x2A]) = le2cpu16(Addr23);
 
 				Addr45 = RandomByte(pAd)&0xFF;  //  high byte
@@ -388,7 +396,9 @@ static NDIS_STATUS rtmp_ee_flash_init(PRTMP_ADAPTER pAd, PUCHAR start)
 				//  WAN
 				rtmp_ee_flash_read(pAd, 0x30, &Addr23);
 				Addr23 = Addr23 & 0xF0FF;
-				Addr23 |= (RandomByte(pAd)&0x0F) << 8;
+				Addr23 |= (RandomByte(pAd)&0xFF) << 8;
+				Addr23 |= 0xF0 << 8;
+
 				*(UINT16 *)(&pAd->EEPROMImage[0x30]) = le2cpu16(Addr23);
 
 				Addr45 = RandomByte(pAd)&0xFF;  //  high byte
