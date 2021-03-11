@@ -1417,9 +1417,7 @@ static void wps_ap_pbc_start_all(int nvram)
 
 	if (!strcmp(opmode, "1")) {
 		//  this is RX
-		do_system("ifconfig %s down", iface);
-		do_system("sleep 2");
-		do_system("ifconfig %s up", iface);
+		do_system("ifconfig %s down up", iface);
 		do_system("iwpriv %s set WscConfMode=0", iface);
 		do_system("iwpriv %s set WscConfMode=7", iface);
 		sleep(1);
@@ -1428,9 +1426,7 @@ static void wps_ap_pbc_start_all(int nvram)
 		do_system("iwpriv %s set WscGetConf=1", iface);
 	} else {
 		//  this is TX
-		do_system("ifconfig %s down", cliiface);
-		do_system("sleep 2");
-		do_system("ifconfig %s up", cliiface);
+		do_system("ifconfig %s down up", cliiface);
 		do_system("iwpriv %s set WscConfMode=1", cliiface);
 		do_system("iwpriv %s set WscMode=2", cliiface);
 		do_system("iwpriv %s set WscGetConf=1", cliiface);
@@ -3881,7 +3877,6 @@ int main(int argc, char *argv[])
 	long inLen;
 	char cmdline[128];
 	unsigned int last_three_bytes  = 0;
-	int reload = 0;
 
 	if ((argc > 1) && (!strcmp(argv[1], "init"))) {
 #if ! defined CONFIG_FIRST_IF_NONE 
@@ -3891,7 +3886,8 @@ int main(int argc, char *argv[])
 				strtol(nvram_bufget(RT2860_NVRAM, "WscModeOption"), NULL, 10));
 #endif
 		update_flash_8021x(RT2860_NVRAM);
-		restart_8021x(RT2860_NVRAM);
+		//  Tiger
+		//restart_8021x(RT2860_NVRAM);
 		nvram_close(RT2860_NVRAM);
 #endif
 #if ! defined CONFIG_SECOND_IF_NONE
@@ -3901,7 +3897,8 @@ int main(int argc, char *argv[])
 				strtol(nvram_bufget(RTDEV_NVRAM, "WscModeOption"), NULL, 10));
 #endif
 		update_flash_8021x(RTDEV_NVRAM);
-		restart_8021x(RTDEV_NVRAM);
+		//  Tiger
+		//restart_8021x(RTDEV_NVRAM);
 		nvram_close(RTDEV_NVRAM);
 #endif
 #if defined (RT2860_WAPI_SUPPORT) || defined (RTDEV_WAPI_SUPPORT)
@@ -3920,7 +3917,21 @@ int main(int argc, char *argv[])
 			nvram_commit(RTDEV_NVRAM);
 			sprintf(cmdline,"iwpriv rai0 set SSID=\"%s\"", newssid);
 			system(cmdline);
-			reload = 1;
+		}
+		if(strstr(nvram_bufget(RTDEV_NVRAM, "ApCliSsid"), "-uninitial") != NULL){
+			char *orig_ssid, *replace_str;
+			char newssid[64];
+			orig_ssid = (char *)nvram_bufget(RTDEV_NVRAM, "ApCliSsid");
+			//  just keep last 20bit add set the 21~24 to 1(RX)
+			last_three_bytes = mct_get_wifi_mac_last_three_bytes(RTDEV_NVRAM) & 0x000FFFFF;
+			last_three_bytes |= 0x000100000;
+			replace_str = strstr(orig_ssid, "-uninitial");
+			*replace_str = 0; //add terminator at the end
+			sprintf(newssid, "%s-%06X", orig_ssid, last_three_bytes);
+			nvram_bufset(RTDEV_NVRAM, "ApCliSsid", newssid);
+			nvram_commit(RTDEV_NVRAM);
+			sprintf(cmdline,"iwpriv apclii0 set ApCliSsid=\"%s\"", newssid);
+			system(cmdline);
 		}
 		{
 			int mode = atoi(nvram_bufget(RT2860_NVRAM, "OperationMode"));
