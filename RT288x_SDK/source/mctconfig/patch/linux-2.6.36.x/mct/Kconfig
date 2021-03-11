@@ -1,0 +1,17 @@
+menu "MCT Related"
+
+#######
+# UVC Type
+#######
+choice
+prompt "UVC TYPE"
+	
+config  MCT_RX
+bool "RX"
+config  MCT_TX
+bool "TX"
+endchoice
+
+
+endmenu
+

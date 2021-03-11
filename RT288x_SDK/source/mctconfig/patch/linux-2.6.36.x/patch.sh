@@ -35,6 +35,9 @@ cp drivers/net/wireless/rlt_wifi/include/rtmp_cmd.h ../../../linux-2.6.36.x/driv
 echo 'start patch include'
 cp include/linux/usb/video.h ../../../linux-2.6.36.x/include/linux/usb/video.h
 cp include/linux/videodev2.h ../../../linux-2.6.36.x/include/linux/videodev2.h
+echo 'start patch Kconfig'
+cp mct ../../../linux-2.6.36.x/. -r
+cp arch/mips/Kconfig ../../../linux-2.6.36.x/arch/mips/Kconfig
 #echo 'start patch mtd'
 #cp drivers/mtd/ralink_spi.c ../../../linux-2.6.36.x/drivers/mtd/ralink/ralink_spi.c
 echo ''
