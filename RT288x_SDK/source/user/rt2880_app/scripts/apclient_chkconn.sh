@@ -6,6 +6,7 @@ ip=`nvram_get 2860 lan_ipaddr`
 nm=`nvram_get 2860 lan_netmask`
 
 interval=10
+count=0
 
 rm /tmp/timeout 1>/dev/null 2>/dev/null
 opmode=`nvram_get 2860 OperationMode`
@@ -33,7 +34,6 @@ do
 	sleep $interval
 
 	if [ ! -e /tmp/doing_wps ]; then
-		interval=10
 		# check connection via conn_status command
 		disconnect=`iwpriv apclii0 conn_status|grep ApClii0|grep Disconnect`
 		if [ -n "$disconnect" ]; then
@@ -43,17 +43,23 @@ do
 				gpio l 52 0 4000 0 1 4000
 				# light up red LED
 				gpio l 14 4000 0 1 0 4000
+				interval=2
+				count=0
 			fi
 			#  disconnect, do connection again
 			ssid=`nvram_get rtdev ApCliSsid`
 			if [ -n "$ssid" ]; then
-				ifconfig apclii0 down up
-				sleep 2
-				iwpriv apclii0 set ApCliEnable=1
-				iwpriv apclii0 set SiteSurvey=1
-				sleep 1
-				iwpriv apclii0 get_site_survey
-				iwpriv apclii0 set ApCliAutoConnect=1
+				count=$((count+1))
+				if [ "$count" -gt "20" ]; then
+					ifconfig apclii0 down up 1>/dev/null
+					sleep 2
+					iwpriv apclii0 set ApCliEnable=1 1>/dev/null
+					iwpriv apclii0 set SiteSurvey=1 1>/dev/null
+					sleep 1
+					iwpriv apclii0 get_site_survey 1>/dev/null
+					iwpriv apclii0 set ApCliAutoConnect=1 1>/dev/null
+					count=0
+				fi
 			fi
 		else
 			count=0
@@ -115,6 +121,7 @@ do
 					# light up red LED
 					gpio l 14 4000 0 1 0 4000
 				fi
+				interval=10
 			fi
 		fi
 	else
