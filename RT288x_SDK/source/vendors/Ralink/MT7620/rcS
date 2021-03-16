@@ -5,6 +5,9 @@ makedevlinks.sh
 cat /etc_ro/motd > /dev/console
 nvram_daemon&
 
+# always set this date, because we don't have RTC and NTP in here
+date 092509002019
+
 init_system start
 
 echo 8388608  > /proc/sys/net/core/rmem_default 
