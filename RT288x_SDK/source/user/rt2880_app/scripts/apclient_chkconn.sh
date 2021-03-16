@@ -111,8 +111,10 @@ do
 				connected="1"
 				# light up green LED
 				gpio l 52 4000 0 1 0 4000
-				# light up red LED
-				gpio l 14 4000 0 1 0 4000
+				if [ -e /tmp/uvcclient_disconnect ]; then
+					# light up red LED
+					gpio l 14 4000 0 1 0 4000
+				fi
 			fi
 		fi
 	else
