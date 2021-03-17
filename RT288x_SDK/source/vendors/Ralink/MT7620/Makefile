@@ -71,7 +71,6 @@ else
 		ln -s "MT7620_AP_2T2R-4L_internal LNA_internal PA_V15.BIN.tx" MT7620_AP_2T2R-4L_V15.BIN; \
 	fi
 endif
-	$(ROMFSINST) "/etc_ro/wlan/MT7612E_EEPROM.bin"
 	$(ROMFSINST) "/etc_ro/wlan/MT7620_AP_2T2R-4L_V15.BIN"
 
 
@@ -155,6 +154,7 @@ endif
 	if [ -f MT$(shell echo $(CONFIG_RT_SECOND_CARD) | tr a-z A-Z)_EEPROM.bin ]; then \
 		$(ROMFSINST) /etc_ro/wlan/MT$(shell echo $(CONFIG_RT_SECOND_CARD) | tr a-z A-Z)_EEPROM.bin; \
 	fi
+
 ifneq ($(CONFIG_BT_MTK_HCI_USB),)
 	$(ROMFSINST) /lib/firmware/mt7662_patch_e3_hdr.bin
 endif
