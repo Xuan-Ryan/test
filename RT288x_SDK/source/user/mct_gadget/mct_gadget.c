@@ -640,14 +640,18 @@ void usb_hub_reset(int plugin)
 #else
 void usb_hub_reset(int plugin)
 {
+	if (plugin == 1) {
+		system("web gpio 11 0");
+	}
+
 	system("web gpio 53 0");  //  pull low to disable USB hub
 
-	if (plugin == 1)
-		sleep(7);
-	else
-		sleep(1);
+	sleep(2);
 
 	system("web gpio 53 1");
+	if (plugin == 0) {
+		system("web gpio 11 1");
+	}
 }
 #endif
 
@@ -743,7 +747,6 @@ static void * video_control_thread(void * arg)
 						//DBG_MSG("m420 : %x\n",  juvchdr.CamaraInfo.m420_res_bitfield);
 						//DBG_MSG("camera : %02x %02x %02x\n", juvchdr.CamaraInfo.camera[0]&0xff, juvchdr.CamaraInfo.camera[1]&0xff, juvchdr.CamaraInfo.camera[2]&0xff);
 						//DBG_MSG("process : %02x %02x %02x\n", juvchdr.CamaraInfo.process[0]&0xff, juvchdr.CamaraInfo.process[1]&0xff, juvchdr.CamaraInfo.process[2]&0xff);
-						system("web gpio 11 0");  //  pull low to enable CP2615
 						usb_hub_reset(1);
 						LED_control(1);
 						i2s_stop = 0;

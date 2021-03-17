@@ -21,6 +21,10 @@ if [ -n "$disconnect" ]; then
 	gpio l 52 0 4000 0 1 4000
 	# light up red LED
 	gpio l 14 4000 0 1 0 4000
+	iwpriv apclii0 set SiteSurvey=1 1>/dev/null
+	sleep 1
+	iwpriv apclii0 get_site_survey 1>/dev/null
+	iwpriv apclii0 set ApCliAutoConnect=1 1>/dev/null
 else
 	connected="1"
 	# light up green LED
@@ -37,31 +41,27 @@ do
 		# check connection via conn_status command
 		disconnect=`iwpriv apclii0 conn_status|grep ApClii0|grep Disconnect`
 		if [ -n "$disconnect" ]; then
+			interval=5
 			if [ "$connected" = "1" ]; then
 				connected="0"
 				# turn off green LED
 				gpio l 52 0 4000 0 1 4000
 				# light up red LED
 				gpio l 14 4000 0 1 0 4000
-				interval=2
 				count=0
 			fi
 			#  disconnect, do connection again
 			ssid=`nvram_get rtdev ApCliSsid`
 			if [ -n "$ssid" ]; then
 				count=$((count+1))
-				if [ "$count" -gt "20" ]; then
-					ifconfig apclii0 down up 1>/dev/null
-					sleep 2
-					iwpriv apclii0 set ApCliEnable=1 1>/dev/null
-					iwpriv apclii0 set SiteSurvey=1 1>/dev/null
-					sleep 1
-					iwpriv apclii0 get_site_survey 1>/dev/null
+				if [ "$count" -gt "6" ]; then
+					#  waiting for 30's and do auto-connect again
 					iwpriv apclii0 set ApCliAutoConnect=1 1>/dev/null
 					count=0
 				fi
 			fi
 		else
+			interval=10
 			count=0
 			#  store the SSID from AP
 			#  ex: ApClii0 Connected AP : 00:05:1B:00:01:02   SSID:UVC-79366D
@@ -121,7 +121,6 @@ do
 					# light up red LED
 					gpio l 14 4000 0 1 0 4000
 				fi
-				interval=10
 			fi
 		fi
 	else
