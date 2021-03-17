@@ -41,7 +41,7 @@ do
 		# check connection via conn_status command
 		disconnect=`iwpriv apclii0 conn_status|grep ApClii0|grep Disconnect`
 		if [ -n "$disconnect" ]; then
-			interval=5
+			interval=2
 			if [ "$connected" = "1" ]; then
 				connected="0"
 				# turn off green LED
@@ -54,8 +54,8 @@ do
 			ssid=`nvram_get rtdev ApCliSsid`
 			if [ -n "$ssid" ]; then
 				count=$((count+1))
-				if [ "$count" -gt "6" ]; then
-					#  waiting for 30's and do auto-connect again
+				if [ "$count" -gt "10" ]; then
+					#  waiting for 20's and do auto-connect again
 					iwpriv apclii0 set ApCliAutoConnect=1 1>/dev/null
 					count=0
 				fi
