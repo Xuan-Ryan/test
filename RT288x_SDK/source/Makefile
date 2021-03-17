@@ -377,7 +377,7 @@ image:
 	cp $(FINAL_IMAGE) kfs/. ; \
 	cp $(FINAL_IMAGE) kfs/$(RESCUE_IMAGE) ; \
 	num_320K=$(shell echo 327680) ; \
-	dd if=$(ROOTDIR)/../Uboot/MT7620-uboot-512Mb-20190919.bin of=$(COMPLETE_IMAGE) ; \
+	dd if=$(ROOTDIR)/../Uboot/MT7620-uboot-512Mb-20210317.bin of=$(COMPLETE_IMAGE) ; \
 	dd if=$(FINAL_IMAGE) of=$(COMPLETE_IMAGE) obs=1 seek=$$num_320K ; \
 	echo $(FINAL_IMAGE) > $(__TYPE).log; \
 	fi \
