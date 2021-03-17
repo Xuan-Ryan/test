@@ -139,6 +139,7 @@ int TcpConnect(char* ipaddr ,int port ,int t)
     int err = connect(sockfd,(struct sockaddr *)&info,sizeof(info));
     if(err==-1){
         printf("Connection error \n");
+		close(sockfd);
 		return -1;
     }
     setsockopt(sockfd,IPPROTO_TCP,TCP_NODELAY, (char *)&on, sizeof(on)); 

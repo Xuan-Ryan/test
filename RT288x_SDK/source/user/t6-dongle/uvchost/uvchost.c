@@ -1448,6 +1448,7 @@ void* uvc_cmd_system(void *lp)
 	        if(ret <= 0){
                 printf("cmd read sokcet failed \n");
 				system("gpio l 14 4000 0 1 0 4000");
+				system("date > /tmp/uvcclient_disconnect");
 				break;
 	        }
             PJUVCHDR pjuvchdr = (PJUVCHDR)cmd;
@@ -1485,7 +1486,7 @@ void* uvc_cmd_system(void *lp)
                         
 						system("gpio l 52 4000 0 1 0 4000");
 						system("gpio l 14 0 4000 0 1 4000");
-						
+						system("rm /tmp/uvcclient_disconnect");
 						break;
 
 
@@ -2195,7 +2196,7 @@ int main(int argc, char **argv)
 	}
 */	
     PidfileCreate("/var/run/uvcclient.pid");
-   
+    system("date > /tmp/uvcclient_disconnect");
 
 	if (pthread_create(&uvc_audio, NULL,uvc_audio_system,&g_udev) != 0) {
 			printf("Error creating uvc_audio_system\n");
