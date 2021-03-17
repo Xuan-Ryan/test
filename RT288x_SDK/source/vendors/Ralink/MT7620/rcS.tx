@@ -17,7 +17,7 @@ echo 2000  > /proc/sys/net/core/netdev_max_backlog
 echo 5 > /proc/sys/net/ipv4/tcp_keepalive_time
 echo 3 > /proc/sys/net/ipv4/tcp_keepalive_intvl
 echo 3 > /proc/sys/net/ipv4/tcp_keepalive_probes
-
+echo 1 > /proc/sys/net/ipv4/tcp_syn_retries
 #for telnet debugging
 QisInit=`nvram_get QisInit`
 if [ "$QisInit" = "0" ]; then
