@@ -94,7 +94,7 @@ char rxbuffer[I2S_PAGE_SIZE];
 
 static int exited = 0;
 static char video_buffer[RAING_NUM][JUVC_MAX_VIDEO_PACKET_SIZE];
-static int total_size[RAING_NUM] = {0, 0, 0, 0};
+static int total_size[RAING_NUM];
 static int copying = 0;
 static int done = 0;
 
@@ -641,16 +641,16 @@ void usb_hub_reset(int plugin)
 void usb_hub_reset(int plugin)
 {
 	if (plugin == 1) {
-		system("web gpio 11 0");
+		system("web gpio 11 0");  //  pull low to enable cp2615
 	}
 
 	system("web gpio 53 0");  //  pull low to disable USB hub
 
 	sleep(2);
 
-	system("web gpio 53 1");
+	system("web gpio 53 1");  //  pull high to enable USB hub
 	if (plugin == 0) {
-		system("web gpio 11 1");
+		system("web gpio 11 1");  //  pull high to disable cp2615
 	}
 }
 #endif
@@ -787,10 +787,13 @@ static void * video_control_thread(void * arg)
 		PRINT_MSG("mct_gadget: client disconnected\n");
 		tcp_control_clnsd = -1;
 		client_connected = 0;
+		i2s_stop = 1;
 		usb_hub_reset(0);
 		LED_control(0);
-		i2s_stop = 1;
 		system("web gpio 11 1");  //  push hi to disable CP2615
+		memset(total_size, '\0', sizeof(total_size));
+		copying = 0;
+		done = 0;
 	}
 
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
@@ -1383,6 +1386,8 @@ static int initialize_procedure(int argc, char **argv)
 	//	return -1;
 
 	load_bg();
+	
+	memset(total_size, '\0', sizeof(total_size));
 
 	if (init_uvc_dev() < 0)
 		return -1;
