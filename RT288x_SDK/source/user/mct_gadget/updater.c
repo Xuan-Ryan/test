@@ -1,0 +1,209 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <pthread.h>
+#include <fcntl.h>		/* open */
+#include <sys/ioctl.h>		/* ioctl */
+#include <pthread.h>
+#include <signal.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <semaphore.h>
+#include <arpa/inet.h>
+#include <stdbool.h>
+#include <linux/types.h>
+#include <linux/input.h>
+#include <linux/hidraw.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <errno.h>
+#include <linux/autoconf.h>
+
+#include "mnspdef.h"
+#include "t6bulkdef.h"
+#include "queue.h"
+#include "t6usbdongle.h"
+#include "displayserver.h"
+#include "jwr2100_tcp_cmddef.h"
+
+unsigned char MT7620_update_flag = 0;
+unsigned char MT7620_tcp_accept_flag = 0;
+char * my_server_ip_addr = "10.10.10.253";
+void * RomUpdateTcp()
+{
+	int ret, i;
+	unsigned char buf[20*1024];
+	unsigned char *rom_buf;
+	struct sockaddr_in from;
+	struct timeval tv;
+	socklen_t len;
+	char *ptr_image_pice ;
+	char *ptr_image ;
+	char *image_data = NULL;
+
+	int packet_frist = -1;
+	int packet_id = -1;
+	int packet_len = -1;
+	int ipAddr = 0 ;
+	int image_size = -1;
+	struct sockaddr_in their_addr;
+	int clientSocket = -1 ;
+	int sin_size = sizeof(struct sockaddr_in);
+
+	len = sizeof(from);
+
+	int fd = socket(AF_INET,SOCK_STREAM,0);
+	if (fd == -1) {
+	 	DEBUG_PRINT("socket create error!\n");
+	 	return;
+	}
+	DEBUG_PRINT("test cursor socket fd=%d ip = %s port=%d \n",fd,my_server_ip_addr,JWR_ROM_TCP_PORT);
+
+	struct sockaddr_in addr;
+	addr.sin_family=AF_INET;
+	addr.sin_port=htons(JWR_ROM_TCP_PORT);
+	addr.sin_addr.s_addr=inet_addr(my_server_ip_addr);
+
+/*
+	tv.tv_sec =  1;
+	tv.tv_usec = 0;
+	if ( setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval)) == -1) {
+		DEBUG_PRINT("setsockopt SO_RCVTIMEO  error\n");
+		close(fd);
+		return ;
+	}
+*/
+	int n = TCP_MAX_BUFFER ;
+	if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1) {
+  		DEBUG_PRINT("setsockopt SO_RCVBUF  error");
+		close(fd);
+		return ;
+	}
+
+	ret = bind(fd,(struct sockaddr*)&addr,sizeof(addr));
+	if (ret == -1) {
+		DEBUG_PRINT("test cursor Bind error!\n");
+		close(fd);
+		return ;
+	}
+	DEBUG_PRINT("test cursor Bind successfully.\n");
+
+	if ((ret = listen(fd, 32)) < 0) {
+		DEBUG_PRINT("Server-listen() error");
+		close(fd);
+		fd = -1;
+		return -4;
+	} else {
+		printf("Server-Ready for client connection...\n");
+	}
+
+	while(1) {
+		if ((clientSocket = accept(fd, (struct sockaddr *)&their_addr, &sin_size)) < 0) {
+			printf("Server-accept() error \n" );
+			close(fd);
+			fd = -1;
+			return -2;
+		} else {
+			printf("Server-accept() is OK\n");
+			/*client IP*/
+			printf("Server-new socket, clientSocket is OK...\n");
+			printf("Got connection from the client: %s\n", inet_ntoa(their_addr.sin_addr));
+			//printf("Got connection from the client: %d\n", *paddr);
+			MT7620_tcp_accept_flag = 1;
+			FILE *fpeng001 = open("/tmp/MT7620_tcp_accept_flag", O_RDWR | O_CREAT);
+			write(fpeng001, &MT7620_tcp_accept_flag, 1);
+			close(fpeng001);
+		}
+
+		fd_set read_sd;
+		FD_ZERO(&read_sd);
+		FD_SET(clientSocket, &read_sd);
+
+		while(clientSocket) {
+			fd_set rsd = read_sd;
+			int sel = select(clientSocket + 1, &rsd, 0, 0, 0);
+
+			if (sel > 0) {
+				//ipAddr = g_active_display_ip;
+				PT6BULKDMAHDR t6_head = (PT6BULKDMAHDR)buf;
+				unsigned int tcptotalget = 0;
+				unsigned int tcptotallength = 0;
+				unsigned int align64k_len = 0;
+
+				ret =recv(clientSocket,&buf[tcptotalget],32,0);
+				if (ret <= 0){
+					//DEBUG_PRINT("cusor recvfrom  error = %d \n",ret);
+					continue;
+				}
+
+				DEBUG_PRINT("rom recvfrom ret = %d \n",ret);
+
+				if (t6_head->Signature != 0x05){
+					DEBUG_PRINT("Signature error\n");
+					//Dump_MnspXactHdr(t6_head);
+					continue;
+				}
+
+				rom_buf = malloc(t6_head->PayloadLength + 32);
+				memcpy(rom_buf, &buf[tcptotalget], 32);
+				tcptotallength = t6_head->PayloadLength;
+				tcptotalget = tcptotalget + 32;
+				PWIFIDONGLEROMHDR rom_head = (PWIFIDONGLEROMHDR)&rom_buf[32+0x40000];
+				MT7620_update_flag = 1;
+				FILE *fpeng000 = open("/tmp/MT7620_update_flag", O_RDWR | O_CREAT);
+				write(fpeng000, &MT7620_update_flag, 1);
+				close(fpeng000);
+				while(tcptotallength) {
+				 	ret =recv(clientSocket,&rom_buf[tcptotalget],tcptotallength,0);
+					if (ret <= 0){
+						//DEBUG_PRINT("cusor recvfrom  error = %d \n",ret);
+						continue;
+					}
+					DEBUG_PRINT("rom recvfrom ret = %d \n",ret);
+					tcptotalget = tcptotalget + ret;
+					tcptotallength = tcptotallength - ret;
+				}
+
+				if (rom_head->FW_for_dest == FW_DEST_RX) {
+					FILE *fpeng = open("/var/RusbFW", O_RDWR | O_CREAT);
+					char cmd[512];
+					int status;
+					write(fpeng, &rom_buf[32 + 512 + 0x40000], rom_head->PayloadLength);
+					printf("rom_head->PayloadLength:%d\n",rom_head->PayloadLength);
+					snprintf(cmd, sizeof(cmd), "/bin/mtd_write -o %d -l %d write %s Kernel", 0, rom_head->PayloadLength, "/var/RusbFW");
+					status = system(cmd);
+					send(clientSocket, &MT7620_update_flag, 1, 0);
+					close(clientSocket);
+					system("reboot");
+				}
+			} else if (sel < 0) {
+				break;
+			}
+		}
+
+		close(clientSocket);
+	}
+
+	if (image_data != NULL) {
+		free(image_data);
+		image_data = NULL;
+	}
+	close(fd);
+}
+
+int main(int argc ,char* avg[])
+{
+	pthread_t pthr_cursor_tcp;
+
+	FILE *fpeng001 = open("/tmp/MT7620_tcp_accept_flag", O_RDWR | O_CREAT);
+	write(fpeng001, &MT7620_tcp_accept_flag, 1);
+	close(fpeng001);
+
+	FILE *fpeng000 = open("/tmp/MT7620_update_flag", O_RDWR | O_CREAT);
+	write(fpeng000, &MT7620_update_flag, 1);
+	close(fpeng000);
+
+	RomUpdateTcp();
+}
