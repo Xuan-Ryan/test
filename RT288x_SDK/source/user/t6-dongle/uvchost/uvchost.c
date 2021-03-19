@@ -1514,8 +1514,8 @@ void* uvc_cmd_system(void *lp)
 						}
 
 						pjuvchdr->c.Rsvd[4] = uci.Vc_Interface & 0xff;
-					
-                        if(pjuvchdr->c.Rsvd[5] == uci.Input_ID){
+					    
+                        if(pjuvchdr->c.Rsvd[5] == uci.Input_ID || pjuvchdr->c.Rsvd[5] == 1){
 							if(pjuvchdr->c.UvcControl.wValue == 0x300){
 								char data[8];
 								CLEAR(data);
@@ -1546,7 +1546,7 @@ void* uvc_cmd_system(void *lp)
                         }
 						
 						if(pudev->uvcver == 0x0150){
-					
+					        pjuvchdr->c.Rsvd[4] = 0;
 							if(pjuvchdr->c.Rsvd[5] != 1 && pjuvchdr->c.Rsvd[5] != 2 ){
 								printf("No uvc input or process id !!\n");
 								break;

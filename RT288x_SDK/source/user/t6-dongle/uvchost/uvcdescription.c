@@ -466,7 +466,7 @@ int uvc_prase_vc(char *src ,int src_len ,char* desc ,unsigned short* bcdUVC)
 				if(cs->bDescriptorSubtype == USB_INTERFACE_SUBTYPE_VC_HEADER){
 					USB_UVC_VC_HEADER_DESCRIPTOR *vch = (USB_UVC_VC_HEADER_DESCRIPTOR *)src;
 					 printf("VC_HEADER = %x\n",vch->bcdUVC);
-					 vch->bcdUVC = 0x0150;
+					// vch->bcdUVC = 0x0150;
 					 *bcdUVC = vch->bcdUVC;
 					 memcpy(vc_desc,src,cs->bLength);
 					 vc_desc+= cs->bLength;
