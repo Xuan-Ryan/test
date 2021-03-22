@@ -2267,7 +2267,12 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 					break;
 				/* FALLTHROUGH */
 			case USB_DT_CONFIG:
-				value = config_desc(cdev, w_value);
+				/*
+				 * It's a workaround for the Logitech device which has two configuration 
+				 * descriptors, once the user attaches this device we just report one 
+				 * configuration.
+				 */
+				value = config_desc(cdev, w_value&0xFF00);
 				if (value >= 0)
 					value = min(w_length, (u16) value);
 				break;
@@ -2852,7 +2857,7 @@ long device_ioctl(struct file *file, unsigned int cmd, unsigned long data)
 		g_uvc_nv12_res_bitflag = capabilities.nv12;
 		g_uvc_i420_res_bitflag = capabilities.i420;
 		g_uvc_m420_res_bitflag = capabilities.m420;
-		if(currentbcdUVC == 0x0150)
+		if(currentbcdUVC == 0x0150)  //  commented out this line for 1.5 only if you want.
 		{
 			uvc_change_desc_compatable();
 		}

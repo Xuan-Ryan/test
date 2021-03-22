@@ -1513,7 +1513,7 @@ static struct usb_descriptor_header *fsg_hs_function[MAX_DESC_NUM] = {
 	//(struct usb_descriptor_header *) &hidg0_hs_in_ep_desc,
 	//(struct usb_descriptor_header *) &M_uvc_control_cs_ep,
 	//(struct usb_descriptor_header *) &M_uvc_streaming_intf_alt0,
-	//(struct usb_descriptor_header *) &fsg_hs_bulk_in_desc,
+	//(struct usb_descriptor_header *) &fsg_hs_bulk_in_desc,  // un-commented out these lines above for 1.5 only if you want.
 	//(struct usb_descriptor_header *) &M_uvc_input_header,                        //fsg_hs_function[INPUT_HEADER_IDX]
 	//(struct usb_descriptor_header *) &M_uvc_format_mjpg,                         //fsg_hs_function[INPUT_FORMAT_IDX]
 	//(struct usb_descriptor_header *) &M_uvc_frame_mjpg_720p,

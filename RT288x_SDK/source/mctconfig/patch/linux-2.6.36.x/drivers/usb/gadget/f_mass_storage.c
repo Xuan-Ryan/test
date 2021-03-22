@@ -3177,6 +3177,7 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 void uvc_change_desc_compatable(void)
 {
 	int   descarrayidx, descformatcnt, descframecnt;
+	//  modify here for 1.5 only if you want.
 	fsg_hs_function[2] = (struct usb_descriptor_header *)&M_uvc_control_header;
 	fsg_hs_function[3] = (struct usb_descriptor_header *)&M_uvc_camera_terminal;
 	fsg_hs_function[4] = (struct usb_descriptor_header *)&M_uvc_processing;
