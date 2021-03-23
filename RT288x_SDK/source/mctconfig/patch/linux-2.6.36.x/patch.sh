@@ -28,6 +28,7 @@ cp drivers/net/raeth/raether.c ../../../linux-2.6.36.x/drivers/net/raeth/raether
 echo 'start patch rlt_wifi'
 cp drivers/net/wireless/rlt_wifi/common/ee_flash.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/common/ee_flash.c
 cp drivers/net/wireless/rlt_wifi/common/wsc.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/common/wsc.c
+cp drivers/net/wireless/rlt_wifi/common/ba_action.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/common/ba_action.c
 cp drivers/net/wireless/rlt_wifi/ap/ap_cfg.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/ap/ap_cfg.c
 cp drivers/net/wireless/rlt_wifi/os/linux/ap_ioctl.c ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/os/linux/ap_ioctl.c
 cp drivers/net/wireless/rlt_wifi/include/os/rt_os.h ../../../linux-2.6.36.x/drivers/net/wireless/rlt_wifi/include/os/rt_os.h
