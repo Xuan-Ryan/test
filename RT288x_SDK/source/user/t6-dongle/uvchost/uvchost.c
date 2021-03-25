@@ -1061,7 +1061,7 @@ int init_device(struct uvcdev *udev)
 
         }
     }
-
+/*
 	memset(&setfps, 0, sizeof(struct v4l2_streamparm));
 	setfps.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	setfps.parm.capture.timeperframe.numerator = 1;
@@ -1071,7 +1071,7 @@ int init_device(struct uvcdev *udev)
 		return -1;
 
     }
-		
+*/		
 	return 1;
            
 }
@@ -1207,6 +1207,7 @@ int SendUvcInfo(struct uvcdev* pudev , struct format_list* pfl,struct uvc_ctrl_i
     unsigned char   h264_res_bitfield  = 0;
     unsigned char   yuv_res_bitfield   = 0;
     unsigned char   nv12_res_bitfield  = 0;
+	int j5uvc = 0;
     CLEAR(Mf);
 	CLEAR(Pt);
 	PJUVCHDR juvchdr =(PJUVCHDR) cmd;
@@ -1249,6 +1250,11 @@ int SendUvcInfo(struct uvcdev* pudev , struct format_list* pfl,struct uvc_ctrl_i
 	}
     memcpy(&pudev->vid,&juvchdr->c.Rsvd[0],2);
 	memcpy(&pudev->pid,&juvchdr->c.Rsvd[2],2);
+	if(pudev->vid == 0x0711 && pudev->pid == 0x3110 ){
+        printf("webcan jvcu4335 \n");
+        j5uvc= 1;
+     }
+	
 	//printf("vid = %x \n",pudev->vid);
 	//printf("pid = %x \n",pudev->pid);
 	
@@ -1386,6 +1392,9 @@ int SendUvcInfo(struct uvcdev* pudev , struct format_list* pfl,struct uvc_ctrl_i
 	juvchdr->c.CamaraInfo.i420_res_bitfield =0;
 	juvchdr->c.CamaraInfo.m420_res_bitfield = 0;	
 	memcpy(juvchdr->c.CamaraInfo.camera,puci->vci.bmControl, 3);
+	if(j5uvc == 1){
+		puci->vcp.bmControl[1] &= 0xFB;
+	}
 	memcpy(juvchdr->c.CamaraInfo.process,puci->vcp.bmControl, 3);
 	hex_dump(cmd,32,"cmd data");
 	ret = TcpWrite(pudev->cmd_socket,cmd,32);
