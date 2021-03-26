@@ -67,6 +67,7 @@ void mysignal(int signo)
   g_udev.video_active = 0;
   g_udev.cmd_thread_run = 0;
   g_udev.cmd_active= 0;
+  g_udev.uvc_detcet_run = 0;
   sem_post(&video_mutex);
   sem_post(&audio_mutex);
   sem_destroy(&video_mutex);
@@ -1423,7 +1424,24 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
 
 }
 
-
+void *uvc_detect_system(void *lp)
+{
+	struct uvcdev* pudev = (struct uvcdev*) lp;
+	pudev->uvc_detcet_run = 1;
+	char dev_name[256]="/dev/video0";
+    struct stat st;
+    printf("uvc_detect_system \n");
+    while(pudev->uvc_detcet_run){
+		if(0 == access(dev_name, 0)){
+			sleep(2);
+			continue;
+    	}
+	    closeSocket(pudev->cmd_socket);
+		break;
+    }
+	pudev->uvc_detcet_run =0;
+	printf("uvc_detect_leave \n");
+}
 
 
 void* uvc_cmd_system(void *lp)
@@ -1434,6 +1452,7 @@ void* uvc_cmd_system(void *lp)
 	struct uvcdev* pudev = (struct uvcdev*) lp;
 	struct format_list fl;
 	struct uvc_ctrl_info uci ;
+	pthread_t uvc_detect;
 	
 	int sformat = 0 ;
 	int sw = 0;
@@ -1465,6 +1484,13 @@ void* uvc_cmd_system(void *lp)
 		}
 		printf("Tcp cmd link successful\n");
 		
+		if (pthread_create(&uvc_detect, NULL,uvc_detect_system,lp) != 0) {
+			printf("Error creating uvc_cmd_system\n");
+			close(cmd_fd);
+			cmd_fd = 0;
+			closeSocket(pudev->cmd_socket);
+			continue;
+		}
        
 		sem_post(&audio_mutex);  
 		pudev->cmd_active = 1;
@@ -1478,6 +1504,7 @@ void* uvc_cmd_system(void *lp)
 				cmd_fd = 0;
 				pudev->video_active = 0;
 				pudev->audio_active= 0;
+				pudev->uvc_detcet_run = 0;
 				break;
 	        }
             PJUVCHDR pjuvchdr = (PJUVCHDR)cmd;
@@ -1505,7 +1532,7 @@ void* uvc_cmd_system(void *lp)
 						pudev->h = sh ;
 						pudev->video_active= 0;
 						sem_post(&video_mutex);
-                           
+                        pudev->uvc_detcet_run = 0;   
 						break;
 					case JUVC_CONTROL_CAMERAINFO:
                         printf("JUVC_CONTROL_CAMERAINFO \n");
@@ -2190,6 +2217,7 @@ int main(int argc, char **argv)
     pthread_t uvc_video;
 	pthread_t uvc_cmd;
     pthread_t usb_paser;
+    
     uint16_t vid , pid;  
 	
 	int ret = 0;	

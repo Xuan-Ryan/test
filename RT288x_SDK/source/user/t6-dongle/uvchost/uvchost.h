@@ -76,7 +76,7 @@ struct uvcdev{
 	int video_active;
 	int cmd_thread_run;
 	int cmd_active;
-	int cmd_frist ;
+	int uvc_detcet_run ;
 	char video_id;
 	unsigned short vid;
 	unsigned short pid;
