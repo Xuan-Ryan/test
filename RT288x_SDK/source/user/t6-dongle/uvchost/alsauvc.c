@@ -355,6 +355,7 @@ END:
     	audio_resample_close((ReSampleContext*)par->resampleEngine);
 	if(capture_handle!= NULL)
 		snd_pcm_close(capture_handle);
+
 #ifdef WRITE_FILE	
     fclose(fp);
 #endif

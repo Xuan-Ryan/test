@@ -1815,7 +1815,7 @@ void* uvc_video_system(void *lp)
 	
         close_device(pudev);
 		closeSocket(pudev->udpsocket);
-		
+		printf("video active stop \n");
 		//closeSocket(pudev->hsocket);
         sleep(1);
 
@@ -1863,8 +1863,9 @@ void* uvc_audio_system(void *lp)
 		ap.run = &pudev->audio_active;
 		RunAudioCapture(&ap);
 		closeSocket(ap.socket);
+		printf("audio active stop \n");
         sleep(1); // wait  access  stream0
-	
+	    
 	}
     printf("Leave uvc_audio_system \n");
 }

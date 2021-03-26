@@ -1,5 +1,7 @@
 #ifndef __UVCHOST_H
 #define __UVCHOST_H
+
+
 #pragma pack(1)
 
 #define GADGET_BROADCAST_PORT                   42776
@@ -74,11 +76,12 @@ struct uvcdev{
 	int video_active;
 	int cmd_thread_run;
 	int cmd_active;
+	int cmd_frist ;
 	char video_id;
 	unsigned short vid;
 	unsigned short pid;
 	unsigned short uvcver;
-	
+
 };
 
 struct InputTerminal
