@@ -1262,6 +1262,9 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
 	if(pudev->vid == 0x0711 && pudev->pid == 0x3110 ){
         printf("webcan jvcu4335 \n");
         j5uvc= 1;
+     }else if(pudev->vid == 0x0711 && pudev->pid == 0x3106 ){
+        printf("webcan jvcu4335 \n");
+        j5uvc= 1;
      }
 	
 	//printf("vid = %x \n",pudev->vid);

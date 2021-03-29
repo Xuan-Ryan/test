@@ -266,6 +266,7 @@ int udpImageWrite(int sockfd ,char *ipaddr ,int port,char id ,char* image_data ,
 void closeSocket(int clientSocket)
 {
 	if(clientSocket > 0){
+		printf("close socket = %d \n",clientSocket);
 		shutdown(clientSocket, SHUT_RDWR);
 		close(clientSocket);
 	}	
