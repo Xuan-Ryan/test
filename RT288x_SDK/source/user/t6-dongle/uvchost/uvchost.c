@@ -26,10 +26,7 @@
 #include <sys/socket.h>
 #include <signal.h>
 
-
 #include <linux/videodev2.h>
-#include <semaphore.h>
-
 
 
 #include "alsauvc.h"
@@ -44,9 +41,7 @@ int g_exit_program = 0;
 struct uvcdev g_udev;
 struct  timeval start;
 struct  timeval end;
-sem_t video_mutex;		  
-sem_t audio_mutex; 
-
+        
 
 
 void mysignal(int signo)  
@@ -67,11 +62,6 @@ void mysignal(int signo)
   g_udev.video_active = 0;
   g_udev.cmd_thread_run = 0;
   g_udev.cmd_active= 0;
-  g_udev.uvc_detcet_run = 0;
-  sem_post(&video_mutex);
-  sem_post(&audio_mutex);
-  sem_destroy(&video_mutex);
-  sem_destroy(&audio_mutex);
 }  
 
 
@@ -1200,9 +1190,10 @@ void uvcframeset( int frameindex ,int *w ,int *h)
 
 }
 
-int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uvc_ctrl_info* puci)
+int SendUvcInfo(struct uvcdev* pudev , struct format_list* pfl,struct uvc_ctrl_info* puci)
 {
 	int ret = 0;
+	int fd = 0; 
 	int i = 0;
     int j = 0;
 	int vclen = 0;
@@ -1222,7 +1213,7 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
 	PJUVCHDR juvchdr =(PJUVCHDR) cmd;
 
   
-	ret = GetDevConfigDesc(fd ,buf);
+	ret = GetDevConfigDesc(pudev->fd ,buf);
   
 	if(ret <= 0){
 		printf("Get dev config failed \n");
@@ -1253,7 +1244,7 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
 	}
 	
   
-	if(GetDevString(fd,Mf,Pt,juvchdr->c.Rsvd) < 0){
+	if(GetDevString(pudev->fd,Mf,Pt,juvchdr->c.Rsvd) < 0){
 		printf("Get dev string failed \n");
 		return -1;
 	}
@@ -1317,7 +1308,7 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
 		
 	}
 
-	enum_uvc_device(fd,pfl);
+	enum_uvc_device(pudev->fd,pfl);
 	
 	if(pfl->index == 0){
 		return -1;
@@ -1374,7 +1365,7 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
 	printf("yuv_res_bitfield = %x\n",yuv_res_bitfield);  
 	printf("nv12_res_bitfield = %x\n",nv12_res_bitfield);  
 
-	ret = v4l2_get_control_info(fd,(char*)puci);
+	ret = v4l2_get_control_info(pudev->fd,(char*)puci);
 	if(ret <= 0){
 		return -1;
 	}
@@ -1424,24 +1415,7 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
 
 }
 
-void *uvc_detect_system(void *lp)
-{
-	struct uvcdev* pudev = (struct uvcdev*) lp;
-	pudev->uvc_detcet_run = 1;
-	char dev_name[256]="/dev/video0";
-    struct stat st;
-    printf("uvc_detect_system \n");
-    while(pudev->uvc_detcet_run){
-		if(0 == access(dev_name, 0)){
-			sleep(2);
-			continue;
-    	}
-	    closeSocket(pudev->cmd_socket);
-		break;
-    }
-	pudev->uvc_detcet_run =0;
-	printf("uvc_detect_leave \n");
-}
+
 
 
 void* uvc_cmd_system(void *lp)
@@ -1452,47 +1426,31 @@ void* uvc_cmd_system(void *lp)
 	struct uvcdev* pudev = (struct uvcdev*) lp;
 	struct format_list fl;
 	struct uvc_ctrl_info uci ;
-	pthread_t uvc_detect;
 	
 	int sformat = 0 ;
 	int sw = 0;
 	int sh = 0;
-	int cmd_fd = 0;
 	pudev->cmd_thread_run = 1;
     while(pudev->cmd_thread_run)
     {
-    	
-		
-		CLEAR(fl);
-		CLEAR(uci);
-        pudev->uvcver = 0;
-        pudev->w = 0;
-		pudev->h = 0;
-		cmd_fd = open_device();
-        if(cmd_fd <= 0){
+        if(pudev->fd <= 0){
 			sleep(1);
 			continue;
         }
 		
+		CLEAR(fl);
+		CLEAR(uci);
+        pudev->uvcver = 0;
+		
 		pudev->cmd_socket= TcpConnect("10.10.10.254",GADGET_CONTROL_PORT,0);//UdpInit();
 		if(pudev->cmd_socket < 0){
 			printf("Tcp cmd link failed\n");
-			close(cmd_fd);
-			cmd_fd = 0;
-			sleep(1);
+			sleep(3);
 			continue;
 		}
 		printf("Tcp cmd link successful\n");
-		
-		if (pthread_create(&uvc_detect, NULL,uvc_detect_system,lp) != 0) {
-			printf("Error creating uvc_cmd_system\n");
-			close(cmd_fd);
-			cmd_fd = 0;
-			closeSocket(pudev->cmd_socket);
-			continue;
-		}
-       
-		sem_post(&audio_mutex);  
+        
+		 
 		pudev->cmd_active = 1;
 		while(pudev->cmd_active){
 	        ret = TcpRead(pudev->cmd_socket,cmd,32);
@@ -1500,11 +1458,6 @@ void* uvc_cmd_system(void *lp)
                 printf("cmd read sokcet failed \n");
 				system("gpio l 14 4000 0 1 0 4000");
 				system("date > /tmp/uvcclient_disconnect");
-				close(cmd_fd);
-				cmd_fd = 0;
-				pudev->video_active = 0;
-				pudev->audio_active= 0;
-				pudev->uvc_detcet_run = 0;
 				break;
 	        }
             PJUVCHDR pjuvchdr = (PJUVCHDR)cmd;
@@ -1531,12 +1484,11 @@ void* uvc_cmd_system(void *lp)
 						pudev->w = sw ;
 						pudev->h = sh ;
 						pudev->video_active= 0;
-						sem_post(&video_mutex);
-                        pudev->uvc_detcet_run = 0;   
+
 						break;
 					case JUVC_CONTROL_CAMERAINFO:
-                        printf("JUVC_CONTROL_CAMERAINFO \n");
-						if(SendUvcInfo(cmd_fd,pudev,&fl,&uci) <=0){
+
+						if(SendUvcInfo(pudev,&fl,&uci) <=0){
 						 	printf("set SendUvcInfo failed \n");
 							break;
 			        	}
@@ -1624,7 +1576,7 @@ void* uvc_cmd_system(void *lp)
 						    }
 
 							
-							ret = v4l2_control_transfer(cmd_fd,pjuvchdr->c.UvcControl.bmRequestType,pjuvchdr->c.UvcControl.bRequest,pjuvchdr->c.UvcControl.wValue,
+							ret = v4l2_control_transfer(pudev->fd,pjuvchdr->c.UvcControl.bmRequestType,pjuvchdr->c.UvcControl.bRequest,pjuvchdr->c.UvcControl.wValue,
 																				pjuvchdr->c.UvcControl.wIndex,data,pjuvchdr->c.UvcControl.wLength);
 							if(ret <= 0){
 								
@@ -1681,7 +1633,7 @@ void* uvc_cmd_system(void *lp)
 							}
 							
 							
-							ret = v4l2_control_transfer(cmd_fd,pjuvchdr->c.UvcControl.bmRequestType,pjuvchdr->c.UvcControl.bRequest,pjuvchdr->c.UvcControl.wValue,
+							ret = v4l2_control_transfer(pudev->fd,pjuvchdr->c.UvcControl.bmRequestType,pjuvchdr->c.UvcControl.bRequest,pjuvchdr->c.UvcControl.wValue,
 														pjuvchdr->c.UvcControl.wIndex,data,pjuvchdr->c.UvcControl.wLength);
 
 							if(ret != pjuvchdr->c.UvcControl.wLength){
@@ -1737,13 +1689,11 @@ void* uvc_video_system(void *lp)
 	int ret = 0 ;
 	unsigned  long diff = 0;
 	struct uvcdev* pudev = (struct uvcdev*) lp;
-
+	
 	pudev->video_thread_run = 1;
 	while(pudev->video_thread_run){
 
-
-		sem_wait(&video_mutex);
-		
+		pudev->udpsocket = 0;
 		pudev->fd = open_device();
 	    if(pudev->fd <= 0 ){
 			sleep(1);
@@ -1812,6 +1762,11 @@ void* uvc_video_system(void *lp)
     
 	    pudev->video_active= 1;
 		pudev->video_id = 0;
+		
+		
+		
+		
+				
 				
 				
 		while(pudev->video_active){
@@ -1823,7 +1778,6 @@ void* uvc_video_system(void *lp)
 		
 			if(readframe(pudev) < 0){
 		  		//printf("readframe  failed \n");
-		  		
 				closeSocket(pudev->cmd_socket);
 		  	 	break;
 		  	}
@@ -1842,7 +1796,7 @@ void* uvc_video_system(void *lp)
 	
         close_device(pudev);
 		closeSocket(pudev->udpsocket);
-		printf("video active stop \n");
+		
 		//closeSocket(pudev->hsocket);
         sleep(1);
 
@@ -1862,9 +1816,6 @@ void* uvc_audio_system(void *lp)
 	
 	pudev->audio_thread_run = 1;
 	while(pudev->audio_thread_run){
-        sem_wait(&audio_mutex);
-
-		 
 		if(0 != access("/proc/asound/card1/stream0", 0)){
 			sleep(3);
 			continue;
@@ -1890,9 +1841,8 @@ void* uvc_audio_system(void *lp)
 		ap.run = &pudev->audio_active;
 		RunAudioCapture(&ap);
 		closeSocket(ap.socket);
-		printf("audio active stop \n");
         sleep(1); // wait  access  stream0
-	    
+	
 	}
     printf("Leave uvc_audio_system \n");
 }
@@ -2217,7 +2167,6 @@ int main(int argc, char **argv)
     pthread_t uvc_video;
 	pthread_t uvc_cmd;
     pthread_t usb_paser;
-    
     uint16_t vid , pid;  
 	
 	int ret = 0;	
@@ -2229,10 +2178,8 @@ int main(int argc, char **argv)
 	g_udev.fd = 0;
 	g_udev.force_format = 1;
 	g_udev.format = V4L2_PIX_FMT_MJPEG;
-	g_udev.w = 0;
-	g_udev.h = 0;
-	sem_init(&video_mutex, 0, 0);
-	sem_init(&audio_mutex, 0, 0);
+	g_udev.w = 1280;
+	g_udev.h = 720;
 /*
 	g_udev.fd = open_device();
 	GetDevVidPid(g_udev.fd,&g_udev.vid,&g_udev.pid);
