@@ -1839,10 +1839,10 @@ void* uvc_video_system(void *lp)
 
         }
     
-	    pudev->video_active= 1;
+	    
 		pudev->video_id = 0;
 				
-				
+		pudev->video_active= 1;		
 		while(pudev->video_active){
 			
 			if(pudev->video_id == 0){
