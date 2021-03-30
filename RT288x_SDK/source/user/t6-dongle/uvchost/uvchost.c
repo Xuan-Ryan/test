@@ -1218,6 +1218,7 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
     unsigned char   yuv_res_bitfield   = 0;
     unsigned char   nv12_res_bitfield  = 0;
 	int j5uvc = 0;
+	int microsoft = 0;
     CLEAR(Mf);
 	CLEAR(Pt);
 	PJUVCHDR juvchdr =(PJUVCHDR) cmd;
@@ -1266,6 +1267,8 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
      }else if(pudev->vid == 0x0711 && pudev->pid == 0x3106 ){
         printf("webcan jvcu100 \n");
         j5uvc= 1;
+     }else if(pudev->vid == 0x045E && pudev->pid == 0x0772){
+		microsoft = 1;
      }
 	
 	//printf("vid = %x \n",pudev->vid);
@@ -1942,9 +1945,10 @@ void* uvc_audio_system(void *lp)
 		}
 		
 #ifndef WRITE_FILE	
-		pudev->socket= UdpInit(); //TcpConnect("10.10.10.254",GADGET_MIC_PORT,3); //UdpInit(); 
+		pudev->socket=  UdpInit(); //TcpConnect("10.10.10.254",GADGET_MIC_PORT,3);
 		if(pudev->socket < 0){
 			printf("Tcp audio link failed\n");
+			closeSocket(pudev->cmd_socket);
 			sleep(3);
 			continue;
 		}
@@ -1961,6 +1965,7 @@ void* uvc_audio_system(void *lp)
 		ap.run = &pudev->audio_active;
 		RunAudioCapture(&ap);
 		closeSocket(ap.socket);
+		closeSocket(pudev->cmd_socket);
 		printf("audio active stop \n");
         sleep(1); // wait  access  stream0
 	    

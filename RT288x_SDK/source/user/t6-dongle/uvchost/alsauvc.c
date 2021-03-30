@@ -341,7 +341,7 @@ void RunAudioCapture(struct audio_para *par)
      
 
 		
-	   // printf("audio socket write r = %d  \n",ret);
+	    //printf("audio socket write r = %d  \n",ret);
 	
 		if(ret < 0){
 			printf("audio socket write failed \n");
@@ -355,7 +355,6 @@ END:
     	audio_resample_close((ReSampleContext*)par->resampleEngine);
 	if(capture_handle!= NULL)
 		snd_pcm_close(capture_handle);
-
 #ifdef WRITE_FILE	
     fclose(fp);
 #endif
@@ -497,7 +496,7 @@ void JudgeAudioResample(struct audio_para *par)
   	par->ch =1;
   par->page_size = par->rate[0] / 100;
   printf("par->ch = %d ,par->rate[0] = %d par->page_size =%d \n",par->ch,par->rate[0],par->page_size );
-  if(par->ch != 2 &&  par->rate[0] != 48000){
+  if(par->ch != 2 ||  par->rate[0] != 48000){
   	  printf("resample par->ch = %d ,par->rate[0] = %d \n",par->ch,par->rate[0]);
 	  par->resampleEngine =(void*) av_audio_resample_init(2, par->ch, 48000, par->rate[0], SAMPLE_FMT_S16, SAMPLE_FMT_S16, 16, 10, 0, 0.8);
 

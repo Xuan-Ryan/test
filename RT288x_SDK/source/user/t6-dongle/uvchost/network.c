@@ -275,11 +275,13 @@ int udpImageWrite(int sockfd ,char *ipaddr ,int port,char id ,char* image_data ,
 
 void closeSocket(int clientSocket)
 {
+	pthread_mutex_lock(&tcp_mutex);
 	if(clientSocket > 0){
 		printf("close socket = %d \n",clientSocket);
 		shutdown(clientSocket, SHUT_RDWR);
 		close(clientSocket);
-	}	
+	}
+	pthread_mutex_unlock(&tcp_mutex);
 	clientSocket = -1;
 }
 
