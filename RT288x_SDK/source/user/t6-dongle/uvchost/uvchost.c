@@ -68,6 +68,7 @@ void mysignal(int signo)
   g_udev.cmd_thread_run = 0;
   g_udev.cmd_active= 0;
   g_udev.uvc_detcet_run = 0;
+  g_udev.tcp_detcet_run = 0;
   sem_post(&video_mutex);
   sem_post(&audio_mutex);
   sem_destroy(&video_mutex);
@@ -79,7 +80,7 @@ void initsignal(void)
 {  
   struct sigaction act, act2;  
   signal(SIGPIPE, SIG_IGN);
-  
+
   act.sa_handler = mysignal;  
   act.sa_flags   = 0;  
   sigemptyset(&act.sa_mask);  
@@ -1263,7 +1264,7 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
         printf("webcan jvcu4335 \n");
         j5uvc= 1;
      }else if(pudev->vid == 0x0711 && pudev->pid == 0x3106 ){
-        printf("webcan jvcu4335 \n");
+        printf("webcan jvcu100 \n");
         j5uvc= 1;
      }
 	
@@ -1446,6 +1447,34 @@ void *uvc_detect_system(void *lp)
 	printf("uvc_detect_leave \n");
 }
 
+void *tcp_detect_system(void *lp)
+{
+	struct uvcdev* pudev = (struct uvcdev*) lp;
+	char cmd[32];
+	int  ret = 0;
+	pudev->tcp_detcet_run = 1;
+	PJUVCHDR pjuvchdr = (PJUVCHDR)cmd;
+    while(pudev->tcp_detcet_run){
+        pjuvchdr->Tag = JUVC_TAG;
+		pjuvchdr->XactType = JUVC_TYPE_ALIVE;
+		ret = TcpWrite(pudev->cmd_socket,cmd,32);
+		printf("tcp write ret = %d \n",ret);
+        if(ret <= 0){
+			printf("write socket failed \n");
+	    	closeSocket(pudev->cmd_socket);
+			break;
+        }
+		sleep(1);
+    }
+	pudev->tcp_detcet_run =0;
+	printf("tcp_detect_leave \n");
+
+
+
+
+}
+
+
 void uvc_default_setting(struct uvcdev* pudev)
 {
 	pudev->format = V4L2_PIX_FMT_MJPEG;
@@ -1464,6 +1493,7 @@ void* uvc_cmd_system(void *lp)
 	struct format_list fl;
 	struct uvc_ctrl_info uci ;
 	pthread_t uvc_detect;
+	pthread_t tcp_detect;
 	
 	int sformat = 0 ;
 	int sw = 0;
@@ -1502,7 +1532,15 @@ void* uvc_cmd_system(void *lp)
 			closeSocket(pudev->cmd_socket);
 			continue;
 		}
-       
+/*
+		if (pthread_create(&tcp_detect, NULL,tcp_detect_system,lp) != 0) {
+			printf("Error creating uvc_cmd_system\n");
+			close(cmd_fd);
+			cmd_fd = 0;
+			closeSocket(pudev->cmd_socket);
+			continue;
+		}
+*/       
 		sem_post(&audio_mutex);  
 		pudev->cmd_active = 1;
 		while(pudev->cmd_active){
@@ -1516,6 +1554,7 @@ void* uvc_cmd_system(void *lp)
 				pudev->video_active = 0;
 				pudev->audio_active= 0;
 				pudev->uvc_detcet_run = 0;
+				pudev->tcp_detcet_run = 0;
 				uvc_default_setting(pudev);
 				break;
 	        }

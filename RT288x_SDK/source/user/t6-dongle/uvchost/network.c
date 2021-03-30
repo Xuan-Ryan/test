@@ -9,6 +9,9 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/tcp.h> 
+#include <pthread.h>
+
+pthread_mutex_t tcp_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 
@@ -149,9 +152,14 @@ int TcpConnect(char* ipaddr ,int port ,int t)
 		setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,sizeof(timeout));
 	}else{
 		
-		int optval = 1;
-  		socklen_t optlen = sizeof(optval);
-		setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen);
+		int keepalive = 1;  // 開啟keepalive
+		int keepidle = 3;  // 空閒3s開始傳送檢測包（系統預設2小時）
+		int keepinterval = 1;  // 傳送檢測包間隔 1s（系統預設75s）
+		int keepcount = 5;  // 傳送次數如果5次都沒有迴應，就認定peer端斷開了。（系統預設9次）
+		setsockopt(sockfd, SOL_SOCKET,  SO_KEEPALIVE,&keepalive, sizeof(keepalive));
+		setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE,&keepidle, sizeof(keepidle));
+		setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL,&keepinterval, sizeof(keepinterval));
+		setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT,&keepcount, sizeof(keepcount));
 	}
     return sockfd;
     
@@ -163,17 +171,19 @@ int TcpWrite(int clientSocket,char *buffer, int size)
 	int length = sizeof(int);
 	int write_bytes = 0;
 	int offset = 0;
-
+    pthread_mutex_lock(&tcp_mutex);
 	do {
 		int write_ret = 0;
 		offset = write_bytes;
 		write_ret = write(clientSocket, buffer+offset, size-offset);
-		if(write_ret <= 0)
+		if(write_ret <= 0){
+			 pthread_mutex_unlock(&tcp_mutex);
 			return write_ret;
+		}
 		
 		write_bytes += write_ret;
 	}while(write_bytes < size);
-
+    pthread_mutex_unlock(&tcp_mutex);
 	return write_bytes;
 }
 
