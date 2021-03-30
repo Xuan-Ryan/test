@@ -191,7 +191,7 @@ LDWEBLIB += -lcrypto -lssl
 endif
 
 GET_CGI = web
-SET_CGI = internet.cgi wireless.cgi makeRequest.cgi firewall.cgi adm.cgi media.cgi
+SET_CGI = internet.cgi wireless.cgi makeRequest.cgi firewall.cgi adm.cgi media.cgi onlinetest.cgi
 ifeq ($(shell [[ "$(CONFIG_MTK_VOIP)" == "y" || "$(CONFIG_MTK_TR069)" == "y" ]] && echo true), true)
 SET_CGI += voip.cgi tr069.cgi tr069upload_ca.cgi tr069upload_cc.cgi
 endif
