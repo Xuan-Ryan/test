@@ -677,6 +677,11 @@ function confirm_update()
 
 function update_fw()
 {
+	/*stop_service();*/
+	/*  load the firmware page  */
+	window.location.href = 'upload_firmware.shtml?time='+Math.random()*10000000000000000;
+	return;
+
 	var i = 0;
 	var w = $(window).width();
 	var h = $(window).height();
@@ -1273,6 +1278,26 @@ function init_ssid()
 	});
 }
 
+function stop_service()
+{
+	var url = '/cgi-bin/onlinetest.cgi';
+	var formdata = {
+		'page'         : 'onlinetest',
+		'item'         : 'stop_service',
+	};
+
+	$.ajax({
+		url               : url,
+		type              : 'POST',
+		data              : formdata,
+		cache             : false,
+		timeout           : 0
+	}).done(function(data) {
+		console.info('service stop');
+	}).error(function(jqXHR, textStatus, errorThrown) {
+	});
+}
+
 /* Onload */
 function initValue()
 {
@@ -1294,9 +1319,14 @@ function initValue()
 
 	init_model_name();
 
-	get_result();
+	/*stop_service();*/
+
+	/* get_result(); */
 
 	setTimeout(closeModal, 300);
+
+	/*  clear parameter of GET method  */
+	window.history.replaceState({}, '', '/');
 }
 
 function cancel_btn()
