@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include "upload.h"
 #include <string.h>
 
@@ -201,13 +202,14 @@ void javascriptUpdate(int success)
 	if(success){
 		printf(" \
 function refresh_all(){	\
-  top.location.href = \"http://%s\"; \
+  window.location.href = \"http://%s\"; \
 } \
 function update(){ \
+  console.info('%s'); \
   self.setTimeout(\"refresh_all()\", %s);\
-}", getLanIP(), REFRESH_TIMEOUT);
+}", getLanIP(), getLanIP(), REFRESH_TIMEOUT);
 	}else{
-		printf("function update(){ parent.menu.setLockMenu(0);}");
+		printf("function update(){ window.history.replaceState({}, '', '/'); }");
 	}
 	printf("</script>");
 }
@@ -216,7 +218,6 @@ inline void webFoot(void)
 {
 	printf("</body></html>\n");
 }
-
 
 int main (int argc, char *argv[])
 {
@@ -243,7 +244,7 @@ getenv("SERVER_SOFTWARE"));
 <html>\n\
 <head>\n\
 <TITLE>Upload Firmware</TITLE>\n\
-<link rel=stylesheet href=/style/normal_ws.css type=text/css>\n\
+<link rel=stylesheet href=/css/normal_ws.css type=text/css>\n\
 <meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\">\n\
 </head>\n\
 <body onload=\"update()\"> <h1> Upload Firmware</h1>");

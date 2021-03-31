@@ -1111,3 +1111,68 @@ sleep_again:
 }
 //#endif
 
+void web_header(void)
+{
+	printf("Content-Type:text/plain;charset=utf-8\n\n");
+}
+
+void parse_info(char * file_name, UPDATEINFO * info)
+{
+	unsigned int new_ver = 0;
+	FILE * fp = NULL;
+	char buf[256];
+	char * p = NULL;
+
+	fp = fopen(file_name, "r");
+	if (fp) {
+		info->result = 1;
+		//  skip first line
+		fgets(buf, sizeof(buf), fp);
+		while (fgets(buf, sizeof(buf), fp)) {
+			if ((p=strchr(buf, '='))) {
+				//  skip to " = "
+				while (*++p == ' ');
+				//  remove \n
+				if (p[strlen(p)-1] == '\n') 
+					p[strlen(p)-1] = '\0';
+				if (strstr(buf, "me") && strstr(buf, "me") == buf) {
+					strcpy(info->project_name, p);
+				} else if (strstr(buf, "Date")) {
+					strcpy(info->date, p);
+				} else if (strstr(buf, "Version")) {
+					strcpy(info->version, p);
+				} else if (strstr(buf, "PathName")) {
+					strcpy(info->path_name, p);
+				} else if (strstr(buf, "Size")) {
+					info->file_size = atoi(p);
+				}
+			}
+		}
+		fclose(fp);
+	} else {
+		info->result = 0;
+	}
+}
+
+char * extract_version(char * str)
+{
+	char * p = str;
+	int len = strlen(str);
+	if (str) {
+		while(len--) {
+			if(*p == '=') 
+				return p+1;
+			p++;
+		}
+	}
+	return "";
+}
+
+void remove_carriage(char * str)
+{
+	int len = strlen(str);
+	while(len--) {
+		if (str[len] == 0x0D || str[len] == 0x0A)
+			str[len] = '\0';
+	}
+}

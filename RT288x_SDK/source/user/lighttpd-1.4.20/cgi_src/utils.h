@@ -1,7 +1,12 @@
 #ifndef HAVE_UTILS_H
 #define HAVE_UTILS_H
 
+#include <fcntl.h>
+#include <arpa/inet.h>
+#include <sys/mman.h>
+
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "nvram.h"
@@ -94,6 +99,52 @@ char *web_get(char *tag, char *input, int dbg);
 						fprintf(log_fp, "%s:%s:%d:" fmt "\n", __FILE__, __func__, __LINE__, ##arg); \
 						fclose(log_fp); \
 					} while(0)
+/*
+ *  Uboot image header format
+ *  (ripped from mkimage.c/image.h)
+ */
+#define STATUS_FILE "/var/updateSta"
+#define IH_MAGIC    0x27051956
+#define IH_NMLEN    32
+typedef struct image_header {
+    uint32_t    ih_magic;   /* Image Header Magic Number    */
+    uint32_t    ih_hcrc;    /* Image Header CRC Checksum    */
+    uint32_t    ih_time;    /* Image Creation Timestamp */
+    uint32_t    ih_size;    /* Image Data Size      */
+    uint32_t    ih_load;    /* Data  Load  Address      */
+    uint32_t    ih_ep;      /* Entry Point Address      */
+    uint32_t    ih_dcrc;    /* Image Data CRC Checksum  */
+    uint8_t     ih_os;      /* Operating System     */
+    uint8_t     ih_arch;    /* CPU architecture     */
+    uint8_t     ih_type;    /* Image Type           */
+    uint8_t     ih_comp;    /* Compression Type     */
+    uint8_t     ih_name[IH_NMLEN];  /* Image Name       */
+} image_header_t;
+
+typedef struct trigger_header {
+	uint8_t     tag[4];
+	uint32_t    size;
+	uint32_t    checksum;
+	uint8_t     version;
+	uint8_t     reserved[3];
+} trigger_header_t;
+
+typedef struct _updateinfo {
+	int result;
+	int need_update;
+	char project_name[256];
+	char date[32];
+	char version[64];
+	char path_name[PATH_MAX];
+	unsigned int file_size;
+} UPDATEINFO;
+
+int convert_ver(const char * ver);
+int convert_t6ver(const char * ver);
+unsigned int extract_t6ver(char * dpinfo);
+void parse_info(char * file_name, UPDATEINFO * info);
+char * extract_version(char * str);
+void remove_carriage(char * str);
 
 void lookupAllList(char *dir_path);
 void lookupSelectList(void);
