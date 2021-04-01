@@ -262,7 +262,7 @@ ifeq	($(CONFIG_ROOTFS_IN_FLASH_NO_PADDING),y)
 	ENTRY=`readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}'` ; \
 	$(CUR_DIR)/mkimage -A mips -O linux -T kernel -C $(COMP) -a 80000000 -e $$ENTRY -k $$KRN_SIZE -n "Linux Kernel Image" -d $(KERNELZ).$(COMP) $(IMAGE)
 else
-	@cd $(IMAGEDIR) ; $(CUR_DIR)/mkimage -A mips -O linux -T kernel -C $(COMP) -a 80000000 -e $(shell readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}') -k `ls $(KERNELZ).$(COMP) -l | awk '{print $$5}'` -n '$(__MODEL)=$(__VERSION)' -d $(KERNELZ).$(COMP) $(IMAGE);cp $(IMAGE) $(FINAL_IMAGE) ; \
+	@cd $(IMAGEDIR) ; $(CUR_DIR)/mkimage -A mips -O linux -T kernel -C $(COMP) -a 80000000 -e $(shell readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}') -k `ls $(KERNELZ).$(COMP) -l | awk '{print $$5}'` -n '$(__MODEL):$(__TYPE):$(__VERSION)' -d $(KERNELZ).$(COMP) $(IMAGE);cp $(IMAGE) $(FINAL_IMAGE) ; \
 	echo 'Current Type is $(__TYPE)'
 endif
 
