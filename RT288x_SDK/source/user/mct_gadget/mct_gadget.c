@@ -26,6 +26,9 @@
 
 #include "mct_gadget.h"
 #include "uvcdev.h"
+#ifndef SUPPORT_RING_ELEMENT
+#include "queue.h"
+#endif
 
 //  Added by Tiger
 #include "ralink_gpio.h"
@@ -34,8 +37,6 @@
 #endif
 
 sem_t video_write_mutex;
-
-#define AUDIO_USES_TCP                   0
 
 /*  I2S device  */
 int i2s_fd = -1;
@@ -51,7 +52,7 @@ static int client_connected = 0;
 /*  udp  */
 int udp_broadcast_socket = -1;
 int udp_video_socket = -1;
-#if 		AUDIO_USES_TCP
+#ifdef AUDIO_USES_TCP
 int tcp_mic_socket = -1;
 int tcp_spk_socket = -1;
 #else
@@ -93,10 +94,19 @@ char rxbuffer[I2S_PAGE_SIZE];
 #endif
 
 static int exited = 0;
-static char video_buffer[RAING_NUM][JUVC_MAX_VIDEO_PACKET_SIZE];
-static int total_size[RAING_NUM];
+
+#ifdef SUPPORT_RING_ELEMENT
+static char video_buffer[RING_NUM][JUVC_MAX_VIDEO_PACKET_SIZE];
+static int total_size[RING_NUM];
 static int copying = 0;
 static int done = 0;
+#else
+static char video_buffer[JUVC_MAX_VIDEO_PACKET_SIZE];
+static int total_size = 0;
+
+queue_t * queue = NULL;
+
+#endif
 
 extern struct uvc_state mct_uvc_data;
 extern unsigned char gSetDirBuff[MCT_UVC_NOTIFY_SIZE];
@@ -145,7 +155,11 @@ static void load_bg(void)
 					sprintf(full_name, "/home/bg/%s/%s", lang, BG_FILENAME720P);
 			}
 		} else {
+#ifdef SUPPORT_RING_ELEMENT
 			total_size[0] = 0;
+#else
+			total_size = 0;
+#endif
 			return;
 		}
 	} else {
@@ -166,17 +180,29 @@ static void load_bg(void)
 					sprintf(full_name, "/home/bg/en-us/%s", BG_FILENAME720P);
 			}
 		} else {
+#ifdef SUPPORT_RING_ELEMENT
 			total_size[0] = 0;
+#else
+			total_size = 0;
+#endif
 			return;
 		}
 	}
 
 	fp = fopen(full_name, "r");
 	if (fp) {
+#ifdef SUPPORT_RING_ELEMENT
 		total_size[0] = fread(video_buffer[0], 1, JUVC_MAX_VIDEO_PACKET_SIZE, fp);
+#else
+		total_size = fread(video_buffer, 1, JUVC_MAX_VIDEO_PACKET_SIZE, fp);
+#endif
 		fclose(fp);
 	} else {
+#ifdef SUPPORT_RING_ELEMENT
 		total_size[0] = 0;
+#else
+		total_size = 0;
+#endif
 	}
 }
 
@@ -188,7 +214,7 @@ static void close_socket()
 		close(tcp_ctrl_socket);
 		tcp_ctrl_socket = -1;
 	}
-#if AUDIO_USES_TCP
+#ifdef AUDIO_USES_TCP
 	if (tcp_mic_socket > -1) {
 		close(tcp_mic_socket);
 		tcp_mic_socket = -1;
@@ -226,13 +252,10 @@ static void close_socket()
 
 static int init_tcp_socket(unsigned short port)
 {
-	int on = 1;
+	int optval = 1;
 	struct sockaddr_in serveraddr;
 	int tcp_socket = -1;
-
 	//struct timeval tv;
-	//memset(&tv, '\0', sizeof(tv));
-	//tv.tv_sec = TCP_TIME_OUT;
 
 	/* create sockett */
 	tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -241,14 +264,18 @@ static int init_tcp_socket(unsigned short port)
 		return -1;
 	}
 
+	//memset(&tv, '\0', sizeof(tv));
+	//tv.tv_sec = TCP_TIME_OUT;
 	//setsockopt(tcp_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-	setsockopt(tcp_socket, IPPROTO_TCP, TCP_NODELAY, (char *)&on, sizeof(on));
-	if(setsockopt(tcp_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on)) < 0) {
-		DBG_MSG("Server-setsockopt() error");
-		close(tcp_socket);
-		tcp_socket = -1;
-		return -1;
-	}
+	setsockopt(tcp_socket, IPPROTO_TCP, TCP_NODELAY, (char *)&optval, sizeof(optval));
+	setsockopt(tcp_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&optval, sizeof(optval));
+	setsockopt(tcp_socket, SOL_SOCKET, SO_KEEPALIVE, (char *)&optval, sizeof(optval));
+	optval = 3;  // when idling over 3s then sending keepalive probes.(the default value is 2h)
+	setsockopt(tcp_socket, IPPROTO_TCP, TCP_KEEPIDLE, (char *)&optval, sizeof(optval));
+	optval = 3;  // every 3 sec between individual keepalive probes.(the default value is 75s)
+        setsockopt(tcp_socket, IPPROTO_TCP, TCP_KEEPINTVL, (char *)&optval, sizeof(optval));
+	optval = 5;  // 5 of the keepalive probes TCP should send before dropping the connection. .(the default value is 9)
+        setsockopt(tcp_socket, IPPROTO_TCP, TCP_KEEPCNT, (char *)&optval, sizeof(optval));
 
 	/* initialize structure serveraddr */
 	bzero(&serveraddr, sizeof(serveraddr));
@@ -530,6 +557,10 @@ void * video_status_thread(void * arg)
 					else
 						is_yuv = 0;
 					send_command(JUVC_CONTROL_CAMERACTRL, mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3], 0, 0);
+					i2s_stop = 0;
+				} else if (mct_uvc_data.status == 2) {
+					//  stop streaming
+					i2s_stop = 1;
 				}
 #if MCT_PROTORCOL_VER_2
 			} else {  /*  for video control  */
@@ -646,7 +677,10 @@ void usb_hub_reset(int plugin)
 
 	system("web gpio 53 0");  //  pull low to disable USB hub
 
-	sleep(2);
+	if (plugin == 1)
+		sleep(2);
+	else
+		sleep(1);
 
 	system("web gpio 53 1");  //  pull high to enable USB hub
 	if (plugin == 0) {
@@ -671,6 +705,28 @@ void LED_control(int type)
 	}
 }
 
+int setTimer(int sec)
+{
+	struct itimerval value, ovalue;
+
+	value.it_value.tv_sec = sec;
+	value.it_value.tv_usec = 0;
+	value.it_interval.tv_sec = sec;
+	value.it_interval.tv_usec = 0;
+	return setitimer(ITIMER_REAL, &value, &ovalue);
+}
+
+void stopTimer(void)
+{
+	struct itimerval value, ovalue;
+
+	value.it_value.tv_sec = 0;
+	value.it_value.tv_usec = 0;
+	value.it_interval.tv_sec = 0;
+	value.it_interval.tv_usec = 0;
+	setitimer(ITIMER_REAL, &value, &ovalue);
+}
+
 static void * video_control_thread(void * arg)
 {
 	int ret = -1;
@@ -679,7 +735,6 @@ static void * video_control_thread(void * arg)
 	JUVCHDR juvchdr;
 	int l = sizeof(JUVCHDR);
 	int optval = 1;
-	socklen_t optlen = sizeof(optval);
 	UVC_CAPABILITIES_DATA cap_data;
 	char data[256];
 
@@ -698,6 +753,14 @@ static void * video_control_thread(void * arg)
 			sleep(1);
 			continue;
 		}
+		optval = 1;
+		setsockopt(tcp_control_clnsd, SOL_SOCKET, SO_KEEPALIVE, (char *)&optval, sizeof(optval));
+		optval = 3;
+		setsockopt(tcp_control_clnsd, IPPROTO_TCP, TCP_KEEPIDLE, (char *)&optval, sizeof(optval));
+		optval = 3;
+		setsockopt(tcp_control_clnsd, IPPROTO_TCP, TCP_KEEPINTVL, (char *)&optval, sizeof(optval));
+		optval = 5;
+		setsockopt(tcp_control_clnsd, IPPROTO_TCP, TCP_KEEPCNT, (char *)&optval, sizeof(optval));
 
 		/*  maybe we don't need to wait for this, anyway, just check it out  */
 		if (!wait_setting_done()) {
@@ -708,7 +771,6 @@ static void * video_control_thread(void * arg)
 		PRINT_MSG("mct_gadget: client connected\n");
 		client_connected = 1;
 		sleep(1);
-		setsockopt(tcp_control_clnsd, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen);
 		ret = send_command(JUVC_CONTROL_CAMERAINFO, mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3], 0, 0);
 
 		while(exited == 0) {
@@ -716,7 +778,7 @@ static void * video_control_thread(void * arg)
 			if (ret == 0) {
 				/*  close by the client side, we need to jump out this loop  */
 				close(tcp_control_clnsd);
-				tcp_control_clnsd = 0;
+				tcp_control_clnsd = -1;
 				break;
 			}
 			DBG_MSG("mct_gadget: %d, ret = %d\n" , __LINE__, ret);
@@ -749,7 +811,6 @@ static void * video_control_thread(void * arg)
 						//DBG_MSG("process : %02x %02x %02x\n", juvchdr.CamaraInfo.process[0]&0xff, juvchdr.CamaraInfo.process[1]&0xff, juvchdr.CamaraInfo.process[2]&0xff);
 						usb_hub_reset(1);
 						LED_control(1);
-						i2s_stop = 0;
 					} else if (juvchdr.Flags == JUVC_CONTROL_MANUFACTURER) {
 						char buffer[256];
 						read(tcp_control_clnsd, buffer, juvchdr.TotalLength);
@@ -785,15 +846,16 @@ static void * video_control_thread(void * arg)
 		}
 		ioctl_uvc(UVC_CLIENT_LOST, NULL);
 		PRINT_MSG("mct_gadget: client disconnected\n");
-		tcp_control_clnsd = -1;
 		client_connected = 0;
 		i2s_stop = 1;
 		usb_hub_reset(0);
 		LED_control(0);
 		system("web gpio 11 1");  //  push hi to disable CP2615
+#ifdef SUPPORT_RING_ELEMENT
 		memset(total_size, '\0', sizeof(total_size));
 		copying = 0;
 		done = 0;
+#endif
 	}
 
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
@@ -837,43 +899,55 @@ void * broadcast_thread(void * arg)
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
 }
 
-#define FOR_TEST  0
-
-#if FOR_TEST
-int test_image(char * buf, int max)
-{
-	FILE * fp = NULL;
-	int n = 0;
-	fp = fopen("/bin/1280x720.jpg", "r");
-	if (fp) {
-		n = fread(buf, 1, max, fp);
-		fclose(fp);
-	}
-	return n;
-}
-#endif
-
 void * video_write_thread(void * arg)
 {
 	DBG_MSG("mct_gadget: %s go\n", __FUNCTION__);
+#ifndef SUPPORT_RING_ELEMENT
+	PVIDEO_FRAME frame = NULL;
+#endif
 
 	while(exited == 0) {
 		if (udp_video_socket <= -1) {
 			sleep(1);
 			continue;
 		}
+#ifdef SUPPORT_RING_ELEMENT
 		sem_wait(&video_write_mutex);
-		if (is_yuv == 0)
+#else
+		if (queue_length(queue) <= 0){
+			usleep(1000);
+			continue;
+		}
+		frame = (PVIDEO_FRAME)queue_remove(queue);
+#endif
+		if (is_yuv == 0) {
+#ifdef SUPPORT_RING_ELEMENT
 			write_uvc(video_buffer[done], total_size[done]);
-		else
+#else
+			if (frame)
+				write_uvc(frame->buf, frame->length);
+#endif
+		} else {
+#ifdef SUPPORT_RING_ELEMENT
 			write_uvc4yuv(video_buffer[done], total_size[done]);
+#else
+			if (frame)
+				write_uvc4yuv(frame->buf, frame->length);
+#endif
+		}
+#ifndef SUPPORT_RING_ELEMENT
+		if (frame) {
+			free_video_frame(frame);
+			frame = NULL;
+		}
+#endif
 	}
 
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
 }
 
-#define COUNTING_FPS					0
-#if COUNTING_FPS
+//#define COUNTING_FPS					1
+#ifdef COUNTING_FPS
 struct timeval tv;					/*  for time calculation  */
 unsigned long long start_t =0, end_t =0, period=0, pre_period=0;
 int count_num = 0;					/*  Encoded frame count  */
@@ -892,23 +966,14 @@ void * video_thread(void * arg)
 	int first_time = 1;
 	char buffer[JUVC_UDP_PKT_SIZE];
 	unsigned char xid = 0;
+#ifndef SUPPORT_RING_ELEMENT
+	int frame_size = 0;
+	PVIDEO_FRAME frame = NULL;
+#endif
 
 	DBG_MSG("mct_gadget: %s go\n", __FUNCTION__);
 
-#if FOR_TEST
-	total_size[0] = test_image(video_buffer[0], JUVC_MAX_VIDEO_PACKET_SIZE);
-	PRINT_MSG("total_size = %d\n", total_size[0]);
-#endif
-
 	while(exited == 0) {
-#if FOR_TEST
-		if (total_size[0] > 0) {
-			if (write_uvc(video_buffer[0], total_size[0]) > 0) {
-				sleep(1);
-				continue;
-			}
-		}
-#else
 		if (udp_video_socket <= -1) {
 			sleep(1);
 			continue;
@@ -918,39 +983,92 @@ void * video_thread(void * arg)
 			/*  read from socket;  */
 			memset(&from, '\0', sizeof(struct sockaddr_in));
 			n = recvfrom(udp_video_socket, buffer, JUVC_UDP_PKT_SIZE, 0, (struct sockaddr*)&from, &len);
+ 
 			if (n <= 0) {
+#ifndef SUPPORT_RING_ELEMENT
+				if (frame) {
+					free_video_frame(frame);
+					frame = NULL;
+				}
+#endif
 				continue;
 			}
-#if COUNTING_FPS
+#ifdef COUNTING_FPS
 			data_size += n;
 #endif
 			header = (PJUVCHDR)buffer;
 			if (first_time == 1) {
 				if (header->XactOffset != 0) {
+#ifndef SUPPORT_RING_ELEMENT
+					if (frame) {
+						free_video_frame(frame);
+						frame = NULL;
+					}
+#endif
 					continue;  /*  drop this packet  */
 				} else {
 					first_time = 0;
+#ifdef SUPPORT_RING_ELEMENT
 					memcpy(video_buffer[copying], buffer+sizeof(JUVCHDR), header->PayloadLength);
 					total_size[copying] = header->PayloadLength;
+#else
+					if (frame) {
+						free_video_frame(frame);
+						frame = NULL;
+					}
+					frame = allocate_video_frame(header->TotalLength);
+					if (frame == NULL)
+						continue;
+					memcpy(frame->buf, buffer+sizeof(JUVCHDR), header->PayloadLength);
+					frame_size = header->PayloadLength;
+#endif
 					xid = header->XactId;
 				}
 			} else {
 				if (header->XactOffset == 0) {
+#ifdef SUPPORT_RING_ELEMENT
 					memcpy(video_buffer[copying], buffer+sizeof(JUVCHDR), header->PayloadLength);
 					total_size[copying] = header->PayloadLength;
+#else
+					if (frame) {
+						free_video_frame(frame);
+						frame = NULL;
+					}
+					frame = allocate_video_frame(header->TotalLength);
+					if (frame == NULL)
+						continue;
+ 					memcpy(frame->buf, buffer+sizeof(JUVCHDR), header->PayloadLength);
+					frame_size = header->PayloadLength;
+#endif
 					xid = header->XactId;
 				} else {
 					if (xid != header->XactId) {
+#ifdef SUPPORT_RING_ELEMENT
 						DBG_MSG("packet failed: total_size = (%d/%d), offset = %d, xid = (%d/%d)\n", total_size[copying], header->TotalLength, header->XactOffset, xid, (unsigned int)header->XactId);
+#else
+						DBG_MSG("packet failed: total_size = (%d/%d), offset = %d, xid = (%d/%d)\n", frame_size, header->TotalLength, header->XactOffset, xid, (unsigned int)header->XactId);
+
+						if (frame) {
+							free_video_frame(frame);
+							frame = NULL;
+						}
+#endif
 						continue;
 					}
+#ifdef SUPPORT_RING_ELEMENT
 					memcpy(video_buffer[copying]+header->XactOffset, buffer+sizeof(JUVCHDR), header->PayloadLength);
 					total_size[copying] += header->PayloadLength;
+#else
+					memcpy(frame->buf+header->XactOffset, buffer+sizeof(JUVCHDR), header->PayloadLength);
+					frame_size += header->PayloadLength;
+#endif
 				}
 			}
+
+#ifdef SUPPORT_RING_ELEMENT
 			//DBG_MSG("total_size[%d] = (%d/%d), offset = %d, xid = %d\n", copying, total_size[copying], header->TotalLength, header->XactOffset, (unsigned int)header->XactId);
 			if (total_size[copying] >= header->TotalLength) {
-#if COUNTING_FPS
+ #ifdef COUNTING_FPS
 				count_num ++;
 				real_fps ++;
 				gettimeofday(&tv,NULL);
@@ -967,12 +1085,41 @@ void * video_thread(void * arg)
 					real_fps = 0;
 					data_size = 0;
 				}
-#endif
+ #endif
 				done = copying;
-				copying = ++copying%RAING_NUM;
+				copying = ++copying%RING_NUM;
 				sem_post(&video_write_mutex);
 			}
+#else
+			if (frame_size >= header->TotalLength) {
+ #ifdef COUNTING_FPS
+				count_num ++;
+				real_fps ++;
+				gettimeofday(&tv,NULL);
+				end_t = tv.tv_sec * 1000000 + tv.tv_usec;
+				period = end_t - start_t;
+
+				if (period - pre_period >= 1000000) {
+					pre_period = period;
+					PRINT_MSG("fps=%d (frames= %d), bps=%lld Kbps\n" \
+					, real_fps \
+					, count_num \
+					, (data_size>>7));  /*  this mean size/1024*8  */
+
+					real_fps = 0;
+					data_size = 0;
+				}
+ #endif				
+				if(queue_length(queue) <= QUEUE_NUM) {
+					queue_add(queue, (void*)frame);
+				} else {
+					free_video_frame(frame);
+				}
+				frame = NULL;
+			}
+#endif
 		} else {
+#ifdef SUPPORT_RING_ELEMENT
 			//DBG_MSG("total_size[0] = %d\n", total_size[0]);
 			if (total_size[0] > 0) {
 				if (is_yuv == 0) {
@@ -988,18 +1135,35 @@ void * video_thread(void * arg)
 				/*  failed to get the bg  */
 				sleep(1);
 			}
-		}
+#else
+			if (total_size > 0) {
+				if (is_yuv == 0) {
+					if (write_uvc(video_buffer, total_size) > 0) {
+						sleep(1);
+					}
+				} else {
+					if (write_uvc4yuv(video_buffer, total_size) > 0) {
+						sleep(1);
+					}
+				}
+			} else {
+				/*  failed to get the bg  */
+				sleep(1);
+			}
 #endif
+		}
 	}
 
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
 }
 
 //  for tcp
-#if AUDIO_USES_TCP
+#ifdef AUDIO_USES_TCP
 void * mic_thread(void * arg)
 {
 	int ret = 0;
+	int offset = 0;
+	int readbyte = 0;
 	struct sockaddr_in from;
 	int len = sizeof(from);
 	int tcp_mic_clnsd = 0;
@@ -1020,7 +1184,7 @@ void * mic_thread(void * arg)
 
 		if (client_connected == 1) {
 			/*  waiting for client  */
-			//DBG_MSG("waiting for client\n");
+			DBG_MSG("waiting for client\n");
 			memset(&from, '\0', sizeof(struct sockaddr_in));
 			tcp_mic_clnsd = accept(tcp_mic_socket, (struct sockaddr*)&from, &len);
 
@@ -1031,7 +1195,17 @@ void * mic_thread(void * arg)
 
 			while(exited == 0) {
 				/*  read from socket;  */
-				ret = read(tcp_mic_clnsd, mic_buffer, I2S_PAGE_SIZE);
+				ret = 0;
+				offset = 0;
+				readbyte = 0;
+				do {
+					ret = read(tcp_mic_clnsd, mic_buffer+offset, I2S_PAGE_SIZE-offset);
+					if (ret <= 0)
+						break;
+					readbyte += ret;
+					offset += ret;
+				} while(readbyte < I2S_PAGE_SIZE);
+
 				if (ret < 0) {
 					sleep(1);
 					/*  is timeout maybe we need to read again  */
@@ -1050,7 +1224,7 @@ void * mic_thread(void * arg)
 
 				/*  write to i2s  */
 				if (i2s_fd > 0) {
-					if (i2s_stop == 0)
+					if (i2s_stop == 0 && readbyte == I2S_PAGE_SIZE)
 						ioctl(i2s_fd, I2S_PUT_AUDIO, mic_buffer);
 				} else {
 					continue;
@@ -1181,6 +1355,10 @@ void * mic_thread(void * arg)
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
 }
 
+void * mct_write_thread(void * arg)
+{
+}
+
 void * spk_thread(void * arg)
 {
 	int n = 0;
@@ -1210,7 +1388,7 @@ void * spk_thread(void * arg)
 			}
 
 			/*  write to socket;  */
-			n = sendto(udp_spk_socket, spk_buffer, 0, I2S_PAGE_SIZE, &addr, addrlen);
+			n = sendto(udp_spk_socket, spk_buffer, 0, I2S_PAGE_SIZE, (struct sockaddr *)&addr, addrlen);
 			if (n <= 0) {
 				sleep(1);
 				continue;
@@ -1382,13 +1560,16 @@ static int create_thread()
 
 static int initialize_procedure(int argc, char **argv)
 {
-	//if (check_exist_inst() < 0)
-	//	return -1;
+	int optval = 0;
+	if (check_exist_inst() < 0)
+		return -1;
 
 	load_bg();
-	
+#ifdef SUPPORT_RING_ELEMENT
 	memset(total_size, '\0', sizeof(total_size));
-
+#else
+	queue = queue_create();
+#endif
 	if (init_uvc_dev() < 0)
 		return -1;
 
@@ -1402,7 +1583,7 @@ static int initialize_procedure(int argc, char **argv)
 	if ((tcp_ctrl_socket=init_tcp_socket((unsigned short)GADGET_CONTROL_PORT)) < 0) {
 		return -1;
 	}
-#if AUDIO_USES_TCP
+#ifdef AUDIO_USES_TCP
 	if ((tcp_mic_socket=init_tcp_socket((unsigned short)GADGET_MIC_PORT)) < 0) {
 		close_socket();
 		return -1;
@@ -1417,6 +1598,12 @@ static int initialize_procedure(int argc, char **argv)
 		close_socket();
 		return -1;
 	}
+	/*  set the buffer to 3072*3  */
+	optval = I2S_PAGE_SIZE*3 ;
+	if (setsockopt(udp_mic_socket, SOL_SOCKET, SO_RCVBUF, &optval, sizeof(optval)) == -1) {
+		close_socket();
+		return -1;
+        }
 
 	if ((udp_spk_socket=init_udp_socket((unsigned short)GADGET_SPK_PORT, 0)) < 0) {
 		close_socket();
@@ -1486,6 +1673,10 @@ static void close_procedure(void)
 	close_uvc();
 
 	close_i2s();
+#ifndef SUPPORT_RING_ELEMENT
+	releses_queue(queue);
+	queue_destroy(queue);
+#endif
 
 	sem_destroy(&video_write_mutex);
 }

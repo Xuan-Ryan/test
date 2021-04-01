@@ -2,6 +2,9 @@
 #define __MCT_GADGET__
 
 //#define SUPPORT_H264_FOR_TCP                    1
+//#define SUPPORT_RING_ELEMENT                    1
+//#define AUDIO_USES_TCP                          0
+
 #define GADGET_BROADCAST_PORT                   42776
 #define GADGET_CONTROL_PORT                     42777
 #define GADGET_CAMERA_PORT                      42800
@@ -24,7 +27,11 @@
 #define JUVC_UDP_PKT_SIZE                       32768
 #define JUVC_MAX_TCPCLIENT                      20
 
-#define RAING_NUM                               8
+#ifdef SUPPORT_RING_ELEMENT
+ #define RING_NUM                               4
+#else
+ #define QUEUE_NUM                              8
+#endif
 #define BG_FILENAME240P                         "bg-240p.jpg"
 #define BG_FILENAME480P                         "bg-480p.jpg"
 #define BG_FILENAME720P                         "bg-720p.jpg"
