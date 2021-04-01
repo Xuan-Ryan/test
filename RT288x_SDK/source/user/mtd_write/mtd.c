@@ -55,6 +55,18 @@ int quiet;
 int verbose;
 int write_check=1;
 
+char log_file[64] = "/var/mtd_write.log";
+static void write_to_file(unsigned ratio)
+{
+	FILE * fp = NULL;
+
+	fp = fopen(log_file, "w");
+	if (fp) {
+		fprintf(fp, "%d", ratio);
+		fclose(fp);
+	}
+}
+
 int mtd_check(char *mtd)
 {
 	struct mtd_info_user mtdInfo;
@@ -86,12 +98,14 @@ mtd_unlock(const char *mtd)
 	fd = mtd_open(mtd, O_RDWR | O_SYNC);
 	if(fd < 0) {
 		fprintf(stderr, "Could not open mtd device: %s\n", mtd);
+		write_to_file(-3);
 		exit(1);
 	}
 
 	if(ioctl(fd, MEMGETINFO, &mtdInfo)) {
 		fprintf(stderr, "Could not get MTD device info from %s\n", mtd);
 		close(fd);
+		write_to_file(-3);
 		exit(1);
 	}
 
@@ -145,19 +159,23 @@ mtd_erase(const char *mtd)
 	fd = mtd_open(mtd, O_RDWR | O_SYNC);
 	if(fd < 0) {
 		fprintf(stderr, "Could not open mtd device: %s\n", mtd);
+		write_to_file(-4);
 		exit(1);
 	}
 
 	if(ioctl(fd, MEMGETINFO, &mtdInfo)) {
 		fprintf(stderr, "Could not get MTD device info from %s\n", mtd);
 		close(fd);
+		write_to_file(-4);
 		exit(1);
 	}
 
 	mtdEraseInfo.length = mtdInfo.erasesize;
 	test_buf = malloc(sizeof(unsigned char) * mtdInfo.erasesize);
-	if(!test_buf)
+	if(!test_buf) {
+		write_to_file(-4);
 		exit(1);
+	}
 
 	for (mtdEraseInfo.start = 0;
 		 mtdEraseInfo.start < mtdInfo.size;
@@ -167,6 +185,7 @@ mtd_erase(const char *mtd)
 		if(ioctl(fd, MEMERASE, &mtdEraseInfo)){
 			fprintf(stderr, "Failed to erase block on %s at 0x%x\n", mtd, mtdEraseInfo.start);
 			close(fd);
+			write_to_file(-4);
 			exit(1);
 		}
 
@@ -177,6 +196,7 @@ mtd_erase(const char *mtd)
 		if(read(fd, test_buf, mtdEraseInfo.length) != mtdEraseInfo.length){
 				fprintf(stderr, "Failed to erase block, read() failed\n");
 				close(fd);
+				write_to_file(-4);
 				exit(1);
 		}
 		if(test_char == 256){
@@ -187,6 +207,7 @@ mtd_erase(const char *mtd)
 			if(test_buf[i] != test_char){
 				fprintf(stderr, "Failed to erase block, dismatch\n");
 				close(fd);
+				write_to_file(-4);
 				exit(1);
 			}
 		}
@@ -210,16 +231,19 @@ mtd_write(int imagefd, int offset, int len, const char *mtd)
 	unsigned char *test_buf;
 	unsigned int erase_test_char = 256, erase_begin_pos;
 	int	boot_from_spi = 0;
+	int length = len;
 
 	fd = mtd_open(mtd, O_RDWR | O_SYNC);
 	if(fd < 0) {
 		fprintf(stderr, "Could not open mtd device: %s\n", mtd);
+		write_to_file(-5);
 		exit(1);
 	}
 
 	if(ioctl(fd, MEMGETINFO, &mtdInfo)) {
 		fprintf(stderr, "Could not get MTD device info from %s\n", mtd);
 		close(fd);
+		write_to_file(-5);
 		exit(1);
 	}
 		
@@ -237,6 +261,7 @@ mtd_write(int imagefd, int offset, int len, const char *mtd)
 		buf_orig = (char *)malloc(mtdInfo.erasesize+mtdInfo.oobblock);
 		if (NULL == buf_orig) {
 			fprintf(stderr, "malloc failed\n");
+			write_to_file(-5);
 			exit(1);
 		}
 		memset(buf_orig, 0xff, mtdInfo.erasesize+mtdInfo.oobblock); 
@@ -246,6 +271,7 @@ mtd_write(int imagefd, int offset, int len, const char *mtd)
 		buf = (char *)malloc(BUFSIZE);
 		if (NULL == buf) {
 			fprintf(stderr, "malloc failed\n");
+			write_to_file(-5);
 			exit(1);
 		}	
 	}
@@ -307,6 +333,7 @@ mtd_write(int imagefd, int offset, int len, const char *mtd)
 			if (ioctl (fd,MEMERASE,&mtdEraseInfo) < 0) {
 				fprintf(stderr, "Erasing mtd failed: %s\n", mtd);
 				free(buf);
+				write_to_file(-5);
 				exit(1);
 			}
 			e += mtdInfo.erasesize;
@@ -322,10 +349,12 @@ mtd_write(int imagefd, int offset, int len, const char *mtd)
 			if (result < 0) {
 				fprintf(stderr, "Error writing image.\n");
 				free(buf);
+				write_to_file(-5);
 				exit(1);
 			} else {
 				fprintf(stderr, "Insufficient space.\n");
 				free(buf);
+				write_to_file(-5);
 				exit(1);
 			}
 		}
@@ -341,22 +370,26 @@ mtd_write(int imagefd, int offset, int len, const char *mtd)
  			if( lseek(fd, -r, SEEK_CUR) == -1){
  				fprintf(stderr, "_lseek failed.\n");
 				free(buf);
+				write_to_file(-5);
  				exit(1);
  			}
 
  			if(!(test_buf = malloc(sizeof(char) * r))){
  				fprintf(stderr, "Out of memory.\n");
 				free(buf);
+				write_to_file(-5);
  				exit(1);
  			}
  			if( read(fd, test_buf, r) != r){
  				fprintf(stderr, "Error reading mtd.\n");
 				free(buf);
+				write_to_file(-5);
  				exit(1);
  			}
  			if(memcmp(buf, test_buf, r)){
  				fprintf(stderr, "Post-Write check failed.\n");
 				free(buf);
+				write_to_file(-5);
  				exit(1);
  			}else{
  				/*
@@ -375,6 +408,7 @@ mtd_write(int imagefd, int offset, int len, const char *mtd)
 		}
 		fflush(stdout);
 		statistic += result;
+		write_to_file((int)((float)statistic/(float)length*100.0));
 	}
 	if (!quiet)
 		fprintf(stderr, "\b\b\b\b");
@@ -409,6 +443,7 @@ void usage(void)
 	"Example: To write linux.trx to mtd4 labeled as linux and reboot afterwards\n"
 	"         mtd -r write linux.trx linux\n\n");
 #endif
+	write_to_file(-8);
 	exit(1);
 }
 
@@ -504,6 +539,7 @@ int main (int argc, char **argv)
 			imagefile = argv[1];
 			if ((imagefd = open(argv[1], O_RDONLY)) < 0) {
 				fprintf(stderr, "Couldn't open image file: %s!\n", imagefile);
+				write_to_file(-1);
 				exit(1);
 			}
 		}
