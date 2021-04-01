@@ -24,7 +24,7 @@
  *  (ripped from mkimage.c/image.h)
  */
 #define IH_MAGIC    0x27051956
-#define IH_NMLEN    32
+#define IH_NMLEN    32-4
 typedef struct image_header {
     uint32_t    ih_magic;   /* Image Header Magic Number    */
     uint32_t    ih_hcrc;    /* Image Header CRC Checksum    */
@@ -38,6 +38,7 @@ typedef struct image_header {
     uint8_t     ih_type;    /* Image Type           */
     uint8_t     ih_comp;    /* Compression Type     */
     uint8_t     ih_name[IH_NMLEN];  /* Image Name       */
+    uint32_t	ih_ksz;     /* Kernel Part Size		*/
 } image_header_t;
 
 
