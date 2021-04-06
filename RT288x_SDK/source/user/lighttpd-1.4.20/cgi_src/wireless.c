@@ -3906,22 +3906,22 @@ int main(int argc, char *argv[])
 #endif
 		/*  5G  */
 		if(strstr(nvram_bufget(RTDEV_NVRAM, "SSID1"), "_uninitial") != NULL){
-			char *orig_ssid, *replace_str;
+			char orig_ssid[64], *replace_str = NULL;
 			char newssid[64];
-			orig_ssid = (char *)nvram_bufget(RTDEV_NVRAM, "SSID1");
+			strcpy(orig_ssid, (char *)nvram_bufget(RTDEV_NVRAM, "SSID1"));
 			last_three_bytes = mct_get_wifi_mac_last_three_bytes(RTDEV_NVRAM) & 0x00FFFFFF;
 			replace_str = strstr(orig_ssid, "_uninitial");
 			*replace_str = 0; //add terminator at the end
 			sprintf(newssid, "%s-%06X", orig_ssid, last_three_bytes);
 			nvram_bufset(RTDEV_NVRAM, "SSID1", newssid);
 			nvram_commit(RTDEV_NVRAM);
-			sprintf(cmdline,"iwpriv rai0 set SSID=\"%s\"", newssid);
-			system(cmdline);
+			system("ralink_init make_wireless_config rtdev");
+			system("ifconfig rai0 down up");
 		}
 		if(strstr(nvram_bufget(RTDEV_NVRAM, "ApCliSsid"), "-uninitial") != NULL){
-			char *orig_ssid, *replace_str;
+			char orig_ssid[64], *replace_str = NULL;
 			char newssid[64];
-			orig_ssid = (char *)nvram_bufget(RTDEV_NVRAM, "ApCliSsid");
+			strcpy(orig_ssid, (char *)nvram_bufget(RTDEV_NVRAM, "ApCliSsid"));
 			//  just keep last 20bit add set the 21~24 to 1(RX)
 			last_three_bytes = mct_get_wifi_mac_last_three_bytes(RTDEV_NVRAM) & 0x000FFFFF;
 			last_three_bytes |= 0x000100000;
@@ -3930,8 +3930,10 @@ int main(int argc, char *argv[])
 			sprintf(newssid, "%s-%06X", orig_ssid, last_three_bytes);
 			nvram_bufset(RTDEV_NVRAM, "ApCliSsid", newssid);
 			nvram_commit(RTDEV_NVRAM);
-			sprintf(cmdline,"iwpriv apclii0 set ApCliSsid=\"%s\"", newssid);
-			system(cmdline);
+			system("ralink_init make_wireless_config rtdev");
+			system("ifconfig apclii0 down");
+			system("ifconfig rai0 down up");
+			system("ifconfig apclii0 up");
 		}
 		{
 			int mode = atoi(nvram_bufget(RT2860_NVRAM, "OperationMode"));
