@@ -385,6 +385,9 @@ void Client::Connect( ) {
 
     assert( mSettings->inHostname != NULL );
 
+    struct timeval timeout;
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
     // create an internet socket
     int type = ( isUDP( mSettings )  ?  SOCK_DGRAM : SOCK_STREAM);
 
@@ -409,6 +412,11 @@ void Client::Connect( ) {
                    SockAddr_get_sizeof_sockaddr( &mSettings->local ) );
         WARN_errno( rc == SOCKET_ERROR, "bind" );
     }
+
+    if (setsockopt (mSettings->mSock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+        WARN( 1, "setsockopt");
+    if (setsockopt (mSettings->mSock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+        WARN( 1, "setsockopt");
 
     // connect socket
     rc = connect( mSettings->mSock, (sockaddr*) &mSettings->peer, 

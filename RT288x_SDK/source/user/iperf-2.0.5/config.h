@@ -79,13 +79,13 @@
 #define HAVE_NETINET_IN_H 1
 
 /* */
-#define HAVE_POSIX_THREAD 1
+//#define HAVE_POSIX_THREAD 1
 
 /* */
 /* #undef HAVE_PRINTF_QD */
 
 /* Define if you have POSIX threads libraries and header files. */
-#define HAVE_PTHREAD 1
+//#define HAVE_PTHREAD 1
 
 /* Define to 1 if you have the `pthread_cancel' function. */
 /* #undef HAVE_PTHREAD_CANCEL */
