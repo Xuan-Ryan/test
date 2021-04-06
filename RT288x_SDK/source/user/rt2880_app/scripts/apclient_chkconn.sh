@@ -57,6 +57,9 @@ do
 				if [ "$count" -gt "10" ]; then
 					#  waiting for 20's and do auto-connect again
 					iwpriv apclii0 set ApCliAutoConnect=1 1>/dev/null
+					ifconfig apclii0 down 1>/dev/null
+					ifconfig rai0 down up 1>/dev/null
+					ifconfig apclii0 up 1>/dev/null
 					count=0
 				fi
 			fi
