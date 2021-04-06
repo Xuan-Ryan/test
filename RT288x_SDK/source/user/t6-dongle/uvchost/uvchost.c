@@ -29,6 +29,7 @@
 
 #include <linux/videodev2.h>
 #include <semaphore.h>
+#include <pthread.h>
 
 
 
@@ -38,6 +39,7 @@
 #include "uvchost.h"
 
 #include "uvcdescription.h"
+//#include "t6usbdongle.h"
 
 
 int g_exit_program = 0;
@@ -46,8 +48,13 @@ struct  timeval start;
 struct  timeval end;
 sem_t video_mutex;		  
 sem_t audio_mutex; 
-
-
+int cmdAddrr = 0;
+int fbAddr =0;
+int fbAddr1=  (58 - 8) * 1024 * 1024;
+int fbAddr2=  (58 - 4) * 1024 * 1024;
+char videobuf[1048576];
+pthread_mutex_t usb_mutex = PTHREAD_MUTEX_INITIALIZER;
+int lost_frame = 0;
 
 void mysignal(int signo)  
 {  
@@ -519,12 +526,26 @@ int GetDevString(int fd ,char* sMf ,char* sPt ,char* des)
 
 }
 
-static void process_image(char* id ,const void *p, int size)
+int process_image(char* id ,const void *p, int size)
 {
-     printf("id = %d image size = %d \n",id,size);
-     
-	 
-	 
+     //printf("id = %d image size = %d \n",id,size);
+     char* ptr = (char*)p;
+	 int   datalen = size;
+     int   i = 0; 
+	// printf("head = %2x %2x \n",ptr[0] ,ptr[1] );
+	 if((ptr[0] & 0xff) == 0xFF && (ptr[1] & 0xff) == 0xD8){
+	 	for(i = 1 ; i <= 32 ; i++){
+			if((ptr[datalen -i] & 0xFF) == 0xD9){
+				//printf("end1 = %2x \n",ptr[datalen -i]);
+				if( (ptr[datalen -i - 1] & 0xFF) == 0xff){
+					//printf("end2 = %2x \n",ptr[datalen -i -1]);
+					return 1;	
+				}
+			}
+	 	}
+	 }
+     lost_frame++;
+	 return 0;
 	 /*
 	 char  pcmname[256]="/home/pic.yuyv";
 	 FILE *fp=fopen(pcmname,"wb");
@@ -542,8 +563,11 @@ static int read_frame(struct uvcdev *udev )
 	struct v4l2_buffer buf;
 	unsigned int i;
     int ret;
+	int len;
 	char cmd[256];
-
+    int  resetflag = 0;
+	int  cmdoffset =0;
+  
 	buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	buf.memory = V4L2_MEMORY_MMAP;
 
@@ -579,12 +603,49 @@ static int read_frame(struct uvcdev *udev )
     }
  */   
 
+
+     if(udev->format == V4L2_PIX_FMT_MJPEG){
+	 	if(process_image(&udev->video_id,udev->buffers[buf.index].start, buf.bytesused) ==1)
+			udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused);
+     }else{	
+   			udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused);
+     }
+	
   
-	if(udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused)<0){
-		printf("udpImageWrite error \n");
-		return -1;
+
+
+   
+	
+   
+
+	
+	
+#if 0
+	if(fbAddr == fbAddr1)
+		fbAddr = fbAddr2;
+	else
+		fbAddr = fbAddr1;
+
+	len= buf.bytesused + 1024 +48;
+	 
+    if(len < 0x100000 )
+	    cmdoffset = 0x100000;
+	else if(len < 0x200000)
+		cmdoffset = 0x200000;
+	else
+		cmdoffset = 0x300000;
+		
+	if(cmdAddrr + cmdoffset > fbAddr1){
+		cmdAddrr = 0;
+		resetflag = 0x80;
+	}else{
+		resetflag = 0;	
 	}
 
+	t6_libusb_FilpJpegFrame(udev->buffers[buf.index].start,buf.bytesused,resetflag,cmdAddrr,fbAddr,udev->w,udev->h);
+	
+	cmdAddrr = cmdAddrr +cmdoffset;
+#endif
 	//process_image(&udev->video_id,udev->buffers[buf.index].start, buf.bytesused);
 
 	if (-1 == xioctl(udev->fd, VIDIOC_QBUF, &buf)){
@@ -607,7 +668,7 @@ static int readframe(struct uvcdev *udev)
 	FD_SET(udev->fd, &fds);
 
 	/* Timeout. */
-	tv.tv_sec = 5;
+	tv.tv_sec = 2;
 	tv.tv_usec = 0;
 
 	r = select(udev->fd + 1, &fds, NULL, NULL, &tv);
@@ -669,7 +730,7 @@ int init_mmap(struct uvcdev *udev)
 {
 	struct v4l2_requestbuffers req;
 	int i = 0;
-	int n = 2;	
+	int n = 3;	
 	CLEAR(req);
 	//if(udev->w == 3842 && udev->h ==2160)
 	//	n = 1;
@@ -685,7 +746,7 @@ int init_mmap(struct uvcdev *udev)
 
 	}
 
-	if (req.count < 2) {
+	if (req.count < 1) {
 	   fprintf(stderr, "Insufficient buffer memory on \n");
 	   return -1;
 	}
@@ -1076,7 +1137,7 @@ int init_device(struct uvcdev *udev)
 	memset(&setfps, 0, sizeof(struct v4l2_streamparm));
 	setfps.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	setfps.parm.capture.timeperframe.numerator = 1;
-	setfps.parm.capture.timeperframe.denominator =30;
+	setfps.parm.capture.timeperframe.denominator =5;
 	if (-1 == xioctl(udev->fd, VIDIOC_S_PARM, &setfps)){
         printf("Error VIDIOC_S_PARM \n");
 		return -1;
@@ -1696,9 +1757,11 @@ void* uvc_cmd_system(void *lp)
 								break;
 						    }
 
-							
+							pthread_mutex_lock(&usb_mutex);
 							ret = v4l2_control_transfer(cmd_fd,pjuvchdr->c.UvcControl.bmRequestType,pjuvchdr->c.UvcControl.bRequest,pjuvchdr->c.UvcControl.wValue,
-																				pjuvchdr->c.UvcControl.wIndex,data,pjuvchdr->c.UvcControl.wLength);
+																			pjuvchdr->c.UvcControl.wIndex,data,pjuvchdr->c.UvcControl.wLength);
+
+							pthread_mutex_unlock(&usb_mutex);	
 							if(ret <= 0){
 								
 								printf("get 4l2_control_transfer failed ret = %d \n",ret); 
@@ -1753,10 +1816,10 @@ void* uvc_cmd_system(void *lp)
 							
 							}
 							
-							
+							pthread_mutex_lock(&usb_mutex);
 							ret = v4l2_control_transfer(cmd_fd,pjuvchdr->c.UvcControl.bmRequestType,pjuvchdr->c.UvcControl.bRequest,pjuvchdr->c.UvcControl.wValue,
 														pjuvchdr->c.UvcControl.wIndex,data,pjuvchdr->c.UvcControl.wLength);
-
+                            pthread_mutex_unlock(&usb_mutex);
 							if(ret != pjuvchdr->c.UvcControl.wLength){
 								printf("Set v4l2_control_transfer failed ret = %d \n",ret);
 								printf("bmRequestType = %x \n",pjuvchdr->c.UvcControl.bmRequestType) ;
@@ -1887,14 +1950,30 @@ void* uvc_video_system(void *lp)
 	    
 		pudev->video_id = 0;
 				
-		pudev->video_active= 1;		
-		while(pudev->video_active){
+		pudev->video_active= 1;	
+#if 	0	
+		ret = openT6dev();
+		if(ret <= 0)
+			printf("T6 open faild \n");
+		pthread_mutex_lock(&usb_mutex);
+		ret = t6_libusb_set_resolution(pudev->w,pudev->h);
+		if(ret <0)
+			printf("t6_libusb_set_resolution faild \n");
+		ret =t6_libusb_set_monitor_power(1);
+		if(ret <0)
+			printf("t6_libusb_set_monitor_power \n");
+		pthread_mutex_unlock(&usb_mutex);
+		cmdAddrr = 0;
+#endif 	
 			
+		
+		while(pudev->video_active){
+		  
 			if(pudev->video_id == 0){
 				gettimeofday(&start,NULL);
 				diff = 0;
 			}	
-		
+		  
 			if(readframe(pudev) < 0){
 		  		//printf("readframe  failed \n");
 		  		
@@ -1905,11 +1984,19 @@ void* uvc_video_system(void *lp)
 			gettimeofday(&end,NULL);
 			diff = 1000000 * (end.tv_sec-start.tv_sec)+ end.tv_usec-start.tv_usec;
 		    if(diff >= 1000000){
-				printf("sec = %d frame = %d \n",diff,pudev->video_id );
+				printf("sec = %d frame = %d  lost = %d \n",diff,pudev->video_id,lost_frame );
 				pudev->video_id =0;
+				lost_frame = 0;
 		    }
+		
 		   
 		}
+#if 0		
+		pthread_mutex_lock(&usb_mutex);
+		t6_libusb_set_monitor_power(0);
+		pthread_mutex_unlock(&usb_mutex);
+		closeT6evd();
+#endif		
         stop_capturing(pudev);
 #endif			
         uninit_mmap(pudev);
