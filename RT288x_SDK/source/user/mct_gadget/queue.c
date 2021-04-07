@@ -43,7 +43,7 @@ queue_t* queue_create()
 {
 	queue_t *queue = NULL;
 
-	PRINT_MSG("%s \n",__func__);
+	DBG_MSG("%s \n",__func__);
 
 	queue = malloc(sizeof(queue_t));
 	if(queue == NULL)
@@ -59,7 +59,7 @@ queue_t* queue_create()
 
 void releses_queue(queue_t* queue)
 {
- 	PRINT_MSG("%s \n",__func__);
+ 	DBG_MSG("%s \n",__func__);
 
 	if(queue == NULL)
 		return;
@@ -67,7 +67,7 @@ void releses_queue(queue_t* queue)
 	VIDEO_FRAME * frame = NULL;
 	do {
 		pthread_mutex_lock(&queue->mutex);
-		PRINT_MSG("[queue_destroy] The queue is not empty=%d\n",queue->length);
+		DBG_MSG("[queue_destroy] The queue is not empty=%d\n",queue->length);
 		if (queue->length > 0) {
 			pthread_mutex_unlock(&queue->mutex);
 			frame = queue_remove(queue);
@@ -84,10 +84,10 @@ void releses_queue(queue_t* queue)
 
 void queue_destroy(queue_t* queue)
 {
-	PRINT_MSG("%s \n",__func__);
+	DBG_MSG("%s \n",__func__);
 
 	if (queue == NULL) {
-		PRINT_MSG("[queue_destroy] Tried to destroy a 'NULL' queue\n");
+		DBG_MSG("[queue_destroy] Tried to destroy a 'NULL' queue\n");
 		return;
 	}
 
@@ -95,7 +95,7 @@ void queue_destroy(queue_t* queue)
 	free(queue);
 	queue = NULL;
 
-	PRINT_MSG("queue_destroy \n");
+	DBG_MSG("queue_destroy \n");
 }
 
 void queue_add(queue_t* queue, void* element)
