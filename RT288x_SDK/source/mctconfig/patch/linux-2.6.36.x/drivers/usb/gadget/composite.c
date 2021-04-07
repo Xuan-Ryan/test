@@ -109,7 +109,7 @@ __u32 client_connected = 0;
 __u8 current_b_request;
 unsigned current_w_value;
 
-unsigned int g_uvc_mjpeg_res_bitflag = 0x04;
+unsigned int g_uvc_mjpeg_res_bitflag = 0x08;
 unsigned int g_uvc_h264_res_bitflag= 0x0;
 unsigned int g_uvc_yuv_res_bitflag= 0x0;
 unsigned int g_uvc_nv12_res_bitflag= 0x0;
@@ -133,7 +133,7 @@ module_param(g_uvc_m420_res_bitflag, uint, S_IRWXU|S_IRWXG);
 MODULE_PARM_DESC(g_uvc_m420_res_bitflag, "resolution for m420");
 
 module_param(g_uvc_camera_terminal_controlbit, uint, S_IRWXU|S_IRWXG);
-MODULE_PARM_DESC(g_uvc_mjpeg_res_bitflag, "camera capability");
+MODULE_PARM_DESC(g_uvc_camera_terminal_controlbit, "camera capability");
 module_param(g_uvc_processing_controlbit, uint, S_IRWXU|S_IRWXG);
 MODULE_PARM_DESC(g_uvc_processing_controlbit, "camera capability");
 
