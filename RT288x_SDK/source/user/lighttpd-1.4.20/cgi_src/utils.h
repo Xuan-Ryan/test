@@ -47,6 +47,7 @@ void set_nth_value_flash(int nvram, int index, char *flash_key, char *value);
 char *get_lanif_name(void);
 char *get_wanif_name(void);
 char *get_macaddr(char *ifname);
+char *get_mac_last3addr(char *ifname);
 char *get_ipaddr(char *ifname);
 char *get_netmask(char *ifname);
 int get_index_routingrule(const char *rrs, char *dest, char *netmask, char *interface);

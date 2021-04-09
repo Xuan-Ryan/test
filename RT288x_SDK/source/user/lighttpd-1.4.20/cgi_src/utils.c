@@ -379,6 +379,32 @@ char *get_macaddr(char *ifname)
 	return if_hw;
 }
 
+char *get_mac_last3addr(char *ifname)
+{
+	struct ifreq ifr;
+	char *ptr;
+	int skfd;
+	static char if_hw[18] = {0};
+
+	if((skfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		fprintf(stderr, "%s: open socket error\n", __func__);
+		return NULL;
+	}
+	strncpy(ifr.ifr_name, ifname, IF_NAMESIZE);
+	if(ioctl(skfd, SIOCGIFHWADDR, &ifr) < 0) {
+		close(skfd);
+		fprintf(stderr, "%s: ioctl fail\n", __func__);
+		return NULL;
+	}
+
+	ptr = (char *)&ifr.ifr_addr.sa_data;
+	sprintf(if_hw, "%02X%02X%02X",
+			(ptr[3] & 0377), (ptr[4] & 0377), (ptr[5] & 0377));
+	close(skfd);
+
+	return if_hw;
+}
+
 char *get_ipaddr(char *ifname)
 {
 	struct ifreq ifr;
