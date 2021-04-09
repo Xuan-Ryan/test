@@ -277,15 +277,20 @@ void clear_log(char *input)
 void set_sys_cmd(char *input)
 {
 	char *cmd = web_get("command", input, 0);
+	char full_cmd[512];
 
 	if(!cmd)
 		return;
 
-	if(!strlen(cmd))
-		do_system("cat /dev/null > %s", SYSTEM_COMMAND_LOG);
-	else
-		do_system("%s 1>%s 2>&1", cmd, SYSTEM_COMMAND_LOG);
-	do_system("echo \"%s\" > /var/last_system_command", cmd);
+	if(!strlen(cmd)) {
+		sprintf(full_cmd, "cat /dev/null > %s", SYSTEM_COMMAND_LOG);
+		system(full_cmd);
+	} else {
+		sprintf(full_cmd, "%s 1>%s 2>&1", cmd, SYSTEM_COMMAND_LOG);
+		system(full_cmd);
+	}
+	sprintf(full_cmd, "echo \"%s\" > /var/last_system_command", cmd);
+	system(full_cmd);
 	web_redirect(getenv("HTTP_REFERER"));
 
 	return;
@@ -293,7 +298,9 @@ void set_sys_cmd(char *input)
 
 void set_last_cmd(char *input)
 {
-	do_system("sh < /var/last_system_command 1>%s 2>&1", SYSTEM_COMMAND_LOG);
+	char full_cmd[512];
+	sprintf(full_cmd, "sh < /var/last_system_command 1>%s 2>&1", SYSTEM_COMMAND_LOG);
+	system(full_cmd);
 	web_redirect(getenv("HTTP_REFERER"));
 
 	return;
