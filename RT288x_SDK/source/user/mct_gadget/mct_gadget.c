@@ -364,6 +364,19 @@ static void signal_handler(int sig)
 	}
 }
 
+static int connected_status(int connect)
+{
+	FILE * fp = NULL;
+	char buf[] = "connected";
+	if (connect) {
+		fp = fopen(CONNECTED_FILE, "w");
+		fwrite(buf, 1, strlen(buf), fp);
+		fclose(fp);
+	} else {
+		unlink(CONNECTED_FILE);
+	}
+}
+
 static int check_exist_inst(void)
 {
 	int fd_pid = open(PID_FILE, O_WRONLY | O_CREAT | O_EXCL, 0660);
@@ -671,21 +684,22 @@ void usb_hub_reset(int plugin)
 #else
 void usb_hub_reset(int plugin)
 {
-	if (plugin == 1) {
+	/*if (plugin == 1) {
 		system("web gpio 11 0");  //  pull low to enable cp2615
-	}
+	}*/
 
 	system("web gpio 53 0");  //  pull low to disable USB hub
 
-	if (plugin == 1)
+	/*if (plugin == 1)
 		sleep(2);
 	else
-		sleep(1);
+		sleep(1);*/
+	usleep(100000);
 
 	system("web gpio 53 1");  //  pull high to enable USB hub
-	if (plugin == 0) {
+	/*if (plugin == 0) {
 		system("web gpio 11 1");  //  pull high to disable cp2615
-	}
+	}*/
 }
 #endif
 
@@ -769,7 +783,6 @@ static void * video_control_thread(void * arg)
 		}
 
 		PRINT_MSG("mct_gadget: client connected\n");
-		client_connected = 1;
 		sleep(1);
 		ret = send_command(JUVC_CONTROL_CAMERAINFO, mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3], 0, 0);
 
@@ -811,6 +824,8 @@ static void * video_control_thread(void * arg)
 						//DBG_MSG("process : %02x %02x %02x\n", juvchdr.CamaraInfo.process[0]&0xff, juvchdr.CamaraInfo.process[1]&0xff, juvchdr.CamaraInfo.process[2]&0xff);
 						usb_hub_reset(1);
 						LED_control(1);
+						connected_status(1);
+						client_connected = 1;
 					} else if (juvchdr.Flags == JUVC_CONTROL_MANUFACTURER) {
 						char buffer[256];
 						read(tcp_control_clnsd, buffer, juvchdr.TotalLength);
@@ -850,8 +865,11 @@ static void * video_control_thread(void * arg)
 		i2s_stop = 1;
 		usb_hub_reset(0);
 		LED_control(0);
-		system("web gpio 11 1");  //  push hi to disable CP2615
-#ifdef SUPPORT_RING_ELEMENT
+		connected_status(0);
+#ifndef SUPPORT_RING_ELEMENT
+		//  clear queue
+		releses_queue(queue);
+#else
 		memset(total_size, '\0', sizeof(total_size));
 		copying = 0;
 		done = 0;
@@ -1667,6 +1685,8 @@ static int main_loop(int argc, char **argv)
 static void close_procedure(void)
 {
 	unlink(PID_FILE);
+
+	unlink(CONNECTED_FILE);
 
 	close_socket();
 
