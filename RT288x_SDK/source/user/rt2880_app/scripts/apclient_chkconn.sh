@@ -10,6 +10,30 @@ count=0
 connected="0"
 disconnect="0"
 
+green_led()
+{
+	# light up green LED
+	gpio l 52 4000 0 1 0 4000
+	# turn off red LED
+	gpio l 14 0 4000 0 1 4000
+}
+
+red_led()
+{
+	# turn off green LED
+	gpio l 52 0 4000 0 1 4000
+	# light up red LED
+	gpio l 14 4000 0 1 0 4000
+}
+
+orange_led()
+{
+	# light up green LED
+	gpio l 52 4000 0 1 0 4000
+	# light up red LED
+	gpio l 14 4000 0 1 0 4000
+}
+
 rm /tmp/timeout 1>/dev/null 2>/dev/null
 opmode=`nvram_get 2860 OperationMode`
 if [ "$opmode" = "1" ]; then
@@ -18,96 +42,68 @@ if [ "$opmode" = "1" ]; then
 	disconnect=`web rtdev wifi clnConnected`
 	if [ "$disconnect" != "0" ]; then
 		# connected
-		connected="1"
-		# light up green LED
-		gpio l 52 4000 0 1 0 4000
-		if [ -e /tmp/uvcclient_disconnect ]; then
-			# light up red LED
-			gpio l 14 4000 0 1 0 4000
+		if [ -e /tmp/mctgadget_connected ]; then
+			green_led
 		else
-			# turn off red LED
-			gpio l 14 0 4000 0 1 4000
+			orange_led
 		fi
 	else
 		# disconnected
-		connected="0"
-		# turn off green LED
-		gpio l 52 0 4000 0 1 4000
-		# light up red LED
-		gpio l 14 4000 0 1 0 4000
+		red_led
 	fi
 
 	interval=2
 	while :
 	do
-		sleep $interval
 		disconnect=`web rtdev wifi clnConnected`
-		#  connected
 		if [ "$disconnect" != "0" ]; then
-			# previous status
+			# connected
 			if [ "$connected" = "0" ]; then
-				# light up green LED
-				gpio l 52 4000 0 1 0 4000
-				if [ -e /tmp/uvcclient_disconnect ]; then
-					# light up red LED
-					gpio l 14 4000 0 1 0 4000
+				if [ -e /tmp/mctgadget_connected ]; then
+					green_led
 				else
-					# turn off red LED
-					gpio l 14 0 4000 0 1 4000
+					orange_led
 				fi
-				interval=2
 			fi
+			interval=10
 			connected="1"
 		else
-			# previous status
+			# disconnected
 			if [ "$connected" = "1" ]; then
-				# disconnected
-				connected="0"
-				# turn off green LED
-				gpio l 52 0 4000 0 1 4000
-				# light up red LED
-				gpio l 14 4000 0 1 0 4000
-				interval=10
+				red_led
 			fi
+			connected="0"
+			interval=2
 		fi
+		sleep $interval
 	done
 else
 	# for WiFi client to check whether connect to AP or not.
 	# and also control LED to indicate the status.
 	disconnect=`iwpriv apclii0 conn_status|grep ApClii0|grep Disconnect`
 	if [ -n "$disconnect" ]; then
-		# turn off green LED
-		gpio l 52 0 4000 0 1 4000
-		# light up red LED
-		gpio l 14 4000 0 1 0 4000
-		ifconfig apclii0 down up 1>/dev/null 2>/dev/null
-		iwpriv apclii0 set ApCliEnable=1 1>/dev/null 2>/dev/null
+		red_led
 		iwpriv apclii0 set SiteSurvey=1 1>/dev/null 2>/dev/null
 		sleep 1
 		iwpriv apclii0 get_site_survey 1>/dev/null 2>/dev/null
 		iwpriv apclii0 set ApCliAutoConnect=1 1>/dev/null 2>/dev/null
 	else
-		connected="1"
-		# light up green LED
-		gpio l 52 4000 0 1 0 4000
-		# light up red LED
-		gpio l 14 4000 0 1 0 4000
+		if [ -e /tmp/uvcclient_disconnect ]; then
+			orange_led
+		else
+			green_led
+		fi
 	fi
-	
+
 	while :
 	do
-		sleep $interval
 		if [ ! -e /tmp/doing_wps ]; then
 			# check connection via conn_status command
 			disconnect=`iwpriv apclii0 conn_status|grep ApClii0|grep Disconnect`
 			if [ -n "$disconnect" ]; then
-				interval=2
 				if [ "$connected" = "1" ]; then
 					connected="0"
-					# turn off green LED
-					gpio l 52 0 4000 0 1 4000
-					# light up red LED
-					gpio l 14 4000 0 1 0 4000
+					red_led
 					count=0
 				fi
 				#  disconnect, do connection again
@@ -123,74 +119,73 @@ else
 						count=0
 					fi
 				fi
+				interval=2
 			else
-				interval=10
 				count=0
 				#  store the SSID from AP
 				#  ex: ApClii0 Connected AP : 00:05:1B:00:01:02   SSID:UVC-79366D
 				CUR_SSID=`iwpriv apclii0 conn_status|awk -F ' ' '{print $6}'|awk -F ':' '{print $2}'`
 				if [ -n "$CUR_SSID" ]; then
-					ORG_SSID=`nvram_get rtdev ApCliSsid`
-					SSID=`iwpriv apclii0 stat|grep SSID`
-					SSID=`echo $SSID|awk -F '=' '{print $2}'`
-					SSID=`echo $SSID|xargs`
-					AUTHTYPE=`iwpriv apclii0 stat|grep AuthType`
-					AUTHTYPE=`echo $AUTHTYPE|awk -F '=' '{print $2}'`
-					AUTHTYPE=`echo $AUTHTYPE|xargs`
-					ENCRYPTYPE=`iwpriv apclii0 stat|grep EncrypType`
-					ENCRYPTYPE=`echo $ENCRYPTYPE|awk -F '=' '{print $2}'`
-					ENCRYPTYPE=`echo $ENCRYPTYPE|xargs`
-					KEY=`iwpriv apclii0 stat|grep "Key "`
-					KEY=`echo $KEY|awk -F '=' '{print $2}'`
-					KEY=`echo $KEY|xargs`
-					if [ -n "$SSID" ] && [ "$SSID" != "$ORG_SSID" ]; then
-						nvram_set rtdev ApCliSsid "$SSID"
-	
-						if [ -n `echo $AUTHTYPE|grep WPA2` ]; then
-							nvram_set rtdev ApCliAuthMode WPA2PSK
-							#nvram_set rtdev ApCliWPAPSK "$KEY"
-						elif [ -n `echo $AUTHTYPE|grep WPA` ]; then
-							nvram_set rtdev ApCliAuthMode WPAPSK
-							#nvram_set rtdev ApCliWPAPSK "$KEY"
-						elif [ -n `echo $AUTHTYPE|grep SHARED` ]; then
-							nvram_set rtdev ApCliAuthMode SHARED
-							#nvram_set rtdev ApCliKey1Str "$KEY"
-						elif [ -n `echo $AUTHTYPE|grep OPEN` ]; then
-							nvram_set rtdev ApCliAuthMode OPEN
-							#nvram_set rtdev ApCliKey1Str "$KEY"
-						else
-							nvram_set rtdev ApCliAuthMode WPA2PSK
-							#nvram_set rtdev ApCliWPAPSK "$KEY"
+					if [ "$connected" = "0" ]; then
+						connected="1"
+						ORG_SSID=`nvram_get rtdev ApCliSsid`
+						SSID=`iwpriv apclii0 stat|grep SSID`
+						SSID=`echo $SSID|awk -F '=' '{print $2}'`
+						SSID=`echo $SSID|xargs`
+						AUTHTYPE=`iwpriv apclii0 stat|grep AuthType`
+						AUTHTYPE=`echo $AUTHTYPE|awk -F '=' '{print $2}'`
+						AUTHTYPE=`echo $AUTHTYPE|xargs`
+						ENCRYPTYPE=`iwpriv apclii0 stat|grep EncrypType`
+						ENCRYPTYPE=`echo $ENCRYPTYPE|awk -F '=' '{print $2}'`
+						ENCRYPTYPE=`echo $ENCRYPTYPE|xargs`
+						KEY=`iwpriv apclii0 stat|grep "Key "`
+						KEY=`echo $KEY|awk -F '=' '{print $2}'`
+						KEY=`echo $KEY|xargs`
+						if [ -n "$SSID" ] && [ "$SSID" != "$ORG_SSID" ]; then
+							nvram_set rtdev ApCliSsid "$SSID"
+		
+							#if [ -n `echo $AUTHTYPE|grep WPA2` ]; then
+								#nvram_set rtdev ApCliAuthMode WPA2PSK
+								#nvram_set rtdev ApCliWPAPSK "$KEY"
+							#elif [ -n `echo $AUTHTYPE|grep WPA` ]; then
+								#nvram_set rtdev ApCliAuthMode WPAPSK
+								#nvram_set rtdev ApCliWPAPSK "$KEY"
+							#elif [ -n `echo $AUTHTYPE|grep SHARED` ]; then
+								#nvram_set rtdev ApCliAuthMode SHARED
+								#nvram_set rtdev ApCliKey1Str "$KEY"
+							#elif [ -n `echo $AUTHTYPE|grep OPEN` ]; then
+								#nvram_set rtdev ApCliAuthMode OPEN
+								#nvram_set rtdev ApCliKey1Str "$KEY"
+							#else
+								#nvram_set rtdev ApCliAuthMode WPA2PSK
+								#nvram_set rtdev ApCliWPAPSK "$KEY"
+							#fi
+		
+							#if [ -n `echo $ENCRYPTYPE|grep AES` ]; then
+								#nvram_set rtdev ApCliEncrypType AES
+							#elif [ -n `echo $ENCRYPTYPE|grep TKIP` ]; then
+								#nvram_set rtdev ApCliEncrypType AES
+							#elif [ -n `echo $ENCRYPTYPE|grep WEP` ]; then
+								#nvram_set rtdev ApCliEncrypType WEP
+							#elif [ -n `echo $ENCRYPTYPE|grep NONE` ]; then
+								#nvram_set rtdev ApCliEncrypType NONE
+							#else
+								#nvram_set rtdev ApCliEncrypType AES
+							#fi
 						fi
-	
-						if [ -n `echo $ENCRYPTYPE|grep AES` ]; then
-							nvram_set rtdev ApCliEncrypType AES
-						elif [ -n `echo $ENCRYPTYPE|grep TKIP` ]; then
-							nvram_set rtdev ApCliEncrypType AES
-						elif [ -n `echo $ENCRYPTYPE|grep WEP` ]; then
-							nvram_set rtdev ApCliEncrypType WEP
-						elif [ -n `echo $ENCRYPTYPE|grep NONE` ]; then
-							nvram_set rtdev ApCliEncrypType NONE
+
+						if [ -e /tmp/uvcclient_disconnect ]; then
+							orange_led
 						else
-							nvram_set rtdev ApCliEncrypType AES
+							green_led
 						fi
 					fi
 				fi
-				if [ "$connected" = "0" ]; then
-					connected="1"
-					# light up green LED
-					gpio l 52 4000 0 1 0 4000
-					if [ -e /tmp/mctgadget_connected ]; then
-						# turn off red LED
-						gpio l 14 0 4000 0 1 4000
-					else
-						# light up red LED
-						gpio l 14 4000 0 1 0 4000
-					fi
-				fi
+				interval=10
 			fi
 		else
 			interval=10
 		fi
+		sleep $interval
 	done
 fi
