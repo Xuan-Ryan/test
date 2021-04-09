@@ -1,6 +1,43 @@
 #include "utils.h"
 #include <stdlib.h>
 
+char *mtd_d = "/dev/mtd4";
+char * extract_ver(char * str)
+{
+	//  ex:UVC:RX:0.0.0.0
+	char * p = strrchr(str, ':');
+	if (p)
+		return p+1;
+
+	return "";
+}
+
+void write_version(void){
+
+	int fd = 0;
+	int i = 0;
+	char cmd[128];
+	image_header_t hdr;
+
+	fd = open(mtd_d, O_RDWR | O_SYNC);
+	if (fd < 0) {
+		printf("Could not open mtd device: %s\n",mtd_d);
+		exit(1);
+	}
+	
+	if (read(fd, &hdr, sizeof(hdr)) != sizeof(hdr)){
+		printf("read() failed\n");
+		close(fd);
+		exit(1);
+	}
+
+	if (ntohl(hdr.ih_magic) == IH_MAGIC) {
+		snprintf(cmd, sizeof(cmd),"nvram_set 2860 Version \"%s\"", extract_ver(hdr.ih_name));
+		system(cmd);
+	}
+	close(fd);
+}
+
 static int set_default(void)
 {
 	FILE *fp;
@@ -73,6 +110,7 @@ static void usage(void)
 	printf("Usage:\n");
 	printf("\tinitial: init_system start\n");
 	printf("\trestart: init_system restart\n");
+	printf("\trestart: init_system write_version\n");
 }
 
 int main(int argc, char *argv[])
@@ -96,6 +134,8 @@ int main(int argc, char *argv[])
 		do_system("lighttpd -f /etc_ro/lighttpd/lighttpd.conf -m /etc_ro/lighttpd/lib");
 	} else if (!strcmp(argv[1], "restart")) {
 		init_internet();
+	} else if (!strcmp(argv[1], "write_version")) {
+		write_version();
 	} else {
 		usage();
 	}
