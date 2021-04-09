@@ -145,3 +145,4 @@ ApCliSsid=UVC-uninitial
 ApCliAuthMode=WPA2PSK
 ApCliEncrypType=AES
 ApCliWPAPSK=12345678
+WPSEnable=1
