@@ -13,6 +13,8 @@ svn revert -R RT288x_SDK/source/user/lighttpd-1.4.20/*
 svn revert -R RT288x_SDK/source/user/rt2880_app/nvram/*
 svn revert -R RT288x_SDK/source/user/rt2880_app/scripts/*
 svn revert -R RT288x_SDK/source/user/alsa-lib-1.0.27.2/*
+svn revert -R RT288x_SDK/source/user/mtd_write/*
+svn revert -R RT288x_SDK/source/user/iperf-2.0.5/*
 # if we add more files in source tree we need to add here too.
 
 # remove the archive file, which we don't need it.
