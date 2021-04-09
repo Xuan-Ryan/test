@@ -4,7 +4,7 @@ echo 'start patch drivers'
 echo ''
 echo 'start patch char device'
 cp drivers/char/ralink_gpio.c ../../../linux-2.6.36.x/drivers/char/ralink_gpio.c
-cp dirvers/char/ralink_gdma.c ../../../linux-2.6.36.x/drivers/char/ralink_gdma.c
+cp drivers/char/ralink_gdma.c ../../../linux-2.6.36.x/drivers/char/ralink_gdma.c
 cp drivers/char/i2s/i2s_ctrl.h ../../../linux-2.6.36.x/drivers/char/i2s/i2s_ctrl.h
 cp drivers/char/i2s/i2s_ctrl.c ../../../linux-2.6.36.x/drivers/char/i2s/i2s_ctrl.c
 echo ''
