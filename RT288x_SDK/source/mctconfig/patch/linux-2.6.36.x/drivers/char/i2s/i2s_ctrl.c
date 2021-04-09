@@ -1865,7 +1865,7 @@ void i2s_dma_tx_handler(u32 dma_ch)
 
 			/* Buffer Empty */
 			MSG("TXBE r=%d w=%d[i=%u,c=%u]\n",pi2s_config->tx_r_idx,pi2s_config->tx_w_idx,pi2s_config->tx_isr_cnt,dma_ch);
-			printk("TXBE r=%d w=%d[i=%u,c=%u]\n",pi2s_config->tx_r_idx,pi2s_config->tx_w_idx,pi2s_config->tx_isr_cnt,dma_ch);
+			//printk("TXBE r=%d w=%d[i=%u,c=%u]\n",pi2s_config->tx_r_idx,pi2s_config->tx_w_idx,pi2s_config->tx_isr_cnt,dma_ch);
 	
 #ifdef I2S_STATISTIC		
 			pi2s_status->txbuffer_unrun++;
