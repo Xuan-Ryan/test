@@ -868,9 +868,9 @@ elif [ "$opmode" = "1" ]; then
 	lan.sh
 	nat.sh
 	
-	# light up all of LED for RX
-	gpio l 14 4000 0 1 0 4000
-	gpio l 52 4000 0 1 0 4000
+	# light up all of LED for AP server
+	#gpio l 14 4000 0 1 0 4000
+	#gpio l 52 4000 0 1 0 4000
 
 	# set the global ipv6 address for LAN/WAN, enable ipv6 forwarding,
 	# enable ecmh(multicast) daemon
