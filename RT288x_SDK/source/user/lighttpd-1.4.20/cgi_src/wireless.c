@@ -3935,6 +3935,20 @@ int main(int argc, char *argv[])
 			system("ifconfig rai0 down up");
 			system("ifconfig apclii0 up");
 		}
+		if(strstr(nvram_bufget(RT2860_NVRAM, "HostName"), "_uninitial") != NULL){
+			char host_name[32];
+			char new_host_name[32];
+			char last_3_bytes[16];
+			char * p = NULL;
+
+			strcpy(last_3_bytes, get_mac_last3addr(get_lanif_name()));
+
+			strcpy(host_name, nvram_bufget(RT2860_NVRAM, "HostName"));
+			p = strstr(host_name, "_uninitial");
+			*p = '\0';
+			sprintf(new_host_name, "%s-%s", host_name, last_3_bytes);
+			nvram_bufset(RT2860_NVRAM, "HostName", new_host_name);
+		}
 		{
 			int mode = atoi(nvram_bufget(RT2860_NVRAM, "OperationMode"));
 			if (mode != 1) {
