@@ -8,6 +8,7 @@ nvram_daemon&
 # always set this date, because we don't have RTC and NTP in here
 date 092509002019
 
+init_system write_version
 init_system start
 
 echo 8388608  > /proc/sys/net/core/rmem_default 
@@ -34,5 +35,5 @@ ln -s /etc_ro/cron /etc/cron
 #  UVC
 uvcclient &
 
-#  for ap client
+#  for ap client check
 apclient_chkconn.sh &
