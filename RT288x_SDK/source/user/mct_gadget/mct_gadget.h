@@ -18,6 +18,7 @@
 #define TCP_TIME_OUT                            3
 
 #define PID_FILE                                "/var/run/mct_gadget.pid"
+#define CONNECTED_FILE                          "/tmp/mctgadget_connected"
 
 #define LOGFILE                                 "/dev/console"
 
@@ -56,6 +57,15 @@
                                                    } while(0)
  #else
   #define DBG_MSG(fmt, arg...)                    { }
+ #endif
+ //#define GADGET_DEEP_DEBUG                       1
+ #ifdef GADGET_DEEP_DEBUG
+  #define DEEP_MSG(fmt, arg...)                    do { FILE *log_fp = fopen(LOGFILE, "w+"); \
+                                                     fprintf(log_fp, fmt , ##arg); \
+                                                     fclose(log_fp); \
+                                                   } while(0)
+ #else
+  #define DEEP_MSG(fmt, arg...)                    { }
  #endif
 #else
  #define PRINT_MSG(fmt, arg...)                   {}

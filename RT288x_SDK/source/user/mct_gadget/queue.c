@@ -102,10 +102,9 @@ void queue_add(queue_t* queue, void* element)
 {
 	queue_element_t* new_element;
 
-	DBG_MSG("%s \n",__func__);
+	DEEP_MSG("%s \n",__func__);
 
 	if (queue == NULL || element == NULL) {
-		DBG_MSG("[queue_add] Invalid queue or element\n");
 		return;
 	}
 
@@ -134,7 +133,7 @@ void queue_add(queue_t* queue, void* element)
 int queue_length(queue_t* queue)
 {
 	if (queue) {
-		DBG_MSG("%s, length = %d\n",__func__, queue->length);
+		DEEP_MSG("%s, length = %d\n",__func__, queue->length);
 		return queue->length;
 	}
 	return 0;
@@ -169,7 +168,7 @@ void * queue_remove(queue_t* queue)
 	}
 	queue->length--;
 	void* element = node->element;
-	DBG_MSG("%s \n",__func__);
+	DEEP_MSG("%s \n",__func__);
 	free(node);
 	pthread_mutex_unlock(&queue->mutex);
 	return element;
