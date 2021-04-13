@@ -3,7 +3,8 @@ Default
 WebInit=1
 ModelName=__MODEL__
 Version=__VERSION__
-QisInit=0
+Type=RX
+Calibrated=0
 HostName=J5_uninitial
 Login=admin
 Password=admin
