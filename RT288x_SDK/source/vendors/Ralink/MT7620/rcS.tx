@@ -20,8 +20,8 @@ echo 3 > /proc/sys/net/ipv4/tcp_keepalive_intvl
 echo 3 > /proc/sys/net/ipv4/tcp_keepalive_probes
 echo 1 > /proc/sys/net/ipv4/tcp_syn_retries
 #for telnet debugging
-QisInit=`nvram_get QisInit`
-if [ "$QisInit" = "0" ]; then
+Calibrated=`nvram_get Calibrated`
+if [ "$Calibrated" = "0" ]; then
 	telnetd
 fi
 

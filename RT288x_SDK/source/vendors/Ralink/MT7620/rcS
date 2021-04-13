@@ -2,6 +2,7 @@
 mount -a
 mkdir -p /var/run
 makedevlinks.sh
+
 cat /etc_ro/motd > /dev/console
 nvram_daemon&
 
@@ -20,8 +21,8 @@ echo 3 > /proc/sys/net/ipv4/tcp_keepalive_intvl
 echo 3 > /proc/sys/net/ipv4/tcp_keepalive_probes
 
 #for telnet debugging
-QisInit=`nvram_get QisInit`
-if [ "$QisInit" = "0" ]; then
+Calibrated=`nvram_get Calibrated`
+if [ "$Calibrated" = "0" ]; then
 	telnetd
 fi
 
