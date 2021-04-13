@@ -10,28 +10,42 @@ count=0
 connected="0"
 disconnect="0"
 
+echo "red" > /tmp/led
+
 green_led()
 {
-	# light up green LED
-	gpio l 52 4000 0 1 0 4000
-	# turn off red LED
-	gpio l 14 0 4000 0 1 4000
+	current=`cat /tmp/led`
+	if [ "$current" != "green" ]; then
+		# light up green LED
+		gpio l 52 4000 0 1 0 4000
+		# turn off red LED
+		gpio l 14 0 4000 0 1 4000
+	fi
+	echo "green" > /tmp/led
 }
 
 red_led()
 {
-	# turn off green LED
-	gpio l 52 0 4000 0 1 4000
-	# light up red LED
-	gpio l 14 4000 0 1 0 4000
+	current=`cat /tmp/led`
+	if [ "$current" != "red" ]; then
+		# turn off green LED
+		gpio l 52 0 4000 0 1 4000
+		# light up red LED
+		gpio l 14 4000 0 1 0 4000
+	fi
+	echo "red" > /tmp/led
 }
 
 orange_led()
 {
-	# light up green LED
-	gpio l 52 4000 0 1 0 4000
-	# light up red LED
-	gpio l 14 4000 0 1 0 4000
+	current=`cat /tmp/led`
+	if [ "$current" != "orange" ]; then
+		# light up green LED
+		gpio l 52 4000 0 1 0 4000
+		# light up red LED
+		gpio l 14 4000 0 1 0 4000
+	fi
+	echo "orange" > /tmp/led
 }
 
 rm /tmp/timeout 1>/dev/null 2>/dev/null
@@ -58,20 +72,16 @@ if [ "$opmode" = "1" ]; then
 		disconnect=`web rtdev wifi clnConnected`
 		if [ "$disconnect" != "0" ]; then
 			# connected
-			if [ "$connected" = "0" ]; then
-				if [ -e /tmp/mctgadget_connected ]; then
-					green_led
-				else
-					orange_led
-				fi
+			if [ -e /tmp/mctgadget_connected ]; then
+				green_led
+			else
+				orange_led
 			fi
-			interval=10
+			interval=3
 			connected="1"
 		else
 			# disconnected
-			if [ "$connected" = "1" ]; then
-				red_led
-			fi
+			red_led
 			connected="0"
 			interval=2
 		fi
@@ -101,11 +111,8 @@ else
 			# check connection via conn_status command
 			disconnect=`iwpriv apclii0 conn_status|grep ApClii0|grep Disconnect`
 			if [ -n "$disconnect" ]; then
-				if [ "$connected" = "1" ]; then
-					connected="0"
-					red_led
-					count=0
-				fi
+				connected="0"
+				red_led
 				#  disconnect, do connection again
 				ssid=`nvram_get rtdev ApCliSsid`
 				if [ -n "$ssid" ]; then
@@ -124,11 +131,15 @@ else
 				count=0
 				#  store the SSID from AP
 				#  ex: ApClii0 Connected AP : 00:05:1B:00:01:02   SSID:UVC-79366D
-				CUR_SSID=`iwpriv apclii0 conn_status|awk -F ' ' '{print $6}'|awk -F ':' '{print $2}'`
+				CUR_SSID=`iwpriv apclii0 conn_status|grep 'SSID'|awk -F ' ' '{print $6}'|awk -F ':' '{print $2}'`
 				if [ -n "$CUR_SSID" ]; then
+					#  only doing one time when we switch the status from 0 to 1.
 					if [ "$connected" = "0" ]; then
 						connected="1"
 						ORG_SSID=`nvram_get rtdev ApCliSsid`
+						#  if we can get the SSID from the command below,
+						#  that mean we are connected via WPS, so we need to
+						#  extract the remote SSID from the command.
 						SSID=`iwpriv apclii0 stat|grep SSID`
 						SSID=`echo $SSID|awk -F '=' '{print $2}'`
 						SSID=`echo $SSID|xargs`
@@ -173,12 +184,11 @@ else
 								#nvram_set rtdev ApCliEncrypType AES
 							#fi
 						fi
-
-						if [ -e /tmp/uvcclient_disconnect ]; then
-							orange_led
-						else
-							green_led
-						fi
+					fi
+					if [ -e /tmp/uvcclient_disconnect ]; then
+						orange_led
+					else
+						green_led
 					fi
 				fi
 				interval=10
