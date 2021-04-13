@@ -167,7 +167,7 @@ table.inner_table_page td {
 }
 </style>
 <script type="text/javascript">
-var LocalNetworkMac = '<!--#exec cmd="web 2860 sys lanMacAddr"-->';
+var WiFiMac = '<!--#exec cmd="web rtdev sys wifiMacAddr"-->';
 function check_page_action()
 {
 	if ($('#processing').val() == 'yes')
@@ -291,19 +291,19 @@ function submit(index)
 function clear_field()
 {
 	$('#processing').val('no');
-	$('#usb_result').html('');
+	/*$('#usb_result').html('');
 	$('#led_result').html('');
 	$('#trigger_result').html('');
 	$('#image_result').html('');
 	$('#ethernet_result').html('');
-	$('#wifi_result').html('');
+	$('#wifi_result').html('');*/
 	$('#lan_mac').text('');
 
 	$('#ModelName').text('');
-	$('#wifi24g_info').text('');
+	/*$('#wifi24g_info').text('');*/
 	$('#wifi5g_info').text('');
-	$('#wifi1_mac').text('');
-	$('#wan_mac').text('');
+	/*$('#wifi1_mac').text('');
+	$('#wan_mac').text('');*/
 	$('#wifi2_mac').text('');
 	USB_Result = '';
 	ETH_Result = '';
@@ -675,6 +675,12 @@ function confirm_update()
 	});
 }
 
+function system_cmd()
+{
+	window.location.href = 'system_command.shtml?time='+Math.random()*10000000000000000;
+	return;
+}
+
 function update_fw()
 {
 	/*stop_service();*/
@@ -895,36 +901,14 @@ function parse_wifi_result(data)
 	}
 }
 
-function parse_dev_info(data)
+function parse_dev_info(obj)
 {
-	if (data.length > 0) {
-		var field = data.split(',');
-		var subfield;
-		if (field.length > 0) {
-			$('#ModelName').text('線上測試 '+field[0]+' 版本：'+field[1]);
-
-			if (field[3].length > 0) {
-				subfield = field[3].split(';');
-				if (subfield[0] == 'WPAPSKWPA2PSK')
-					$('#wifi24g_info').text('SSID:'+field[2]+' (密碼:'+field[4]+')');
-				else
-					$('#wifi24g_info').text('SSID:'+field[2]+' (密碼:'+field[5]+')');
-			}
-
-			if (field[7].length>0) {
-				subfield = field[7].split(';');
-				if (subfield[0] == 'WPAPSKWPA2PSK')
-					$('#wifi5g_info').text('SSID:'+field[6]+' (密碼:'+field[8]+')');
-				else
-					$('#wifi5g_info').text('SSID:'+field[6]+' (密碼:'+field[9]+')');
-			}
-
-			$('#lan_mac').text(field[10]);
-			$('#wifi1_mac').text(field[11]);
-			$('#wan_mac').text(field[12]);
-			$('#wifi2_mac').text(field[13]);
-		}
-		return field[10];
+	if (Object.keys(obj).length > 0) {
+		$('#ModelName').text('線上測試 '+obj.ModelName+'('+obj.Type+')'+' 版本：'+obj.Version);
+		$('#wifi5g_info').text('SSID:'+obj.ssid_5g);
+		$('#lan_mac').text(obj.mac_eth);
+		$('#wifi2_mac').text(obj.mac_5g);
+		return obj.mac_5g;
 	}
 	return '';
 }
@@ -955,51 +939,19 @@ function get_result()
 		timeout           : 0
 	}).done(function(data) {
 		if (data.length > 0) {
-			var field = data.split('>');
-			if (field[1] != '...') {
-				if (USB_Result.length == 0)
-					parse_usb_result(field[1]);
-
-				if (ETH_Result.length == 0)
-					parse_ethernet_result(field[2]);
-
-				if (Wifi_Result.length == 0)
-					parse_wifi_result(field[3]);
-
-				if (done == 0) {
-					done = 1;
-					parse_led_result('DONE');
-					parse_trigger_result('DONE');
-				}
-				setTimeout(get_result, 1000);
-
-				if (push_btn == 0 && 
-				    $('#box').is(':visible') == true &&
-				    $('#modal_pic_container').attr('class') != 'loading') {
-						closeModal();
-				}
-			} else {
-				if (push_btn == 1 &&
-				    $('#box').is(':visible') == false) {
-					openModal('processing');
-				}
-
-				setTimeout(get_result, 3000);
-			}
-
-			var lanmac = parse_dev_info(field[0]);
-			if (LocalNetworkMac != lanmac)
+			var res = JSON.parse(data);
+			var wifimac = parse_dev_info(res);
+			if (WiFiMac != wifimac) {
 				window.location.reload(true);
+			}
 		} else {
 			if (push_btn == 1) {
 				if ($('#box').is(':visible') == false)
 					openModal('processing');
 			}
-			setTimeout(get_result, 3000);
 		}
 	}).error(function(jqXHR, textStatus, errorThrown) {
 		clear_field();
-		setTimeout(get_result, 3000);
 	});
 }
 
@@ -1017,18 +969,10 @@ function back_home()
 
 var str;
 var modelName = '<!--#exec cmd="web 2860 nvram ModelName"-->';
+var dev_type = '<!--#exec cmd="web 2860 nvram Type"-->';
 var version = '<!--#exec cmd="web 2860 nvram Version"-->';
-var initialized = '<!--#exec cmd="web 2860 nvram QisInit"-->';
-var ssid24g = '<!--#exec cmd="web 2860 nvram SSID1"-->';
-str = '<!--#exec cmd="web 2860 nvram AuthMode"-->';
-var authmode24g = str.split(';');
-var wpapsk24g = '<!--#exec cmd="web 2860 nvram WPAPSK1"-->';
-var key24g = '<!--#exec cmd="web 2860 nvram Key1Str1"-->';
+var calibrated = '<!--#exec cmd="web 2860 nvram Calibrated"-->';
 var ssid5g = '<!--#exec cmd="web rtdev nvram SSID1"-->';
-str = '<!--#exec cmd="web rtdev nvram AuthMode"-->';
-var authmode5g = str.split(';');
-var wpapsk5g = '<!--#exec cmd="web rtdev nvram WPAPSK1"-->';
-var key5g = '<!--#exec cmd="web rtdev nvram Key1Str1"-->';
 
 function show_wifi()
 {
@@ -1099,11 +1043,9 @@ function show_region5g(region)
 	}
 	return region_str;
 }
-var region24g = 1*'<!--#exec cmd="web 2860 nvram CountryRegion"-->';
-var region5g = 1*'<!--#exec cmd="web rtdev nvram OurCountryRegionABand"-->';
+var region5g = 1*'<!--#exec cmd="web rtdev nvram CountryRegionABand"-->';
 function init_countryreg()
 {
-	$('#region24g').text(show_region24g(region24g));
 	$('#region5g').text(show_region5g(region5g));
 }
 
@@ -1301,17 +1243,17 @@ function stop_service()
 /* Onload */
 function initValue()
 {
-	initialized = (initialized == ''?'1':initialized);
+	calibrated = (calibrated == ''?'1':calibrated);
 
-	if (initialized == '1') {
-		back_home();
+	if (calibrated == '1') {
+		console.info('This device has beed calibrated');
 	}
 
 	init_ssid();
 
-	$('#ModelName').text('線上測試 '+modelName+' 版本：'+version);
+	$('#ModelName').text('線上測試 '+modelName+'('+dev_type+')'+' 版本：'+version);
 
-	init_fw_name();
+	/*init_fw_name();*/
 
 	parse_cookie();
 
@@ -1321,7 +1263,7 @@ function initValue()
 
 	/*stop_service();*/
 
-	/* get_result(); */
+	get_result();
 
 	setTimeout(closeModal, 300);
 
@@ -1378,13 +1320,9 @@ function cancel_btn()
                  <td class="onlinetest_table_body" style="width:100%;padding:20px" align="center">
                   <table class="inner_table_page" style="border-color:#DDDDDD" height="100%">
                    <tr>
-                    <td height="70px" class="onlinetest_table_upper_left item_font" style="width:25%;vertical-align:middle;border:1px solid #DDDDDD">無線組態</td>
+                    <td height="50px" class="onlinetest_table_upper_left item_font" style="width:25%;vertical-align:middle;border:1px solid #DDDDDD">無線組態</td>
                     <td class="onlinetest_table_upper_right" style="border:1px solid #DDDDDD;padding:0px">
                      <table class="ethernet_table">
-                      <tr>
-                       <td width="30%" height="50%" style="vertical-align:middle;border-right:1px solid #DDDDDD;border-bottom:1px solid #DDDDDD;padding:6px 6px 6px 20px" class="item_font">無線 2.4G</td>
-                       <td id="wifi24g_info" style="vertical-align:middle;border-bottom:1px solid #DDDDDD;padding:6px 6px 6px 20px" class="item_font"></td>
-                      </tr>
                      <tr>
                       <td height="50%" style="vertical-align:middle;border-right:1px solid #DDDDDD;padding:6px 6px 6px 20px" class="item_font">無線 5G</td>
                       <td id="wifi5g_info" style="vertical-align:middle;padding:6px 6px 6px 20px" class="item_font"></td>
@@ -1392,7 +1330,7 @@ function cancel_btn()
                      </table>
                     </td>
                    </tr>
-                   <tr>
+                   <!--<tr>
                     <td height="70px" style="vertical-align:middle;border:1px solid #DDDDDD">
                      <table width="100%" style="padding:0px">
                       <tr>
@@ -1478,35 +1416,7 @@ function cancel_btn()
                     </td>
                     <td id="wifi_result" style="width:75%;vertical-align:middle;border:1px solid #DDDDDD;padding:0px" class="item_font">
                     </td>
-                   </tr>
-                   <tr>
-                    <td height="50px" class="item_font" style="vertical-align:middle;border:1px solid #DDDDDD">
-                    設定頻段
-                    </td>
-                    <td style="vertical-align:middle;border:1px solid #DDDDDD">
-                     <table width="100%" height="100%">
-                      <tr>
-                       <td width="40%" class="item_font" style="vertical-align:middle">
-                        2.4G&nbsp;<span id="region24g"></span>
-                       </td>
-                       <td width="40%" class="item_font" style="vertical-align:middle">
-                        <!--<select id="country_region24g" style="width:160px">
-                         <option value="0">頻道 1~11</option>
-                   
-                         <option value="1">頻道 1~13</option>
-                         <option value="2">頻道 10~11</option>
-                         <option value="3">頻道 10~13</option>
-                         <option value="6">頻道 3~9</option>
-                         <option value="7">頻道 5~13</option>
-                        </select>-->
-                       </td>
-                       <td class="item_font" style="vertical-align:middle;text-align:center">&nbsp;&nbsp;
-                        <!--<a href="javascript:setregion(0)"><div id="setcountryreg24g" align="center" class="button" style="width:100px">設定</div></a>-->
-                       </td>
-                      </tr>
-                     </table>
-                    </td>
-                   </tr>
+                   </tr>-->
                    <tr>
                     <td height="50px" class="item_font" style="vertical-align:middle;border:1px solid #DDDDDD">
                     設定頻段
@@ -1543,13 +1453,11 @@ function cancel_btn()
                       <tr>
                        <td width="80%" class="item_font" style="vertical-align:middle">
                         <select id="model_name" style="width:200px">
-                         <option value="JWR2100">JWR2100</option>
-                         <option value="JWR2100+">JWR2100+</option>
-                         <option value="JWR2105">JWR2105</option>
+                         <option value="UVC">UVC</option>
                         </select>
                        </td>
                        <td class="item_font" style="vertical-align:middle;text-align:center">
-                        <a href="javascript:setmodelname()"><div id="setcountryreg5g" align="center" class="button" style="width:100px">設定</div></a>
+                        <!--<a href="javascript:setmodelname()"><div id="setcountryreg5g" align="center" class="button" style="width:100px">設定</div></a>-->
                        </td>
                       </tr>
                      </table>
@@ -1559,28 +1467,22 @@ function cancel_btn()
                     <td colspan="2" class="onlinetest_table_lower"  style="width:100%; padding:0px;vertical-align:middle">
                      <table class="inner_table_page_tail">
                       <tr>
-                       <td style="padding:0px">
+                       <td style="padding:0px;height:50px">
                         <table width="100%" height="100%"  class="item_font">
                          <tr>
                           <td style="vertical-align:middle;padding:5px 5px 5px 15px;border-bottom:1px solid #DDDDDD" width="20%">內部 Mac:</td>
                           <td id="lan_mac" style="vertical-align:middle;padding:5px 5px 5px 15px;border-right:1px solid #DDDDDD;border-bottom:1px solid #DDDDDD"><!--#exec cmd="web 2860 sys lanMacAddr"--></td>
-                          <td style="vertical-align:middle;padding:5px 5px 5px 15px;border-bottom:1px solid #DDDDDD" width="20%">無線 2.4G Mac:</td>
-                          <td id="wifi1_mac" style="vertical-align:middle;padding:5px 5px 5px 15px;border-right:1px solid #DDDDDD;border-bottom:1px solid #DDDDDD"><!--#exec cmd="web 2860 sys wifiMacAddr"--></td>
-                         </tr>
-                         <tr>
-                          <td style="vertical-align:middle;padding:5px 5px 5px 15px" width="20%">外部 Mac:</td>
-                          <td id="wan_mac" style="vertical-align:middle;padding:5px 5px 5px 15px;border-right:1px solid #DDDDDD"><!--#exec cmd="web 2860 sys wanMacAddr"--></td>
-                          <td style="vertical-align:middle;padding:5px 5px 5px 15px" width="20%">無線 5G Mac:</td>
-                          <td id="wifi2_mac" style="vertical-align:middle;padding:5px 5px 5px 15px;border-right:1px solid #DDDDDD"><!--#exec cmd="web rtdev sys wifiMacAddr"--></td>
+                          <td style="vertical-align:middle;padding:5px 5px 5px 15px;border-bottom:1px solid #DDDDDD" width="20%">無線 5G Mac:</td>
+                          <td id="wifi2_mac" style="vertical-align:middle;padding:5px 5px 5px 15px;border-right:1px solid #DDDDDD;border-bottom:1px solid #DDDDDD"><!--#exec cmd="web rtdev sys wifiMacAddr"--></td>
                          </tr>
                         </table>
                        </td>
                        <td align="right" style="width:15%;vertical-align:middle;border-right:1px solid #DDDDDD">
                         <table height="100%"><tr><td style="width:100%;text-align:center;vertical-align:middle;padding:0px"><a href="javascript:reset_to_default()"><div id="resetbtn" align="center" class="button" style="width:100px">重置系統</div></a></td></tr></table>
                        </td>
-                       <td align="right" style="width:15%;vertical-align:middle">
+                       <!--<td align="right" style="width:15%;vertical-align:middle">
                         <table height="100%"><tr><td style="width:100%;text-align:center;vertical-align:middle;padding:0px"><a href="javascript:retest()"><div align="center" class="button" style="width:100px">測試</div></a></td></tr></table>
-                       </td>
+                       </td>-->
                       </tr>
                      </table>
                     </td>
@@ -1596,8 +1498,10 @@ function cancel_btn()
                <table width="100%" style="padding:10px" height="40px">
                 <tr>
                  <td id="fw_name_container" style="vertical-align:middle;padding:0px 20px 0px 0px"></td>
-                 <td align="right" style="width:151px;vertical-align:middle">
-                  <table height="100%"><tr><td style="width:100%;text-align:right;vertical-align:middle;padding:0px"><a href="javascript:update_fw()"><div id="updatebtn" align="center" class="button" style="width:100px;text-align:center;vertical-align:middle">系統更新</div></a></td></tr></table>
+                 <td align="right" style="width:300px;vertical-align:middle">
+                  <table height="100%"><tr>
+                   <td style="width:100%;text-align:right;vertical-align:middle;padding:0px"><a href="javascript:system_cmd()"><div id="updatebtn" align="center" class="button" style="width:100px;text-align:center;vertical-align:middle">系統命令</div></a></td>
+                   <td style="width:100%;text-align:right;vertical-align:middle;padding:0px"><a href="javascript:update_fw()"><div id="updatebtn" align="center" class="button" style="width:100px;text-align:center;vertical-align:middle">系統更新</div></a></td></tr></table>
                  </td>
                 </tr>
                </table>
