@@ -6309,6 +6309,15 @@ void WebSysGet(char *argv[])
 		   !strcmp(argv[3], "n_AllMediaDir")) {
 		GetCounter(argv[3]);
 #endif
+	} else if (!strcmp(argv[3], "include_html")) {
+		printf("<div id='fade'></div>\n");
+		printf("<div id='box' class='modal'>");
+		printf("<div id='modal_pic_container' class='loading'></div>");
+		printf("<table id='burn_progress_box' width='220px' style='display:none'><tr><td align='center'><table width='150px'><tr>\n");
+		printf("<td style='padding:0px'><div id='burn_progress' class='easyui-progressbar' style='width:200px'></div></td>\n");
+		printf("</tr></table></td></tr></table>");
+		printf("</div>\n");
+		printf("<input type='hidden' id='processing' value='no'>\n");
 	}
 }
 
