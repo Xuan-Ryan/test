@@ -241,8 +241,38 @@ leave:
 }
 #endif
 
+static int get_region(int nvram_id, char * key)
+{
+	int region = 0;
+	const char * buf = NULL;
+	buf = nvram_bufget(nvram_id, key);
+	if (buf)
+		region = atoi(buf);
+	return region;
+}
+
+static void set_region(int nvram_id, char * key, int region)
+{
+	char value[16];
+	sprintf(value, "%d", region);
+	nvram_bufset(nvram_id, key, value);
+}
+
 void load_default(void)
 {
+	int region5g = 0;
+	char model_name[64];
+	char calibrated[4];
+
+	nvram_init(RT2860_NVRAM);
+	strcpy(model_name, nvram_bufget(RT2860_NVRAM, "ModelName"));
+	strcpy(calibrated, nvram_bufget(RT2860_NVRAM, "Calibrated"));
+	nvram_close(RT2860_NVRAM);
+	
+	nvram_init(RTDEV_NVRAM);
+	region5g = get_region(RTDEV_NVRAM, "CountryRegionABand");
+	nvram_close(RTDEV_NVRAM);
+
 	do_system("ralink_init clear 2860");
 #if defined CONFIG_LAN_WAN_SUPPORT || defined CONFIG_MAC_TO_MAC_MODE
 	do_system("ralink_init renew 2860 /etc_ro/Wireless/RT2860AP/RT2860_default_vlan");
@@ -259,7 +289,18 @@ void load_default(void)
 	system("ralink_init clear voip");
 	system("ralink_init renew voip /etc_ro/voip_default_settings");
 #endif
-	do_system("reboot");
+	nvram_init(RT2860_NVRAM);
+	nvram_bufset(RT2860_NVRAM, "ModelName", model_name);
+	nvram_bufset(RT2860_NVRAM, "Calibrated", calibrated);
+	nvram_close(RT2860_NVRAM);
+
+	nvram_init(RTDEV_NVRAM);
+	set_region(RTDEV_NVRAM, "CountryRegionABand", region5g);
+	nvram_close(RTDEV_NVRAM);
+
+	//do_system("reboot");
+	web_header();
+	printf("DONE");
 }
 
 #if defined CONFIG_LOGREAD && defined CONFIG_KLOGD

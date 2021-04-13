@@ -253,28 +253,18 @@ static void get_devinfo()
 	nvram_init(RT2860_NVRAM);
 	nvram_init(RTDEV_NVRAM);
 
-	printf("%s,", nvram_bufget(RT2860_NVRAM, "ModelName"));  //0
-	printf("%s,", nvram_bufget(RT2860_NVRAM, "Version"));    //1
-	printf("%s,", "online_test2.4g");                        //2
-	printf("%s,", nvram_bufget(RT2860_NVRAM, "AuthMode"));   //3  ;
-	printf("%s,", nvram_bufget(RT2860_NVRAM, "WPAPSK1"));    //4
-	printf("%s,", nvram_bufget(RT2860_NVRAM, "Key1Str1"));   //5
-	printf("%s,", "online_test5g");                          //6
-	printf("%s,", nvram_bufget(RTDEV_NVRAM, "AuthMode"));    //7 ;
-	printf("%s,", nvram_bufget(RTDEV_NVRAM, "WPAPSK1"));     //8
-	printf("%s,", nvram_bufget(RTDEV_NVRAM, "Key1Str1"));    //9
+	printf("{");
+	printf("\"ModelName\":\"%s\",", nvram_bufget(RT2860_NVRAM, "ModelName"));
+	printf("\"Type\":\"%s\",", nvram_bufget(RT2860_NVRAM, "Type"));
+	printf("\"Version\":\"%s\",", nvram_bufget(RT2860_NVRAM, "Version"));
+	printf("\"ssid_5g\":\"%s\",", nvram_bufget(RTDEV_NVRAM, "SSID1"));
 	tmp = get_macaddr("eth2");
 	if(tmp == NULL) tmp = "";
-	printf("%s,", tmp);  //10
-	tmp = get_macaddr("ra0");
-	if(tmp == NULL) tmp = "";
-	printf("%s,", tmp);  //11
-	tmp = get_macaddr(get_wanif_name());
-	if(tmp == NULL) tmp = "";
-	printf("%s,", tmp);  //12
+	printf("\"mac_eth\":\"%s\",", tmp);
 	tmp = get_macaddr("rai0");
 	if(tmp == NULL) tmp = "";
-	printf("%s>", tmp);  //13
+	printf("\"mac_5g\":\"%s\"", tmp);
+	printf("}");
 
 	nvram_close(RT2860_NVRAM);
 	nvram_close(RTDEV_NVRAM);
@@ -286,7 +276,7 @@ int get_result()
 
 	get_devinfo();
 
-	fp = fopen (result_path, "r");
+	/*fp = fopen (result_path, "r");
 	if (fp) {
 		fread(&item_result, 1, sizeof(item_result), fp);
 		printf("%d-", item_result.usb_test);
@@ -308,7 +298,7 @@ int get_result()
 		fclose(fp);
 	} else {
 		printf("...");
-	}
+	}*/
 }
 
 int re_test()
@@ -342,16 +332,11 @@ void set_region(char * input)
 
 	nvram_init(nvram_id);
 
-	//  I add a new OurCountryRegionABand in config file, this setting is for 
-	//  web page display, if we set this setting to band1+band4(10), and we need 
-	//  to show a dropdown box which include 3 items, 36~48, 149~165, 36~48+149~165,
-	//  then set the default value is 149~165, and also set the Channel to auto(0).
 	if (strcmp(nvram_str, "rtdev") == 0) {  //  5G
-		nvram_bufset(nvram_id, "OurCountryRegionABand", country_region);  //  write into our country region
 		if (strncmp(country_region, "6", 2) == 0) {  //  Band1
 			nvram_bufset(nvram_id, "CountryRegionABand", country_region);
 		} else if (strncmp(country_region, "10", 3) == 0) {  //  Band1+Band4
-			nvram_bufset(nvram_id, "CountryRegionABand", "4");  //  Band4 only
+			nvram_bufset(nvram_id, "CountryRegionABand", country_region);  //  Band4 only
 		}
 	} else  //  2.4G
 		nvram_bufset(nvram_id, "CountryRegion", country_region);
@@ -993,6 +978,8 @@ int main(int argc, char *argv[])
 	} else if (strcmp(item, "stop_service") == 0) {
 		do_system("killall mct_gadget");
 		do_system("killall uvcclient");
+	} else if (strcmp(item, "onlinetest") == 0) {
+		/*  TBD  */
 	} else {
 		printf("Unknown Command");
 	}
