@@ -132,18 +132,18 @@ else
 						SSID=`iwpriv apclii0 stat|grep SSID`
 						SSID=`echo $SSID|awk -F '=' '{print $2}'`
 						SSID=`echo $SSID|xargs`
-						AUTHTYPE=`iwpriv apclii0 stat|grep AuthType`
-						AUTHTYPE=`echo $AUTHTYPE|awk -F '=' '{print $2}'`
-						AUTHTYPE=`echo $AUTHTYPE|xargs`
-						ENCRYPTYPE=`iwpriv apclii0 stat|grep EncrypType`
-						ENCRYPTYPE=`echo $ENCRYPTYPE|awk -F '=' '{print $2}'`
-						ENCRYPTYPE=`echo $ENCRYPTYPE|xargs`
-						KEY=`iwpriv apclii0 stat|grep "Key "`
-						KEY=`echo $KEY|awk -F '=' '{print $2}'`
-						KEY=`echo $KEY|xargs`
 						if [ -n "$SSID" ] && [ "$SSID" != "$ORG_SSID" ]; then
 							nvram_set rtdev ApCliSsid "$SSID"
-		
+
+							#AUTHTYPE=`iwpriv apclii0 stat|grep AuthType`
+							#AUTHTYPE=`echo $AUTHTYPE|awk -F '=' '{print $2}'`
+							#AUTHTYPE=`echo $AUTHTYPE|xargs`
+							#ENCRYPTYPE=`iwpriv apclii0 stat|grep EncrypType`
+							#ENCRYPTYPE=`echo $ENCRYPTYPE|awk -F '=' '{print $2}'`
+							#ENCRYPTYPE=`echo $ENCRYPTYPE|xargs`
+							#KEY=`iwpriv apclii0 stat|grep "Key "`
+							#KEY=`echo $KEY|awk -F '=' '{print $2}'`
+							#KEY=`echo $KEY|xargs`
 							#if [ -n `echo $AUTHTYPE|grep WPA2` ]; then
 								#nvram_set rtdev ApCliAuthMode WPA2PSK
 								#nvram_set rtdev ApCliWPAPSK "$KEY"
