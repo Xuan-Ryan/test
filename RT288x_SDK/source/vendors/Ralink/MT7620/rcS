@@ -8,16 +8,25 @@ nvram_daemon&
 
 # always set this date, because we don't have RTC and NTP in here
 date 092509002019
+mknod /dev/Web_UVC0 c 255 0
+
+#  UVC
+insmod rt_udc_pdma
+#insmod g_mass_storage g_uvc_mjpeg_res_bitflag=0x0C g_uvc_h264_res_bitflag=0x1C g_uvc_yuv_res_bitflag=0x01
+#insmod g_mass_storage g_uvc_mjpeg_res_bitflag=0x0F g_uvc_h264_res_bitflag=0x0F g_uvc_yuv_res_bitflag=0x01 g_uvc_nv12_res_bitflag=0x01 g_uvc_i420_res_bitflag=0x01 g_uvc_m420_res_bitflag=0x01
+insmod g_mass_storage
 
 init_system write_version
 init_system start
+
+mct_gadget
 
 echo 8388608  > /proc/sys/net/core/rmem_default 
 echo 8388608  > /proc/sys/net/core/rmem_max
 echo 2000  > /proc/sys/net/core/netdev_max_backlog
 
 echo 5 > /proc/sys/net/ipv4/tcp_keepalive_time
-echo 3 > /proc/sys/net/ipv4/tcp_keepalive_intvl
+echo 1 > /proc/sys/net/ipv4/tcp_keepalive_intvl
 echo 3 > /proc/sys/net/ipv4/tcp_keepalive_probes
 
 #for telnet debugging
@@ -32,14 +41,6 @@ mkdir -p /var/log
 #for cpe_app
 ln -s /etc_ro/init.d /etc/init.d
 ln -s /etc_ro/cron /etc/cron
-
-#  UVC
-insmod rt_udc_pdma
-#insmod g_mass_storage g_uvc_mjpeg_res_bitflag=0x0C g_uvc_h264_res_bitflag=0x1C g_uvc_yuv_res_bitflag=0x01
-#insmod g_mass_storage g_uvc_mjpeg_res_bitflag=0x0F g_uvc_h264_res_bitflag=0x0F g_uvc_yuv_res_bitflag=0x01 g_uvc_nv12_res_bitflag=0x01 g_uvc_i420_res_bitflag=0x01 g_uvc_m420_res_bitflag=0x01
-insmod g_mass_storage
-sleep 3
-mct_gadget
 
 #  for ap client check
 apclient_chkconn.sh &
