@@ -111,7 +111,6 @@ else
 			# check connection via conn_status command
 			disconnect=`iwpriv apclii0 conn_status|grep ApClii0|grep Disconnect`
 			if [ -n "$disconnect" ]; then
-				connected="0"
 				red_led
 				#  disconnect, do connection again
 				ssid=`nvram_get rtdev ApCliSsid`
@@ -126,71 +125,68 @@ else
 						count=0
 					fi
 				fi
+				connected="0"
 				interval=2
 			else
 				count=0
-				#  store the SSID from AP
-				#  ex: ApClii0 Connected AP : 00:05:1B:00:01:02   SSID:UVC-79366D
-				CUR_SSID=`iwpriv apclii0 conn_status|grep 'SSID'|awk -F ' ' '{print $6}'|awk -F ':' '{print $2}'`
-				if [ -n "$CUR_SSID" ]; then
-					#  only doing one time when we switch the status from 0 to 1.
-					if [ "$connected" = "0" ]; then
-						connected="1"
-						ORG_SSID=`nvram_get rtdev ApCliSsid`
-						#  if we can get the SSID from the command below,
-						#  that mean we are connected via WPS, so we need to
-						#  extract the remote SSID from the command.
-						SSID=`iwpriv apclii0 stat|grep SSID`
-						SSID=`echo $SSID|awk -F '=' '{print $2}'`
-						SSID=`echo $SSID|xargs`
-						if [ -n "$SSID" ] && [ "$SSID" != "$ORG_SSID" ]; then
-							nvram_set rtdev ApCliSsid "$SSID"
+				#  only doing one time when we switch the status from 0 to 1.
+				if [ "$connected" = "0" ]; then
+					ORG_SSID=`nvram_get rtdev ApCliSsid`
+					#  if we can get the SSID from the command below,
+					#  that mean we are connected via WPS, so we need to
+					#  extract the remote SSID from the command.
+					SSID=`iwpriv apclii0 stat|grep SSID`
+					SSID=`echo $SSID|awk -F '=' '{print $2}'`
+					SSID=`echo $SSID|xargs`
+					if [ -n "$SSID" ] && [ "$SSID" != "$ORG_SSID" ]; then
+						#  store the SSID from AP
+						nvram_set rtdev ApCliSsid "$SSID"
 
-							#AUTHTYPE=`iwpriv apclii0 stat|grep AuthType`
-							#AUTHTYPE=`echo $AUTHTYPE|awk -F '=' '{print $2}'`
-							#AUTHTYPE=`echo $AUTHTYPE|xargs`
-							#ENCRYPTYPE=`iwpriv apclii0 stat|grep EncrypType`
-							#ENCRYPTYPE=`echo $ENCRYPTYPE|awk -F '=' '{print $2}'`
-							#ENCRYPTYPE=`echo $ENCRYPTYPE|xargs`
-							#KEY=`iwpriv apclii0 stat|grep "Key "`
-							#KEY=`echo $KEY|awk -F '=' '{print $2}'`
-							#KEY=`echo $KEY|xargs`
-							#if [ -n `echo $AUTHTYPE|grep WPA2` ]; then
-								#nvram_set rtdev ApCliAuthMode WPA2PSK
-								#nvram_set rtdev ApCliWPAPSK "$KEY"
-							#elif [ -n `echo $AUTHTYPE|grep WPA` ]; then
-								#nvram_set rtdev ApCliAuthMode WPAPSK
-								#nvram_set rtdev ApCliWPAPSK "$KEY"
-							#elif [ -n `echo $AUTHTYPE|grep SHARED` ]; then
-								#nvram_set rtdev ApCliAuthMode SHARED
-								#nvram_set rtdev ApCliKey1Str "$KEY"
-							#elif [ -n `echo $AUTHTYPE|grep OPEN` ]; then
-								#nvram_set rtdev ApCliAuthMode OPEN
-								#nvram_set rtdev ApCliKey1Str "$KEY"
-							#else
-								#nvram_set rtdev ApCliAuthMode WPA2PSK
-								#nvram_set rtdev ApCliWPAPSK "$KEY"
-							#fi
-		
-							#if [ -n `echo $ENCRYPTYPE|grep AES` ]; then
-								#nvram_set rtdev ApCliEncrypType AES
-							#elif [ -n `echo $ENCRYPTYPE|grep TKIP` ]; then
-								#nvram_set rtdev ApCliEncrypType AES
-							#elif [ -n `echo $ENCRYPTYPE|grep WEP` ]; then
-								#nvram_set rtdev ApCliEncrypType WEP
-							#elif [ -n `echo $ENCRYPTYPE|grep NONE` ]; then
-								#nvram_set rtdev ApCliEncrypType NONE
-							#else
-								#nvram_set rtdev ApCliEncrypType AES
-							#fi
-						fi
-					fi
-					if [ -e /tmp/uvcclient_disconnect ]; then
-						orange_led
-					else
-						green_led
+						#AUTHTYPE=`iwpriv apclii0 stat|grep AuthType`
+						#AUTHTYPE=`echo $AUTHTYPE|awk -F '=' '{print $2}'`
+						#AUTHTYPE=`echo $AUTHTYPE|xargs`
+						#ENCRYPTYPE=`iwpriv apclii0 stat|grep EncrypType`
+						#ENCRYPTYPE=`echo $ENCRYPTYPE|awk -F '=' '{print $2}'`
+						#ENCRYPTYPE=`echo $ENCRYPTYPE|xargs`
+						#KEY=`iwpriv apclii0 stat|grep "Key "`
+						#KEY=`echo $KEY|awk -F '=' '{print $2}'`
+						#KEY=`echo $KEY|xargs`
+						#if [ -n `echo $AUTHTYPE|grep WPA2` ]; then
+							#nvram_set rtdev ApCliAuthMode WPA2PSK
+							#nvram_set rtdev ApCliWPAPSK "$KEY"
+						#elif [ -n `echo $AUTHTYPE|grep WPA` ]; then
+							#nvram_set rtdev ApCliAuthMode WPAPSK
+							#nvram_set rtdev ApCliWPAPSK "$KEY"
+						#elif [ -n `echo $AUTHTYPE|grep SHARED` ]; then
+							#nvram_set rtdev ApCliAuthMode SHARED
+							#nvram_set rtdev ApCliKey1Str "$KEY"
+						#elif [ -n `echo $AUTHTYPE|grep OPEN` ]; then
+							#nvram_set rtdev ApCliAuthMode OPEN
+							#nvram_set rtdev ApCliKey1Str "$KEY"
+						#else
+							#nvram_set rtdev ApCliAuthMode WPA2PSK
+							#nvram_set rtdev ApCliWPAPSK "$KEY"
+						#fi
+				
+						#if [ -n `echo $ENCRYPTYPE|grep AES` ]; then
+							#nvram_set rtdev ApCliEncrypType AES
+						#elif [ -n `echo $ENCRYPTYPE|grep TKIP` ]; then
+							#nvram_set rtdev ApCliEncrypType AES
+						#elif [ -n `echo $ENCRYPTYPE|grep WEP` ]; then
+							#nvram_set rtdev ApCliEncrypType WEP
+						#elif [ -n `echo $ENCRYPTYPE|grep NONE` ]; then
+							#nvram_set rtdev ApCliEncrypType NONE
+						#else
+							#nvram_set rtdev ApCliEncrypType AES
+						#fi
 					fi
 				fi
+				if [ -e /tmp/uvcclient_disconnect ]; then
+					orange_led
+				else
+					green_led
+				fi
+				connected="1"
 				interval=10
 			fi
 		else
