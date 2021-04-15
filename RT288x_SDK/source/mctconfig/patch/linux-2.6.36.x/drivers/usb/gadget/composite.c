@@ -2361,7 +2361,7 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 		 * no get() method, we know only altsetting zero works.
 		 */
 		case USB_REQ_SET_INTERFACE:
-			if (ctrl->bRequestType != USB_RECIP_INTERFACE)
+			/*if (ctrl->bRequestType != USB_RECIP_INTERFACE)
 				goto unknown;
 			if (!cdev->config || w_index >= MAX_CONFIG_INTERFACES)
 				break;
@@ -2370,7 +2370,8 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 				break;
 			if (w_value && !f->set_alt)
 				break;
-			value = f->set_alt(f, w_index, w_value);
+			value = f->set_alt(f, w_index, w_value);*/
+			value = 0;
 			break;
 		case USB_REQ_GET_INTERFACE:
 			if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE))
@@ -2394,9 +2395,9 @@ static int composite_setup(struct usb_gadget *gadget, const struct usb_ctrlreque
 				{
 					//printk("Stop Streaming\n");
 					memset(mct_uvc_data.setuptoken_8byte, '\0', 8);
-					current_b_request = ctrl->bRequest;
-					current_w_value = w_value;
-					mct_uvc_data.status = 0x02;
+					//current_b_request = ctrl->bRequest;
+					//current_w_value = w_value;
+					//mct_uvc_data.status = 0x02;
 				}
 			}
 			value = 0;
