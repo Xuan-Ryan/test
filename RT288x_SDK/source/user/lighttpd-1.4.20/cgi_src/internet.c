@@ -614,8 +614,11 @@ void static_routing_init(void)
 		return;
 
 	rrs = (char *) nvram_bufget(RT2860_NVRAM, "RoutingRules");
-	if(!rrs|| !strlen(rrs))
+	if(!rrs|| !strlen(rrs)) {
+		fclose(fp);
 		return;
+	}
+
 	while (fgets(one_rule, sizeof(one_rule), fp) != NULL) {
 		if (nl) {
 			if (sscanf(one_rule, "%s%lx%lx%X%d%d%d%lx",
