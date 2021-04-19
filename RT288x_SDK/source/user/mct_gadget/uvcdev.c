@@ -37,7 +37,6 @@ int init_uvc_dev(void)
 static int cnt = 0;
 int write_uvc(char * buffer, int size)
 {
-	int ret = 0;
 	int offset = 0;
 	int page = JUVC_PAGE_SIZE;
 	char first_buf[JUVC_PAGE_SIZE];
@@ -46,8 +45,8 @@ int write_uvc(char * buffer, int size)
 	if (size <= 0)
 		return 0;
 
-	if (mct_uvc_data.status != 1)
-		return 0;
+	//if (mct_uvc_data.status != 1)
+	//	return 0;
 
 	if (uvc_fd > 0) {
 		/*  incrase 2 for header  */
@@ -74,7 +73,7 @@ int write_uvc(char * buffer, int size)
 			offset += JUVC_PAGE_SIZE;
 		}
 	}
-	return ret;
+	return offset;
 }
 
 int write_uvc4yuv(char * buffer, int size)
