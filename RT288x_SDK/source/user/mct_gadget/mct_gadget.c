@@ -771,13 +771,16 @@ static void * video_control_thread(void * arg)
 		setsockopt(tcp_control_clnsd, SOL_SOCKET, SO_KEEPALIVE, (char *)&optval, sizeof(optval));
 		optval = 3;
 		setsockopt(tcp_control_clnsd, IPPROTO_TCP, TCP_KEEPIDLE, (char *)&optval, sizeof(optval));
-		optval = 3;
+		optval = 1;
 		setsockopt(tcp_control_clnsd, IPPROTO_TCP, TCP_KEEPINTVL, (char *)&optval, sizeof(optval));
 		optval = 5;
 		setsockopt(tcp_control_clnsd, IPPROTO_TCP, TCP_KEEPCNT, (char *)&optval, sizeof(optval));
 
 		/*  maybe we don't need to wait for this, anyway, just check it out  */
 		if (!wait_setting_done()) {
+			PRINT_MSG("our device not ready yet\n");
+			close(tcp_control_clnsd);
+			tcp_control_clnsd = -1;
 			sleep(1);
 			continue;
 		}
@@ -1582,10 +1585,11 @@ static int initialize_procedure(int argc, char **argv)
 	if (check_exist_inst() < 0)
 		return -1;
 
-	load_bg();
 #ifdef SUPPORT_RING_ELEMENT
 	memset(total_size, '\0', sizeof(total_size));
+	load_bg();
 #else
+	load_bg();
 	queue = queue_create();
 #endif
 	if (init_uvc_dev() < 0)
