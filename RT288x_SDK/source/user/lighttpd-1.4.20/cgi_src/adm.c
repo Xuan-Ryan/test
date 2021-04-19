@@ -555,11 +555,13 @@ void management_init(void)
 
 	sprintf(tmp, "echo \"%s:%s\" > /etc/lighttpd.user", user, pw);
 	system(tmp);
-	do_system("ntp.sh");
+	//  remove by Tiger
+	//do_system("ntp.sh");
 #if defined CONFIG_USER_GREENAP && defined CONFIG_CROND && defined CONFIG_CRONTAB
 	do_system("greenap.sh init");
 #endif
-	do_system("ddns.sh");
+	//  remove by Tiger
+	//do_system("ddns.sh");
 #if defined CONFIG_RALINK_WATCHDOG|CONFIG_RALINK_WATCHDOG_MODULE && defined CONFIG_USER_WATCHDOG
 	watchdog_restart();
 #endif
