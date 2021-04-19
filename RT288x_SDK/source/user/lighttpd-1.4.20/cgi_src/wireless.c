@@ -1245,12 +1245,12 @@ static void restart_wps(int nvram, int wsc_enable)
 	}
 #endif
 	do_system("iwpriv %s0 set WscConfMode=0", ifprefix);
-	do_system("route delete 239.255.255.250");
+	system("route delete 239.255.255.250 1>/dev/null 2>/dev/null");
 	if (wsc_enable > 0) {
 		do_system("iwpriv %s0 set WscConfMode=%d", ifprefix, 7);
-		do_system("route add -host 239.255.255.250 dev br0");
+		system("route add -host 239.255.255.250 dev br0 1>/dev/null 2>/dev/null");
 	}
-	do_system("miniupnpd.sh init");
+	//do_system("miniupnpd.sh init");
 }
 
 void set_wifi_wpsconf(int nvram, char *input)
@@ -3882,8 +3882,9 @@ int main(int argc, char *argv[])
 #if ! defined CONFIG_FIRST_IF_NONE 
 		nvram_init(RT2860_NVRAM);
 #if defined (RT2860_WSC_SUPPORT)
-		restart_wps(RT2860_NVRAM, 
-				strtol(nvram_bufget(RT2860_NVRAM, "WscModeOption"), NULL, 10));
+		//  Tiger
+		//restart_wps(RT2860_NVRAM, 
+		//		strtol(nvram_bufget(RT2860_NVRAM, "WscModeOption"), NULL, 10));
 #endif
 		update_flash_8021x(RT2860_NVRAM);
 		//  Tiger
