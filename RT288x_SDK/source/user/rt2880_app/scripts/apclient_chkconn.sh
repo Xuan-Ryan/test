@@ -82,6 +82,7 @@ if [ "$opmode" = "1" ]; then
 		else
 			# disconnected
 			red_led
+			rm /tmp/mctgadget_connected 1>/dev/null 2>/dev/null
 			connected="0"
 			interval=2
 		fi
