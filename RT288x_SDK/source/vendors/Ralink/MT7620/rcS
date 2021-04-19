@@ -16,10 +16,10 @@ insmod rt_udc_pdma
 #insmod g_mass_storage g_uvc_mjpeg_res_bitflag=0x0F g_uvc_h264_res_bitflag=0x0F g_uvc_yuv_res_bitflag=0x01 g_uvc_nv12_res_bitflag=0x01 g_uvc_i420_res_bitflag=0x01 g_uvc_m420_res_bitflag=0x01
 insmod g_mass_storage
 
+loadbg
+
 init_system write_version
 init_system start
-
-mct_gadget
 
 echo 8388608  > /proc/sys/net/core/rmem_default 
 echo 8388608  > /proc/sys/net/core/rmem_max
@@ -41,6 +41,9 @@ mkdir -p /var/log
 #for cpe_app
 ln -s /etc_ro/init.d /etc/init.d
 ln -s /etc_ro/cron /etc/cron
+
+killall loadbg
+mct_gadget
 
 #  for ap client check
 apclient_chkconn.sh &
