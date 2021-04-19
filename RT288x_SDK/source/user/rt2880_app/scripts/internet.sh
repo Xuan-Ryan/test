@@ -4,19 +4,12 @@
 #
 # usage: internet.sh
 #
-
+echo -n "footprint 1 ================ "; echo -n `date`; echo " ====================="
 . /sbin/config.sh
 . /sbin/global.sh
 
-lan_ip=`nvram_get 2860 lan_ipaddr`
-stp_en=`nvram_get 2860 stpEnabled`
-nat_en=`nvram_get 2860 natEnabled`
-radio_off1=`nvram_get 2860 RadioOff`
+#radio_off1=`nvram_get 2860 RadioOff`
 wifi_off=`nvram_get 2860 WiFiOff`
-ra_Bssidnum=`nvram_get 2860 BssidNum`
-if [ "$CONFIG_RTDEV" != "" ]; then
-	rai_Bssidnum=`nvram_get rtdev BssidNum`
-fi
 
 genDevNode()
 {
@@ -216,10 +209,10 @@ ralink_init make_wireless_config rtdev
 #fi
 
 ifconfig lo 127.0.0.1
-
+echo -n "footprint 2 ================ "; echo -n `date`; echo " ====================="
 mdev -s
 setMDEV
-
+echo -n "footprint 3 ================ "; echo -n `date`; echo " ====================="
 #
 # init ip address to all interfaces for different OperationMode:
 #   1 = Gateway Mode
@@ -227,16 +220,16 @@ setMDEV
 #
 if [ "$opmode" = "1" ]; then
 	configVIF
-
+	echo -n "footprint 4 ================ "; echo -n `date`; echo " ====================="
 	addBr0
 	brctl addif br0 eth2
 	brctl addif br0 rai0
 	ifconfig rai0 up 1>/dev/null 2>&1
 	brctl addif br0 rai0
-
-	wan.sh
+	echo -n "footprint 5 ================ "; echo -n `date`; echo " ====================="
 	lan.sh
 	nat.sh
+	echo -n "footprint 6 ================ "; echo -n `date`; echo " ====================="
 
 	# light up all of LED for RX, No need for TX
 	#gpio l 14 4000 0 1 0 4000
@@ -246,16 +239,16 @@ if [ "$opmode" = "1" ]; then
 	# enable ecmh(multicast) daemon
 elif [ "$opmode" = "3" ]; then
 	configVIF
-
+	echo -n "footprint 4 ================ "; echo -n `date`; echo " ====================="
 	addBr0
 	brctl addif br0 eth2
 	brctl addif br0 rai0
 	ifconfig rai0 up 1>/dev/null 2>&1
 	brctl addif br0 rai0
-
-	wan.sh
+	echo -n "footprint 5 ================ "; echo -n `date`; echo " ====================="
 	lan.sh
 	nat.sh
+	echo -n "footprint 6 ================ "; echo -n `date`; echo " ====================="
 	APCLI=`nvram_get rtdev apClient`
 	if [ "$APCLI" == "1" ]; then
 		ifconfig apclii0 up
@@ -294,3 +287,4 @@ if [ "$WDGE" = "1" ]; then
 fi
 
 echo 4096 > /proc/sys/net/ipv4/tcp_max_tw_buckets
+echo -n "footprint 7 ================ "; echo -n `date`; echo " ====================="
