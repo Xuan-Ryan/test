@@ -28,6 +28,7 @@
 #define M_RES_1280X720  3
 #define M_RES_640X480   2
 #define M_RES_320X240   1
+#define T6_EN           0
 
 
 

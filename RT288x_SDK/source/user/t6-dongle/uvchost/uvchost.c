@@ -528,7 +528,7 @@ int GetDevString(int fd ,char* sMf ,char* sPt ,char* des)
 
 int process_image(char* id ,const void *p, int size)
 {
-     //printf("id = %d image size = %d \n",id,size);
+     
      char* ptr = (char*)p;
 	 int   datalen = size;
      int   i = 0; 
@@ -562,7 +562,7 @@ static int read_frame(struct uvcdev *udev )
 {
 	struct v4l2_buffer buf;
 	unsigned int i;
-    int ret;
+    int ret = 0;
 	int len;
 	char cmd[256];
     int  resetflag = 0;
@@ -603,49 +603,69 @@ static int read_frame(struct uvcdev *udev )
     }
  */   
 
+#if T6_EN
+		
+	    // hex_dump(udev->buffers[buf.index].start,1024,"formate");
+	if(udev->format == V4L2_PIX_FMT_MJPEG){
+		if(fbAddr == fbAddr1)
+		 	fbAddr = fbAddr2;
+		else
+			fbAddr = fbAddr1;
 
-     if(udev->format == V4L2_PIX_FMT_MJPEG){
-	 	if(process_image(&udev->video_id,udev->buffers[buf.index].start, buf.bytesused) ==1)
+		len= buf.bytesused + 1024 +48;
+
+		if(len < 0x100000 )
+			cmdoffset = 0x100000;
+		else if(len < 0x200000)
+		 	cmdoffset = 0x200000;
+		else
+		 	cmdoffset = 0x300000;
+		 
+		if(cmdAddrr + cmdoffset > fbAddr1){
+		 	cmdAddrr = 0;
+			resetflag = 0x80;
+		}else{
+		 	resetflag = 0;  
+		}
+		
+		if(process_image(&udev->video_id,udev->buffers[buf.index].start, buf.bytesused) ==1){
+			//printf(" image size = %d \n",buf.bytesused);
+			if(buf.bytesused > 4096){
+				//printf(" image size = %d \n",buf.bytesused);
+				ret = t6_libusb_FilpJpegFrame422(udev->buffers[buf.index].start,buf.bytesused,resetflag,cmdAddrr,fbAddr,udev->w,udev->h);
+				udev->video_id++;
+				}
+			if(ret < 0)
+				return -1;
+		}
+		cmdAddrr = cmdAddrr +cmdoffset;
+       
+	} 
+		
+		 
+		
+#else
+
+	if(udev->format == V4L2_PIX_FMT_MJPEG){
+		udev->video_id++;
+		if(process_image(&udev->video_id,udev->buffers[buf.index].start, buf.bytesused) ==1){
+			if(buf.bytesused > 4096)
+				udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id,udev->buffers[buf.index].start, buf.bytesused);
+		}
+	}else{	
 			udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused);
-     }else{	
-   			udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused);
-     }
+	}
 	
   
-
-
-   
-	
-   
-
-	
-	
-#if 0
-	if(fbAddr == fbAddr1)
-		fbAddr = fbAddr2;
-	else
-		fbAddr = fbAddr1;
-
-	len= buf.bytesused + 1024 +48;
-	 
-    if(len < 0x100000 )
-	    cmdoffset = 0x100000;
-	else if(len < 0x200000)
-		cmdoffset = 0x200000;
-	else
-		cmdoffset = 0x300000;
-		
-	if(cmdAddrr + cmdoffset > fbAddr1){
-		cmdAddrr = 0;
-		resetflag = 0x80;
-	}else{
-		resetflag = 0;	
-	}
-
-	t6_libusb_FilpJpegFrame(udev->buffers[buf.index].start,buf.bytesused,resetflag,cmdAddrr,fbAddr,udev->w,udev->h);
-	
-	cmdAddrr = cmdAddrr +cmdoffset;
 #endif
+
+   
+	
+   
+
+	
+	
+
 	//process_image(&udev->video_id,udev->buffers[buf.index].start, buf.bytesused);
 
 	if (-1 == xioctl(udev->fd, VIDIOC_QBUF, &buf)){
@@ -1887,12 +1907,7 @@ void* uvc_video_system(void *lp)
 			continue;
 	    }
      
-		if(init_device(pudev) < 0 ){
-			printf("init_device faied \n");
-			close_device(pudev);
-			closeSocket(pudev->cmd_socket);
-			continue;
-		}
+		
 	/*
 		if(pudev->format ==V4L2_PIX_FMT_H264 )
 		{
@@ -1927,6 +1942,14 @@ void* uvc_video_system(void *lp)
 			continue;
 
 		}
+
+		if(init_device(pudev) < 0 ){
+			printf("init_device faied \n");
+			close_device(pudev);
+			closeSocket(pudev->udpsocket);
+			closeSocket(pudev->cmd_socket);
+			continue;
+		}
 		
 		if(init_mmap(pudev) < 0 ){
 			printf("init_mmap faied \n");
@@ -1935,7 +1958,7 @@ void* uvc_video_system(void *lp)
 			closeSocket(pudev->cmd_socket);
 			continue;
 		}
-#if 1	
+
 
         if(start_capturing(pudev) < 0){
 			printf("start_capturing  failed \n");
@@ -1951,7 +1974,7 @@ void* uvc_video_system(void *lp)
 		pudev->video_id = 0;
 				
 		pudev->video_active= 1;	
-#if 	0	
+#if T6_EN	
 		ret = openT6dev();
 		if(ret <= 0)
 			printf("T6 open faild \n");
@@ -1991,14 +2014,14 @@ void* uvc_video_system(void *lp)
 		
 		   
 		}
-#if 0		
+#if T6_EN		
 		pthread_mutex_lock(&usb_mutex);
 		t6_libusb_set_monitor_power(0);
 		pthread_mutex_unlock(&usb_mutex);
 		closeT6evd();
 #endif		
         stop_capturing(pudev);
-#endif			
+		
         uninit_mmap(pudev);
 	
         close_device(pudev);

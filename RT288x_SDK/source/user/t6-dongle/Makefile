@@ -33,7 +33,7 @@ all:
 #	$(CC) -o hid-example hid-example.c  -lc -lpthread -lm
 #	$(CC) -o aoamode aoasw/aoasw.c -lusb -L$(ROOTDIR)/lib/libusb-0.1.12 -I$(ROOTDIR)/lib/libusb-0.1.12 
 #	$(CC) -o uvcclient uvcmain.c v4l2uvc.c alsauvc.c $(LIBS) $(CFLAGS)
-	$(CC) -o uvcclient uvchost/uvchost.c uvchost/alsauvc.c uvchost/network.c uvchost/uvcdescription.c $(LIBS) $(CFLAGS)	
+	$(CC) -o uvcclient uvchost/uvchost.c uvchost/alsauvc.c uvchost/network.c uvchost/uvcdescription.c uvchost/t6usbdongle.c $(LIBS) $(CFLAGS)	
 #	$(CC) -o uvcserver uvcserver.c $(LIBS) $(CFLAGS)  
 romfs:
 #	 cp -af usbdongledrv.ko $(ROOTDIR)/romfs/lib/modules

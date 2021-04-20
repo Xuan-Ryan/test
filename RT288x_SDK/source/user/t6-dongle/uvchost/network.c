@@ -150,6 +150,7 @@ int TcpConnect(char* ipaddr ,int port ,int t)
 	    timeout.tv_sec = t;
 	    timeout.tv_usec = 0;
 		setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,sizeof(timeout));
+		setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,sizeof(timeout));
 	}else{
 		
 		int keepalive = 1;  // ¶}±Òkeepalive
