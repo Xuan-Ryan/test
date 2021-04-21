@@ -1035,8 +1035,14 @@ function show_region5g(region)
 	case 6:
 		region_str = '(Y) 頻道 36~48';
 		break;
+	case 8:
+		region_str = '頻道 50~64';
+		break;
 	case 10:
 		region_str = '(X) 頻道 36~48,149~165';
+		break;
+	case 12:
+		region_str = '頻道 36~144'
 		break;
 	default:
 		region_str = '沒有設定';
@@ -1430,11 +1436,13 @@ function cancel_btn()
                        <td width="40%" class="item_font" style="vertical-align:middle">
                         <select id="country_region5g" style="width:200px">
                          <!--<option value="0">頻道 36~64,149~165</option>
-                         <option value="1">頻道 36~64,100~140</option>
-                         <option value="5">頻道 149~161</option>-->
+                         <option value="1">頻道 36~64,100~140</option>-->
+			 <option value="4">頻道 149~165</option>
+                         <option value="5">頻道 149~161</option>
                          <option value="6">(Y) 頻道 36~48</option>
-                         <!--<option value="4">頻道 149~165</option>-->
+			 <option value="8">頻道 50~64</option>
                          <option value="10">(X) 頻道 36~64,149~165</option>
+			 <option value="12">頻道 36~144</option>
                         </select>
                        </td>
                        <td class="item_font" style="vertical-align:middle;text-align:center">
