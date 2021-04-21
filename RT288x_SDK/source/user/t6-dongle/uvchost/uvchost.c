@@ -1559,6 +1559,67 @@ void *tcp_detect_system(void *lp)
 }
 
 
+void Set_LED_Control(int state)
+{
+	FILE * file = NULL;
+	char str[256];
+	char * pch = NULL;
+	int  led_state = 0;
+	file = fopen("/tmp/led" , "r+");
+	
+    if(file == NULL){
+		printf("no led file \n");
+		if(state == 1){ //orage
+			printf("cmd read sokcet failed \n");
+			system("gpio l 14 4000 0 1 0 4000"); 
+			system("date > /tmp/uvcclient_disconnect");
+		}else if (state == 3){ //green
+			system("gpio l 52 4000 0 1 0 4000");  
+			system("gpio l 14 0 4000 0 1 4000");
+			system("rm /tmp/uvcclient_disconnect");
+		}
+		return;
+    }
+	
+	while (fgets(str, sizeof(str), file)) {
+        pch = strstr(str,"orange");
+		if(pch != NULL){
+			led_state = 1;
+			break;
+		}
+		pch = strstr(str,"red");
+		if(pch != NULL){
+			led_state = 2;
+			break;
+		}
+
+		pch = strstr(str,"green");
+		if(pch != NULL){
+			led_state = 3;
+			break;
+		}
+	}
+	fclose(file);
+	if(led_state != state){
+		file = fopen("/tmp/led" , "w");
+		if(state == 1){ //orage
+			printf("cmd read sokcet failed \n");
+			system("gpio l 14 4000 0 1 0 4000"); 
+			system("date > /tmp/uvcclient_disconnect");
+			fputs ("orange",file);
+		}else if (state == 3){ //green
+			system("gpio l 52 4000 0 1 0 4000");  
+			system("gpio l 14 0 4000 0 1 4000");
+			system("rm /tmp/uvcclient_disconnect");
+			fputs ("green",file);
+		}
+		fclose(file);
+	}
+
+	
+
+}
+
 void uvc_default_setting(struct uvcdev* pudev)
 {
 	pudev->format = V4L2_PIX_FMT_MJPEG;
@@ -1631,8 +1692,9 @@ void* uvc_cmd_system(void *lp)
 	        ret = TcpRead(pudev->cmd_socket,cmd,32);
 	        if(ret <= 0){
                 printf("cmd read sokcet failed \n");
-				system("gpio l 14 4000 0 1 0 4000");
-				system("date > /tmp/uvcclient_disconnect");
+				//system("gpio l 14 4000 0 1 0 4000"); 
+				//system("date > /tmp/uvcclient_disconnect");
+				Set_LED_Control(1);
 				close(cmd_fd);
 				cmd_fd = 0;
 				pudev->video_active = 0;
@@ -1676,9 +1738,10 @@ void* uvc_cmd_system(void *lp)
 							break;
 			        	}
                         
-						system("gpio l 52 4000 0 1 0 4000");
-						system("gpio l 14 0 4000 0 1 4000");
-						system("rm /tmp/uvcclient_disconnect");
+						//system("gpio l 52 4000 0 1 0 4000");  
+						//system("gpio l 14 0 4000 0 1 4000");
+						//system("rm /tmp/uvcclient_disconnect");
+						Set_LED_Control(3);
 						break;
 
 
