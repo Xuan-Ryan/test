@@ -32,8 +32,8 @@ mkdir -p /var/log
 ln -s /etc_ro/init.d /etc/init.d
 ln -s /etc_ro/cron /etc/cron
 
-#  UVC
-uvcclient &
-
 #  for ap client check
 apclient_chkconn.sh &
+
+#  UVC
+uvcclient &
