@@ -2,7 +2,13 @@
 #include "upload.h"
 #include <string.h>
 
-#define REFRESH_TIMEOUT		"40000"		/* 40000 = 40 secs*/
+#define LOGFILE	"/dev/console"
+#define DBG_MSG(fmt, arg...)	do {	FILE *log_fp = fopen(LOGFILE, "w+"); \
+						fprintf(log_fp, "%s:%s:%d:" fmt "\n", __FILE__, __func__, __LINE__, ##arg); \
+						fclose(log_fp); \
+					} while(0)
+
+#define REFRESH_TIMEOUT		"2000"		/* 40000 = 40 secs*/
 
 #define RFC_ERROR "RFC1867 error"
 #define UPLOAD_FILE "/var/tmpFW"
@@ -201,13 +207,10 @@ void javascriptUpdate(int success)
 	printf("<script language=\"JavaScript\" type=\"text/javascript\">");
 	if(success){
 		printf(" \
-function refresh_all(){	\
-  window.location.href = \"http://%s\"; \
-} \
 function update(){ \
   console.info('%s'); \
-  self.setTimeout(\"refresh_all()\", %s);\
-}", getLanIP(), getLanIP(), REFRESH_TIMEOUT);
+  window.history.replaceState({}, '', '/');\
+}", getLanIP(), REFRESH_TIMEOUT);
 	}else{
 		printf("function update(){ window.history.replaceState({}, '', '/'); }");
 	}
@@ -219,6 +222,7 @@ inline void webFoot(void)
 	printf("</body></html>\n");
 }
 
+#define	MAX_BUFFER_SIZE		1024*1024
 int main (int argc, char *argv[])
 {
 	char *file_begin, *file_end;
@@ -228,12 +232,13 @@ int main (int argc, char *argv[])
 	FILE *fp = fopen(UPLOAD_FILE, "w");
 	long inLen;
 	char *inStr;
+	long receive_size = 0;
+	long write_remainder = 0;
+	long real_file_size = 0;
+	image_header_t * header;
 
 	inLen = strtol(getenv("CONTENT_LENGTH"), NULL, 10) + 1;
-	inStr = malloc(inLen);
-	memset(inStr, 0, inLen);
-	fread(inStr, 1, inLen, stdin);
-	printf(
+printf(
 "\
 Server: %s\n\
 Pragma: no-cache\n\
@@ -249,42 +254,63 @@ getenv("SERVER_SOFTWARE"));
 </head>\n\
 <body onload=\"update()\"> <h1> Upload Firmware</h1>");
 
+	//  allocate 1M bytes
+	inStr = malloc(MAX_BUFFER_SIZE);
+	//  read the first block
+	fread(inStr, 1, MAX_BUFFER_SIZE, stdin);
+	//  count the receive size
+	receive_size += MAX_BUFFER_SIZE;
+
 	line_begin = inStr;
+
+	//  extract the boundary and keep it
+	//  ex: ------WebKitFormBoundaryXVNs7VyzAAnxkHCm
 	if ((line_end = strstr(line_begin, "\r\n")) == 0) {
 		printf("%s %d", RFC_ERROR, 1);
+		javascriptUpdate(0);
+		webFoot();
+		free(inStr);
+		fclose(fp);
 		return -1;
 	}
 	boundary_len = line_end - line_begin;
 	boundary = malloc(boundary_len+1);
 	if (NULL == boundary) {
 		printf("boundary allocate %d faul!\n", boundary_len);
+		javascriptUpdate(0);
 		goto err;
 	}
 	memset(boundary, 0, boundary_len+1);
 	memcpy(boundary, line_begin, boundary_len);
-
-	// sth like this..
-	// Content-Disposition: form-data; name="filename"; filename="\\192.168.3.171\tftpboot\a.out"
-	//
+	//  shift to next section
+	//  ex: Content-Disposition: form-data; name="filename"; filename="UVC-j5-TX-0.0.0.4.bin"
 	line_begin = line_end + 2;
 	if ((line_end = strstr(line_begin, "\r\n")) == 0) {
 		printf("%s %d", RFC_ERROR, 2);
+		javascriptUpdate(0);
 		goto err;
 	}
 	if(strncasecmp(line_begin, 
 		       "content-disposition: form-data;", 
 		       strlen("content-disposition: form-data;"))) {
 		printf("%s %d", RFC_ERROR, 3);
+		javascriptUpdate(0);
 		goto err;
 	}
+	//  shift to name="filename";....
+	//  if we can't find the ';' that means we got the wrong format
 	line_begin += strlen("content-disposition: form-data;") + 1;
-	if (!(line_begin = strchr(line_begin, ';'))){
+	if (!(line_begin=strchr(line_begin, ';'))){
 		printf("We dont support multi-field upload.\n");
+		javascriptUpdate(0);
 		goto err;
 	}
+	//  shift to filename="..."
+	//  if we can't find the "filename=" thaa means we got the wrong format
 	line_begin += 2;
 	if (strncasecmp(line_begin, "filename=", strlen("filename="))) {
 		printf("%s %d", RFC_ERROR, 4);
+		javascriptUpdate(0);
 		goto err;
 	}
 
@@ -292,29 +318,68 @@ getenv("SERVER_SOFTWARE"));
 	// but if our firmware extension name is the same with other known ones, 
 	// the browser would use other content-type instead.
 	// So we dont check Content-type here...
+	//  shift to next section
+	//  ex: Content-Type: application/octet-stream
 	line_begin = line_end + 2;
+	//  find 2 times "\r\n"
+	//  if not that means we got the wrong file content
 	if ((line_end = strstr(line_begin, "\r\n")) == 0) {
 		printf("%s %d", RFC_ERROR, 5);
+		javascriptUpdate(0);
 		goto err;
 	}
 	line_begin = line_end + 2;
 	if ((line_end = strstr(line_begin, "\r\n")) == 0) {
 		printf("%s %d", RFC_ERROR, 6);
+		javascriptUpdate(0);
 		goto err;
 	}
-	file_begin = line_end + 2;
-	file_end = (char*)memmem(file_begin, inLen - (file_begin - inStr), 
-				 boundary, boundary_len);
-	file_end -= 2;		// back 2 chars.(\r\n);
-	fwrite(file_begin, 1, file_end - file_begin, fp);
+	//  shift to the start of the firmware file
+	line_begin = line_end + 2;
+
+	header = (image_header_t *)line_begin;
+	//  get the kernel size from header
+	if (inLen <= (ntohl(header->ih_ksz)+64)) {
+		printf("wrong length of content from client!\n");
+		javascriptUpdate(0);
+		goto err;
+	}
+	//  need to add the size of header
+	write_remainder = real_file_size = ntohl(header->ih_ksz)+64;
+	//  write the first 1M bytes to the temp file, but needs to reduce the header of HTML
+	fwrite(line_begin, 1, MAX_BUFFER_SIZE-(line_begin-inStr), fp);
+
+	//  count the file size
+	write_remainder -= MAX_BUFFER_SIZE-(line_begin-inStr);
+	while(write_remainder) {
+		memset(inStr, 0, MAX_BUFFER_SIZE);
+		if (write_remainder >= MAX_BUFFER_SIZE) {
+			fread(inStr, 1, MAX_BUFFER_SIZE, stdin);
+			fwrite(inStr, 1, MAX_BUFFER_SIZE, fp);
+			receive_size += MAX_BUFFER_SIZE;
+			write_remainder -= MAX_BUFFER_SIZE;
+		} else {
+			fread(inStr, 1, write_remainder, stdin);
+			fwrite(inStr, 1, write_remainder, fp);
+			receive_size += write_remainder;
+			write_remainder = 0;
+			//  recevice the last data and ingore it
+			fread(inStr, 1, inLen-receive_size, stdin);
+			receive_size += (inLen-receive_size);
+		}
+	}
+	if (receive_size != inLen) {
+		if (inLen-receive_size > 0)
+			fread(inStr, 1, inLen-receive_size, stdin);
+	}
 
 	// examination
 #if defined (UPLOAD_FIRMWARE_SUPPORT)
-		if(!check(UPLOAD_FILE, 0, file_end - file_begin, err_msg) ){
-			printf("Not a valid firmware. %s", err_msg);
-			javascriptUpdate(0);
-			goto err;
-		}
+	if(!check(UPLOAD_FILE, 0, real_file_size, err_msg) ){
+		printf("Not a valid firmware. %s", err_msg);
+		javascriptUpdate(0);
+		goto err;
+	}
 
 	/*
 	 * write the current linux version into flash.
@@ -323,15 +388,14 @@ getenv("SERVER_SOFTWARE"));
 #ifdef CONFIG_RT2880_DRAM_8M
 	system("killall goahead");
 #endif
-
 	// flash write
-	if( mtd_write_firmware(UPLOAD_FILE, 0, file_end - file_begin) == -1){
+	if( mtd_write_firmware(UPLOAD_FILE, 0, real_file_size) == -1){
 		printf("mtd_write fatal error! The corrupted image has ruined the flash!!");
 		javascriptUpdate(0);
 		goto err;
 	}
 #elif defined (UPLOAD_BOOTLOADER_SUPPORT)
-		mtd_write_bootloader(UPLOAD_FILE, 0, file_end - file_begin);
+		mtd_write_bootloader(UPLOAD_FILE, 0, real_file_size);
 #else
 #error "no upload support defined!"
 #endif

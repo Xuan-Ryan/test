@@ -332,12 +332,9 @@ void set_region(char * input)
 
 	nvram_init(nvram_id);
 
-	if (strcmp(nvram_str, "rtdev") == 0) {  //  5G
-		if (strncmp(country_region, "6", 2) == 0) {  //  Band1
-			nvram_bufset(nvram_id, "CountryRegionABand", country_region);
-		} else if (strncmp(country_region, "10", 3) == 0) {  //  Band1+Band4
-			nvram_bufset(nvram_id, "CountryRegionABand", country_region);  //  Band4 only
-		}
+	if (strcmp(nvram_str, "rtdev") == 0) {
+		//  5G
+		nvram_bufset(nvram_id, "CountryRegionABand", country_region);
 	} else  //  2.4G
 		nvram_bufset(nvram_id, "CountryRegion", country_region);
 
