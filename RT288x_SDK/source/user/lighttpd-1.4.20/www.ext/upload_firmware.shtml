@@ -156,7 +156,7 @@ function uploadFirmwareUSBCheck()
 	document.ForceMemUpgrade.ForceMemUpgradeSelect.disabled = true;
 	document.ForceMemUpgrade.ForceMemUpgradeSubmit.disabled = true;
 
-    document.getElementById("loading").style.display="block";
+	document.getElementById("loading").style.display="block";
 	_singleton = 1;
 	return true;
 }
@@ -235,81 +235,34 @@ function pageInit()
 </script>
 
 <body onLoad="pageInit()">
-<table class="body"><tbody><tr><td>
-<h1 id="uploadTitle">Upgrade Firmware</h1>
-<p><font id="uploadIntroduction1">Upgrade the MediaTek SoC firmware to obtain new functionality. </font><font id="uploadIntroduction2" color="#ff0000">It takes about 1 minute to upload &amp; upgrade flash and be patient please. Caution! A corrupted image will hang up the system.</font> </p>
-
-<!-- ----------------- Upload firmware Settings ----------------- -->
-<form method="post" name="UploadFirmware" action="/cgi-bin/upload.cgi" enctype="multipart/form-data">
-<table border="1" cellpadding="2" cellspacing="1" width="95%">
-<tbody><tr>
-  <td class="title" colspan="2" id="uploadFW">Update Firmware</td>
-</tr>
-<tr>
-  <td class="head" id="uploadFWLocation">Location:</td>
-	<td> <input name="filename" size="20" maxlength="256" type="file"> </td>
-</tr>
-</tbody></table>
-<input value="Apply" id="uploadFWApply" name="UploadFirmwareSubmit" type="submit" onClick="return uploadFirmwareCheck();"> &nbsp;&nbsp;
-</form>
-
-<form method="get" name="UploadFirmwareUSB" action="/cgi-bin/usb_upgrade.cgi" hidden>
-<table id="uploadFWUSBTable" name="uploadFWUSBTable" border="1" cellpadding="2" cellspacing="1" width="95%">
-<tbody><tr>
-  <td class="title" colspan="2" id="uploadFWFromUSB">Update Firmware From USB Disk</td>
-</tr>
-<tr>
-  <td class="head" id="uploadFWUSBLocation">Location:</td>
+<table class="body">
+ <tr>
   <td>
-	<select name="firmware_path" size="1">
-		<!-- ....Javascript will update these options.... -->
-	</select>                        
+   <h1 id="uploadTitle">Upgrade Firmware</h1>
+   <p>
+    <font id="uploadIntroduction1">Upgrade the MediaTek SoC firmware to obtain new functionality. </font>
+    <font id="uploadIntroduction2" color="#ff0000">It takes about 1 minute to upload &amp; upgrade flash and be patient please. Caution! A corrupted image will hang up the system.</font>
+   </p>
+   <!-- ----------------- Upload firmware Settings ----------------- -->
+   <form method="post" name="UploadFirmware" action="/cgi-bin/upload.cgi" enctype="multipart/form-data">
+    <table border="1" cellpadding="2" cellspacing="1" width="95%">
+     <tr>
+      <td class="title" colspan="2" id="uploadFW">Update Firmware</td>
+     </tr>
+     <tr>
+      <td class="head" id="uploadFWLocation">Location:</td>
+      <td><input name="filename" size="20" maxlength="256" type="file"></td>
+     </tr>
+    </table>
+    <input value="Apply" id="uploadFWApply" name="UploadFirmwareSubmit" type="submit" onClick="return uploadFirmwareCheck();"> &nbsp;&nbsp;
+   </form>
   </td>
-</tr>
-</tbody></table>
-<table border="0" id="uploadFWUSBSubmit" name="uploadFWUSBSubmit">
-  <tr>
-    <td>
-      <input value="Apply" id="uploadFWUSBApply" name="UploadFirmwareUSBSubmit" type="submit" onClick="return uploadFirmwareUSBCheck()">
-    </td>
-</form>
-<form method="get" name="ScanUSBFirmware" action="/goform/ScanUSBFirmware" hidden>
-    <td>
-  <input value="Scan" id="uploadFWUSBScan" name="UploadFirmwareUSBScan" type="submit"> &nbsp;&nbsp;
-    </td>
-</form>
-  </tr>
+ </tr>
+ <tr>
+  <td>
+   <div id="progress">0</div>
+  </td>
+ </tr>
 </table>
-<form method="post" name="UploadBootloader" action="/cgi-bin/upload_bootloader.cgi" enctype="multipart/form-data" hidden>
-<table border="1" cellpadding="2" cellspacing="1" width="95%">
-<tbody><tr>
-  <td class="title" colspan="2" id="uploadBoot">Update Bootloader</td>
-</tr>
-<tr>
-  <td class="head" id="uploadBootLocation">Location:</td>
-	<td> <input name="filename" size="20" maxlength="256" type="file"> </td>
-</tr>
-</tbody></table>
-<input value="Apply" id="uploadBootApply" name="UploadBootloaderSubmit" onclick="return formBootloaderCheck();" type="submit"> &nbsp;&nbsp;
-</form>
-<form method="post" name="ForceMemUpgrade" action="/goform/forceMemUpgrade" hidden>
-<table border="1" id="div_memupgrade" cellpadding="2" cellspacing="1" width="95%">
-<tbody><tr>
-	<td class="title" colspan="2" id="ForceUpgradeViaMem">Force upgrade via memory</td>
-</tr>
-<tr>
-	<td class="head" id="Force">Force:</td>
-	<td>
-		<select name="ForceMemUpgradeSelect" size="1">
-			<option value="0">No</option>
-			<option value="1">Yes</option>
-		</select>                        
-	</td>
-</tr>
-</tbody></table>
-<input value="Apply" id="ForceMemUpgradeSubmit" name="ForceMemUpgradeSubmit" type="submit"> &nbsp;&nbsp;
-</form>
-
-<br>
-</td></tr></tbody></table>
-</body></html>
+</body>
+</html>
