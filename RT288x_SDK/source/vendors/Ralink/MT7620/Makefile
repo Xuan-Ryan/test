@@ -8,7 +8,6 @@ ROMFS_DIR = $(ROOTDIR)/romfs
 RAMDISK_SIZE  := $(shell echo $(CONFIG_BLK_DEV_RAM_SIZE))
 MKIMAGE_DIR = $(ROOTDIR)/user/mkimage
 CUR_DIR = $(shell pwd)
-COMP = lzma
 
 ROMFS_DIRS = \
 	tmp \
@@ -196,7 +195,7 @@ mkimage: $(MKIMAGE_DIR)/crc32.c $(MKIMAGE_DIR)/mkimage.c
 
 image: mkimage
 	$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S $(ROOTDIR)/$(LINUXDIR)/vmlinux  $(KERNELZ)
-	cd $(IMAGEDIR) ; rm -f $(KERNELZ).*; $(COMP) -9 -f -S .$(COMP) $(KERNELZ)
+	cd $(IMAGEDIR)
 
 ifeq	($(CONFIG_BLK_DEV_INITRD),)
 ifeq	($(CONFIG_ROOTFS_IN_FLASH_NO_PADDING),)
@@ -229,40 +228,40 @@ ifeq	($(CONFIG_ROOTFS_IN_FLASH_NO_PADDING),)
 	#        (90000) MTD Kernel Partition Size (Unit:Bytes)
 	#=============================================================
 	# Original Kernel Image Size
-	  @wc -c $(KERNELZ).$(COMP)
+	  @wc -c $(KERNELZ)
 	# Padded Kernel Image Size 
 ifeq    ($(findstring 0x, $(CONFIG_MTD_KERNEL_PART_SIZ)),0x)
-	  @SIZE=`wc -c $(KERNELZ).$(COMP) | awk '{ print $$1 }'` ; \
+	  @SIZE=`wc -c $(KERNELZ) | awk '{ print $$1 }'` ; \
 	   MTD_KRN_PART_SIZE=`printf "%d" $(CONFIG_MTD_KERNEL_PART_SIZ)` ; \
 	   PAD=`expr $$MTD_KRN_PART_SIZE - 64 - $$SIZE` ; \
-	   dd if=/dev/zero count=1 bs=$$PAD 2> /dev/null | tr \\000 \\377 >> $(KERNELZ).$(COMP)
+	   dd if=/dev/zero count=1 bs=$$PAD 2> /dev/null | tr \\000 \\377 >> $(KERNELZ)
 else
-	  @SIZE=`wc -c $(KERNELZ).$(COMP) | awk '{ print $$1 }'` ; \
+	  @SIZE=`wc -c $(KERNELZ) | awk '{ print $$1 }'` ; \
 	   MTD_KRN_PART_SIZE=`printf "%d" 0x$(CONFIG_MTD_KERNEL_PART_SIZ)` ; \
 	   PAD=`expr $$MTD_KRN_PART_SIZE - 64 - $$SIZE` ; \
-	   dd if=/dev/zero count=1 bs=$$PAD 2> /dev/null | tr \\000 \\377 >> $(KERNELZ).$(COMP)
+	   dd if=/dev/zero count=1 bs=$$PAD 2> /dev/null | tr \\000 \\377 >> $(KERNELZ)
 endif
 endif
-	@wc -c $(KERNELZ).$(COMP)
+	@wc -c $(KERNELZ)
 	# Original RootFs Size 
 	  @du -sb $(ROMFSDIR)
 	# Compressed RootFs Size 
 	  @wc -c $(RAMDISK)
 	# Padded Kernel Image + Compressed Rootfs Size
-	  @cat $(RAMDISK) >> $(KERNELZ).$(COMP) 
-	  @wc -c $(KERNELZ).$(COMP)
+	  @cat $(RAMDISK) >> $(KERNELZ)
+	  @wc -c $(KERNELZ)
 	#===========================================
 endif
 
 ifeq	($(CONFIG_ROOTFS_IN_FLASH_NO_PADDING),y)
 	@cd $(IMAGEDIR) ; \
-	ISIZE=`wc -c $(KERNELZ).$(COMP) | awk '{print $$1}'` ; \
+	ISIZE=`wc -c $(KERNELZ) | awk '{print $$1}'` ; \
 	RSIZE=`wc -c $(RAMDISK) | awk '{print $$1}'` ; \
 	KRN_SIZE=`expr $$ISIZE - $$RSIZE + 64` ; \
 	ENTRY=`readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}'` ; \
-	$(CUR_DIR)/mkimage -A mips -O linux -T kernel -C $(COMP) -a 80000000 -e $$ENTRY -k $$KRN_SIZE -n "Linux Kernel Image" -d $(KERNELZ).$(COMP) $(IMAGE)
+	$(CUR_DIR)/mkimage -A mips -O linux -T kernel -C none -a 80000000 -e $$ENTRY -k $$KRN_SIZE -n "Linux Kernel Image" -d $(KERNELZ) $(IMAGE)
 else
-	@cd $(IMAGEDIR) ; $(CUR_DIR)/mkimage -A mips -O linux -T kernel -C $(COMP) -a 80000000 -e $(shell readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}') -k `ls $(KERNELZ).$(COMP) -l | awk '{print $$5}'` -n '$(__MODEL):$(__TYPE):$(__VERSION)' -d $(KERNELZ).$(COMP) $(IMAGE);cp $(IMAGE) $(FINAL_IMAGE) ; \
+	@cd $(IMAGEDIR) ; $(CUR_DIR)/mkimage -A mips -O linux -T kernel -C none -a 80000000 -e $(shell readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}') -k `ls $(KERNELZ) -l | awk '{print $$5}'` -n '$(__MODEL):$(__TYPE):$(__VERSION)' -d $(KERNELZ) $(IMAGE);cp $(IMAGE) $(FINAL_IMAGE) ; \
 	echo 'Current Type is $(__TYPE)'
 endif
 
