@@ -135,6 +135,7 @@ typedef struct juvc_hdr_packet {
 #define JUVC_CONTROL_GET                        9
 #define JUVC_CONTROL_GETVC                      10
 #define JUVC_CONTROL_STOP_START                 11
+#define JUVC_CONTROL_MOBILE_DEV                 12
 
 /*  JUVC_RES_XXX  */
 #define JUVC_RESPONSE_ACK                       1

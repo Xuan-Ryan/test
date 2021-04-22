@@ -147,6 +147,9 @@ int ioctl_uvc(int ioctrl_cmd, void * data)
 			DBG_MSG("ioctl done\n");
 			//pthread_mutex_unlock(&uvc_mutex);
 			return 0;
+		case UVC_RESET_TO_DEFAULT:
+			ioctl(uvc_fd, UVC_RESET_TO_DEFAULT, NULL);
+			return 0;
 		case CTRLEP_WRITE:
 			ioctl(uvc_fd, CTRLEP_WRITE, (char *)data);
 			return 0;

@@ -97,6 +97,7 @@
 #define UVC_EP0_CLEAR_HALT				0xF9
 #define UVC_SET_VC_DESC					0xFA
 #define UVC_GET_UVC_VER					0xFB
+#define UVC_RESET_TO_DEFAULT				0xFC
 
 extern __u16 currentbcdUVC;
 extern void uvc_change_desc_compatable(void);
@@ -2912,6 +2913,22 @@ long device_ioctl(struct file *file, unsigned int cmd, unsigned long data)
 	case UVC_EP0_CLEAR_HALT:
 		usb_ep_clear_halt(g_uvc_gadget->ep0);
 		break;
+	case UVC_RESET_TO_DEFAULT:
+		myManufacturer_len = 0;
+		memcpy(myProduct, "UVC Camera", strlen("UVC Camera"));
+		myProduct_len = strlen("UVC Camera");;
+		g_uvc_mjpeg_res_bitflag = 0x08;
+		g_uvc_h264_res_bitflag= 0x0;
+		g_uvc_yuv_res_bitflag= 0x0;
+		g_uvc_nv12_res_bitflag= 0x0;
+		g_uvc_i420_res_bitflag= 0x0;
+		g_uvc_m420_res_bitflag= 0x0;
+		g_uvc_camera_terminal_controlbit = 0x0;
+		g_uvc_processing_controlbit = 0x0;
+		myidVendor = cpu_to_le16(HIDG_VENDOR_NUM);
+		myidProduct = cpu_to_le16(HIDG_PRODUCT_NUM);
+		client_connected = 1;
+		uvc_change_desc_compatable();
 	default :
 		printk("device_ioctl: command format error\n");
 	}

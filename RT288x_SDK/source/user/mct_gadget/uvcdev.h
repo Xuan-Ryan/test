@@ -59,6 +59,7 @@ typedef struct _uvc_capabilities_data {
 #define UVC_EP0_CLEAR_HALT                      0xF9
 #define UVC_SET_VC_DESC                         0xFA
 #define UVC_GET_UVC_VER                         0xFB
+#define UVC_RESET_TO_DEFAULT                    0xFC
 
 
 int init_uvc_dev(void);

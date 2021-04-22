@@ -829,6 +829,9 @@ static void * video_control_thread(void * arg)
 						LED_control(1);
 						connected_status(1);
 						client_connected = 1;
+					} else if (juvchdr.Flags == JUVC_CONTROL_MOBILE_DEV) {
+						i2s_stop = 0;
+						client_connected = 1;
 					} else if (juvchdr.Flags == JUVC_CONTROL_MANUFACTURER) {
 						char buffer[256];
 						read(tcp_control_clnsd, buffer, juvchdr.TotalLength);
@@ -866,6 +869,7 @@ static void * video_control_thread(void * arg)
 		PRINT_MSG("mct_gadget: client disconnected\n");
 		client_connected = 0;
 		i2s_stop = 1;
+		ioctl_uvc(UVC_RESET_TO_DEFAULT, NULL);
 		usb_hub_reset(0);
 		LED_control(0);
 		connected_status(0);
