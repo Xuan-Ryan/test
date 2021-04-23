@@ -25,91 +25,190 @@
 <script type="text/javascript" src="/js/shareFun.js"></script>
 <script language="JavaScript" type="text/javascript">
 document.write('<div id="loading" style="display: none;"><br><br><br>Uploading firmware <br><br> Please be patient and don\'t turn off the device</div>');
-//var storageb = 1*<!--#exec cmd="web 2860 build storage"-->;
-var storageb = 0;
-var firmware_path = "";
-var secs
-var timerID = null
-var timerRunning = false
-var timeout = 3
-var delay = 1000
-
-function InitializeTimer(){
-	if(!storageb)
-		return;
-    // Set the length of the timer, in seconds
-    secs = timeout
-    StopTheClock()
-    StartTheTimer()
-}
-
-function StopTheClock(){
-    if(timerRunning)
-        clearTimeout(timerID)
-    timerRunning = false
-}
-
-function StartTheTimer(){
-	if(!storageb)
-		return;
-
-    if (secs==0){
-        StopTheClock()
-
-        timerHandler();
-
-        secs = timeout
-        StartTheTimer()
-    }else{
-        self.status = secs
-        secs = secs - 1
-        timerRunning = true
-        timerID = self.setTimeout("StartTheTimer()", delay)
-    }
-}
-
-function timerHandler(){
-	if(!storageb)
-		return;
-
-	makeRequest("/goform/storageGetFirmwarePath", "n/a", updatePage);
-}
-
-function updatePage() {
-	if(!storageb)
-		return;
-
-	if (http_request.readyState == 4) {
-		if (http_request.status == 200) {
-			updateStorageStatus( http_request.responseText);
-		} else {
-			//alert('There was a problem with the request.');
-		}
-	}
-}
-
-function updateStorageStatus(str)
-{
-	if(!storageb)
-		return;
-
-	if(firmware_path == str)
-		return;
-
-	firmware_path = str;
-	var paths = new Array();
-	paths = firmware_path.split("\n");
-
-	if(paths.length){
-		document.UploadFirmwareUSB.firmware_path.length = 0;
-		for(var i=0; i<paths.length; i++){
-			var j = document.UploadFirmwareUSB.firmware_path.options.length;
-			document.UploadFirmwareUSB.firmware_path.options[j] = new Option(paths[i].substring(12), paths[i], false, false);
-		}
-	}
-}
 
 var _singleton = 0;
+var burn_failed = 0;
+var update_done = 0;
+
+function get_burning_st()
+{
+	var percent = 0.0;
+	var c_val = 0;
+	var base = 0;
+
+	if (burn_failed == 1) {
+		console.info('Failed to update for the last operate.');
+		return;
+	}
+
+	/*  we've done in confirm_update  */
+	if (update_done == 1) {
+		console.info('We have done for update procedure');
+		return;
+	}
+
+	var formdata = {
+		'page'            : 'misc',
+		'going'           : 'update_burningst',
+	};
+
+	$.ajax({
+		url               : '/cgi-bin/misc.cgi',
+		type              : 'POST',
+		data              : formdata,
+		cache             : false, 
+		timeout           : 6000,
+	}).done(function(data) {
+		var progress;
+
+		if (data.length > 0) {
+			if (data == 'checked') {
+				checking = 0;
+				setTimeout(get_burning_st, 1000);
+				return;
+			} else if (data == 'checking') {
+				setTimeout(get_burning_st, 1000);
+				return;
+			}
+			auto_burn_retry = 0;
+			switch(doing_item) {
+			case 0:
+				progress = parseInt(data);
+				if (progress >= 100) {
+					if (sys_fw == 1 && t6_fw == 1)
+						c_val = 20;
+					else if (sys_fw == 1)
+						c_val = 30;
+					else if (t6_fw == 1)
+						c_val = 40;
+
+					if (sys_fw == 1) {
+						doing_item = 1;
+					} else if (t6_fw == 1) {
+						doing_item = 2;
+					} else {
+						/*  no other item  */
+						$('#burn_progress').progressbar('setValue', 100);
+						$('#processing').val('no');
+						return;
+					}
+					$('#burn_progress').progressbar('setValue', c_val);
+				} else {
+					if (progress === parseInt(data, 10)) {
+						if (sys_fw == 1 && t6_fw == 1)
+							percent = 0.2;
+						else if (sys_fw == 1)
+							percent = 0.3;
+						else if (t6_fw == 1)
+							percent = 0.4;
+						else
+							percent = 1.0;
+						progress = Math.floor(progress * percent);
+						$('#burn_progress').progressbar('setValue', progress);
+					}
+				}
+				setTimeout(get_burning_st, 1000);
+				break;
+			case 1:
+				progress = parseInt(data);
+				if (progress >= 100) {
+					if (bootloader_fw == 1 && t6_fw == 1)
+						c_val = 70;
+					else if (bootloader_fw == 1)
+						c_val = 100;
+					else if (t6_fw == 1)
+						c_val = 60;
+
+					if (t6_fw == 1) {
+						doing_item = 2;
+					} else {
+						/*  no other item  */
+						$('#burn_progress').progressbar('setValue', 100);
+						$('#processing').val('no');
+						return;
+					}
+					$('#burn_progress').progressbar('setValue', c_val);
+				} else {
+					if (progress === parseInt(data, 10)) {
+						if (bootloader_fw == 1 && t6_fw == 1) {
+							percent = 0.5;
+							base = 20;
+						} else if (bootloader_fw == 1) {
+							percent = 0.7;
+							base = 30;
+						} else if (t6_fw == 1) {
+							percent = 0.6;
+						} else {
+							percent = 1.0;
+						}
+						progress = Math.floor(progress * percent)+base;
+						$('#burn_progress').progressbar('setValue', progress);
+					}
+				}
+				setTimeout(get_burning_st, 1000);
+				break;
+			case 2:
+				if (data[0] == '0') {
+					$('#burn_progress').progressbar('setValue', 100);
+					$('#processing').val('no');
+				} else if (data[0] == '1') {
+					var field = data.split(',');
+					progress = 1*field[1];
+					if (bootloader_fw == 1 && sys_fw == 1) {
+						percent = 0.3;
+						base = 70;
+					} else if (bootloader_fw == 1) {
+						percent = 0.6;
+						base = 40;
+					} else if (sys_fw == 1) {
+						percent = 0.4;
+						base = 60;
+					} else {
+						percent = 1.0;
+						base = 0;
+					}
+					progress = Math.floor(progress * percent) + base;
+					$('#burn_progress').progressbar('setValue', progress);
+					setTimeout(get_burning_st, 1000);
+				} else if (data[0] == '2') {
+					var errstr = data.split(',');
+					console.info('¿ù»~½X:'+errstr[1]);
+					$('#processing').val('no');
+					closeModal();
+					show_alert('¿ù»~³qª¾', '¿ù»~½X:'+errstr[1], -1, 300, 200, 'slide');
+				} else {
+					setTimeout(get_burning_st, 1000);
+				}
+				break;
+			}
+		} else {
+			if (auto_burn_retry > 20) {
+				console.info('¾Þ§@¿ù»~');
+				$('#processing').val('no');
+				auto_burn_retry = 0;
+				closeModal();
+				show_alert('¿ù»~³qª¾', '¾Þ§@¿ù»~', -1, 300, 200, 'slide');
+				return;
+			} else {
+				setTimeout(get_burning_st, 1000);
+			}
+			auto_burn_retry++;
+		}
+	}).error(function(jqXHR, textStatus, errorThrown) {
+		if (auto_burn_retry > 20) {
+			console.info('¾Þ§@¹O®É');
+			auto_burn_retry = 0;
+			$('#processing').val('no');
+			closeModal();
+			show_alert('¿ù»~³qª¾', '¾Þ§@¹O®É', -1, 300, 200, 'slide');
+			return;
+		} else {
+			setTimeout(get_burning_st, 1000);
+		}
+		auto_burn_retry++;
+	});
+}
+
 function uploadFirmwareCheck()
 {
 	if(_singleton)
@@ -120,16 +219,7 @@ function uploadFirmwareCheck()
 		return false;
 	}
 
-	StopTheClock();
-
-	//document.UploadFirmware.UploadFirmwareSubmit.disabled = true;
-	//document.UploadFirmware.filename.disabled = true;
-	document.UploadBootloader.UploadBootloaderSubmit.disabled = true;
-	document.ScanUSBFirmware.UploadFirmwareUSBScan.disabled = true;
-	document.UploadFirmwareUSB.firmware_path.disabled = true;
-	document.UploadFirmwareUSB.UploadFirmwareUSBSubmit.disabled = true;
-	document.ForceMemUpgrade.ForceMemUpgradeSelect.disabled = true;
-	document.ForceMemUpgrade.ForceMemUpgradeSubmit.disabled = true;
+	setTimeout(get_burning_st, 3000);
 
 	document.getElementById("loading").style.display="block";
 	_singleton = 1;
@@ -137,57 +227,6 @@ function uploadFirmwareCheck()
 	/*  clear parameter of GET method  */
 	window.history.replaceState({}, '', '/');
 
-	return true;
-}
-
-function uploadFirmwareUSBCheck()
-{
-	if(_singleton)
-		return false;
-	if(!firmware_path.length){
-		alert("No firmware is selected.");
-		return false;
-	}
-	StopTheClock();
-
-	document.UploadFirmware.UploadFirmwareSubmit.disabled = true;
-	document.UploadBootloader.UploadBootloaderSubmit.disabled = true;
-	//document.UploadFirmwareUSB.UploadFirmwareUSBSubmit.disabled = true;
-	document.ForceMemUpgrade.ForceMemUpgradeSelect.disabled = true;
-	document.ForceMemUpgrade.ForceMemUpgradeSubmit.disabled = true;
-
-	document.getElementById("loading").style.display="block";
-	_singleton = 1;
-	return true;
-}
-
-function formBootloaderCheck()
-{
-	ret = confirm("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\nThis is for engineer only. Are u sure?\n\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-	if(!ret)
-		return false;
-
-	if(_singleton)
-		return false;
-	if(document.UploadBootloader.filename.value == ""){
-		alert("Bootloader Upgrade: Please specify a file.");
-		return false;
-	}
-
-	StopTheClock();
-
-	document.UploadFirmware.filename.disabled = true;
-	document.UploadFirmware.UploadFirmwareSubmit.disabled = true;
-	//document.UploadBootloader.UploadBootloaderSubmit.disabled = true;
-	document.ScanUSBFirmware.UploadFirmwareUSBScan.disabled = true;
-	document.UploadFirmwareUSB.firmware_path.disabled = true;
-	document.UploadFirmwareUSB.UploadFirmwareUSBSubmit.disabled = true;
-	document.ForceMemUpgrade.ForceMemUpgradeSelect.disabled = true;
-	document.ForceMemUpgrade.ForceMemUpgradeSubmit.disabled = true;
-
-
-	document.getElementById("loading").style.display="block";
-	_singleton = 1;
 	return true;
 }
 
@@ -196,38 +235,7 @@ function pageInit()
 	/*  clear parameter of GET method  */
 	window.history.replaceState({}, '', '/');
 
-	var mUpgrade = "<!--#exec cmd="web 2860 nvram Force_mem_upgrade"-->";
-
-	if(storageb){		
-		makeRequest("/goform/storageGetFirmwarePath", "n/a");
-		InitializeTimer();
-	}
-
-	if(mUpgrade == "1")
-		document.ForceMemUpgrade.ForceMemUpgradeSelect.options.selectedIndex = 1;
-	else
-		document.ForceMemUpgrade.ForceMemUpgradeSelect.options.selectedIndex = 0;
-
 	document.UploadFirmware.UploadFirmwareSubmit.disabled = false;
-	if (storageb)
-	{
-		display("table", "uploadFWUSBTable");
-		display("table", "uploadFWUSBSubmit");
-		display("table", "div_memupgrade");
-		display("inline", "ForceMemUpgradeSubmit");
-		document.ForceMemUpgrade.ForceMemUpgradeSubmit.disabled = false;
-	}
-	else
-	{
-		display("none", "uploadFWUSBTable");
-		display("none", "uploadFWUSBSubmit");
-		display("none", "div_memupgrade");
-		display("none", "ForceMemUpgradeSubmit");
-		document.ForceMemUpgrade.ForceMemUpgradeSubmit.disabled = true;
-	}
-	document.UploadBootloader.UploadBootloaderSubmit.disabled = false;
-
-//	document.UploadFirmware.filename.disabled = false;
 	document.getElementById("loading").style.display="none";
 
 
