@@ -617,6 +617,8 @@ int main(int argc, char *argv[])
 		set_last_cmd(inStr);
 	} else if (!strcmp(form, "OPMode")) {
 		set_opmode(inStr);
+	} else if (!strcmp(form, "reboot")) {
+		do_system("reboot");
 	}
 	free(inStr);
 leave:
