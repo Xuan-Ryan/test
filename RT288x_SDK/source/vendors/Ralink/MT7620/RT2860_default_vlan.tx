@@ -6,6 +6,7 @@ Version=__VERSION__
 Type=TX
 Calibrated=0
 HostName=J5_uninitial
+lang=en-us
 Login=admin
 Password=admin
 OperationMode=3
