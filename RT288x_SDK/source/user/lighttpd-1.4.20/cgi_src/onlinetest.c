@@ -374,9 +374,7 @@ leave:
 inline void clear_update_files(void)
 {
 	unlink("/var/checking");
-	unlink("/var/bl_mtd_write.log");
 	unlink("/var/mtd_write.log");
-	unlink("/var/updateSta");
 }
 
 inline unsigned int getMTDPartSize(char *part)

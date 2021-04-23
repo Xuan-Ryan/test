@@ -980,16 +980,6 @@ void web_back_parentpage(void)
 	printf("</head>\n<body onload=\"opener.location.reload();window.close();\"></html>\n");
 }
 
-void web_debug_header(void)
-{
-	printf("Content-Type: text/plain;charset=utf-8\n\n");
-}
-
-void web_debug_header_no_cache(void)
-{
-	printf("Content-Type: text/plain;charset=utf-8\nPragma: no-cache\nCache-Control: no-cache\n\n");
-}
-
 char *web_get(char *tag, char *input, int dbg)	
 {	
 	char *e_begin, *v_begin, *v_end;
@@ -1142,6 +1132,21 @@ void web_header(void)
 	printf("Content-Type:text/plain;charset=utf-8\n\n");
 }
 
+void web_html_header(void)
+{
+	printf("Content-Type:text/html;charset=utf-8\n\n");
+}
+
+void web_debug_header(void)
+{
+	printf("Content-Type: text/plain;charset=utf-8\n\n");
+}
+
+void web_debug_header_no_cache(void)
+{
+	printf("Content-Type: text/plain;charset=utf-8\nPragma: no-cache\nCache-Control: no-cache\n\n");
+}
+
 void parse_info(char * file_name, UPDATEINFO * info)
 {
 	unsigned int new_ver = 0;
@@ -1201,4 +1206,109 @@ void remove_carriage(char * str)
 		if (str[len] == 0x0D || str[len] == 0x0A)
 			str[len] = '\0';
 	}
+}
+
+static char** str_split(const char* a_str, const char a_delim)
+{
+	char** result    = 0;
+	size_t count     = 0;
+	char* tmp        = (char *)a_str;
+	char* last_comma = 0;
+	char delim[2];
+	delim[0] = a_delim;
+	delim[1] = 0;
+
+	/* Count how many elements will be extracted. */
+	while (*tmp) {
+		if (a_delim == *tmp) {
+			count++;
+			last_comma = tmp;
+		}
+		tmp++;
+	}
+
+	/* Add space for trailing token. */
+	count += last_comma < (a_str + strlen(a_str) - 1);
+	/* Add space for terminating null string so caller
+	knows where the list of returned strings ends. */
+	count++;
+	
+	result = malloc(sizeof(char*) * count);
+
+	if (result) {
+		size_t idx  = 0;
+		char* token = strtok(a_str, delim);
+	
+		while (token) {
+			//assert(idx < count);
+			*(result + idx++) = strdup(token);
+			token = strtok(0, delim);
+		}
+		//assert(idx == count - 1);
+		*(result + idx) = 0;
+	}
+
+	return result;
+}
+
+int convert_ver(const char * ver)
+{
+	int weight[4];
+	int total = 0;
+	char** tokens;
+	//  ex: 99.99.99.99
+	//  99*1,000,000+99*10,000+99*100+99 = 99,999,999
+	//  ex: 1.1.1.1
+	//  1*1,000,000+1*10,000+1*100+1 = 1,010,101
+
+	tokens = str_split(ver, '.');
+
+	if (tokens) {
+		int i ;
+		for ( i=0; *(tokens+i); i++) {
+			weight[i] = atoi(*(tokens+i));
+			free(*(tokens+i));
+		}
+		free(tokens);
+	}
+
+	total = weight[0]*1000000+weight[1]*10000+weight[2]*100+weight[3];
+
+	return total;
+}
+
+void show_error_page(void)
+{
+	const char * value;
+	char lang[16];
+	nvram_init(RT2860_NVRAM);
+	value = (char *) nvram_bufget(RT2860_NVRAM, "lang");
+	
+	if(value == NULL) {
+		strcpy(lang, "en-us");
+	} else {
+		strcpy(lang, value);
+	}
+	nvram_close(RT2860_NVRAM);
+
+	printf("Content-type:text/html charset=utf-8\n\n");
+	printf("<html>\n");
+	printf("<head>\n");
+	printf("<title>Internal Error</title>\n");
+	printf("<meta http-equiv='content-type' content='text/html; charset=utf-8'> \n");
+	printf("<link rel='shortcut icon' href='/images/favicon.ico' type='image/x-icon' />\n");
+	printf("<link rel='stylesheet' type='text/css' href='/css/main_style.css' />\n");
+	printf("<style type='text/css'>body{background-color:#bbbdc1;}.image{position:relative;width:100%%;}#__in_err{position:absolute;left:0px;top:360px;width:100%%;text-align:inherit;text-shadow:1px 6px 4px #bbbdc1;}</style>\n");
+	printf("</head>\n");
+	printf("<body>\n");
+	printf("<form method=post name='inter_err'>\n");
+	printf("<input type='hidden' name='going' value='ack'>\n");
+	printf("<input type='hidden' name='lang' value='%s'>\n", lang);
+	printf("<input type='hidden' name='page' value='inter_err'>\n");
+	printf("<table width='100%%' height='50%%'><tr width='100%%' height='100%%'><td width='100%%' height='100%%' align='center'>\n");
+	printf("<table id='second_table' width='50%%' height='80%%'><tr width='100%%' height='100%%'><td width='100%%' height='100%%' align='center'>\n");
+	printf("<div class='image'>\n");
+	printf("<span style='font-size:30px;' id='__in_err'>Internal Error</span>\n");
+	printf("<img src='/images/internal_error_logo.png'>\n");
+	printf("</div></td></tr></table></td></tr></table></form></body></html>\n");
 }

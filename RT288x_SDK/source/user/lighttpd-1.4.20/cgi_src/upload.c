@@ -14,7 +14,21 @@
 #define UPLOAD_FILE "/var/tmpFW"
 #define MEM_SIZE	1024
 #define MEM_HALT	512
+#define CMDLEN		256
 
+static char cmd[CMDLEN];
+void do_system(char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	vsprintf(cmd, fmt, ap);
+	va_end(ap);
+	sprintf(cmd, "%s 1>%s 2>&1", cmd, LOGFILE);
+	system(cmd);
+
+	return;
+}
 
 void *memmem(const void *buf, size_t buf_len, const void *byte_line, size_t byte_line_len)
 {
@@ -222,7 +236,51 @@ inline void webFoot(void)
 	printf("</body></html>\n");
 }
 
+char *getType(void)
+{
+	static char buf[64];
+	char *nl;
+	FILE *fp;
+
+	memset(buf, 0, sizeof(buf));
+	if( (fp = popen("nvram_get 2860 Type", "r")) == NULL )
+		goto error;
+
+	if(!fgets(buf, sizeof(buf), fp)){
+		pclose(fp);
+		goto error;
+	}
+
+	if(!strlen(buf)){
+		pclose(fp);
+		goto error;
+	}
+	pclose(fp);
+
+	if(nl = strchr(buf, '\n'))
+		*nl = '\0';
+
+	return buf;
+
+error:
+	return "..";
+}
+
 #define	MAX_BUFFER_SIZE		1024*1024
+void read_remainder(char * buffer, int totalsize, int receive_size)
+{
+	while(receive_size < totalsize) {
+		if (totalsize-receive_size > MAX_BUFFER_SIZE) {
+			fread(buffer, 1, MAX_BUFFER_SIZE, stdin);
+			receive_size += MAX_BUFFER_SIZE;
+		} else {
+			int remainder = totalsize-receive_size;
+			fread(buffer, 1, remainder, stdin);
+			receive_size += remainder;
+		}
+	}
+}
+
 int main (int argc, char *argv[])
 {
 	char *file_begin, *file_end;
@@ -237,22 +295,12 @@ int main (int argc, char *argv[])
 	long real_file_size = 0;
 	image_header_t * header;
 
-	inLen = strtol(getenv("CONTENT_LENGTH"), NULL, 10) + 1;
-printf(
-"\
-Server: %s\n\
-Pragma: no-cache\n\
-Content-type: text/html\n",
-getenv("SERVER_SOFTWARE"));
+	//  red LED quickly flash
+	do_system("gpio l 52 0 4000 0 1 4000");
+	do_system("gpio l 14 1 1 1 1 300");
 
-	printf("\n\
-<html>\n\
-<head>\n\
-<TITLE>Upload Firmware</TITLE>\n\
-<link rel=stylesheet href=/css/normal_ws.css type=text/css>\n\
-<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\">\n\
-</head>\n\
-<body onload=\"update()\"> <h1> Upload Firmware</h1>");
+	inLen = strtol(getenv("CONTENT_LENGTH"), NULL, 10) + 1;
+	printf("Content-Type:text/plain;charset=utf-8\n\n");
 
 	//  allocate 1M bytes
 	inStr = malloc(MAX_BUFFER_SIZE);
@@ -266,9 +314,7 @@ getenv("SERVER_SOFTWARE"));
 	//  extract the boundary and keep it
 	//  ex: ------WebKitFormBoundaryXVNs7VyzAAnxkHCm
 	if ((line_end = strstr(line_begin, "\r\n")) == 0) {
-		printf("%s %d", RFC_ERROR, 1);
-		javascriptUpdate(0);
-		webFoot();
+		printf("%s(%d)", RFC_ERROR, 1);
 		free(inStr);
 		fclose(fp);
 		return -1;
@@ -277,7 +323,6 @@ getenv("SERVER_SOFTWARE"));
 	boundary = malloc(boundary_len+1);
 	if (NULL == boundary) {
 		printf("boundary allocate %d faul!\n", boundary_len);
-		javascriptUpdate(0);
 		goto err;
 	}
 	memset(boundary, 0, boundary_len+1);
@@ -286,31 +331,25 @@ getenv("SERVER_SOFTWARE"));
 	//  ex: Content-Disposition: form-data; name="filename"; filename="UVC-j5-TX-0.0.0.4.bin"
 	line_begin = line_end + 2;
 	if ((line_end = strstr(line_begin, "\r\n")) == 0) {
-		printf("%s %d", RFC_ERROR, 2);
-		javascriptUpdate(0);
+		printf("%s(%d)", RFC_ERROR, 2);
 		goto err;
 	}
-	if(strncasecmp(line_begin, 
-		       "content-disposition: form-data;", 
-		       strlen("content-disposition: form-data;"))) {
-		printf("%s %d", RFC_ERROR, 3);
-		javascriptUpdate(0);
+	if(strncasecmp(line_begin, "content-disposition: form-data;", strlen("content-disposition: form-data;"))) {
+		printf("%s(%d)", RFC_ERROR, 3);
 		goto err;
 	}
 	//  shift to name="filename";....
 	//  if we can't find the ';' that means we got the wrong format
 	line_begin += strlen("content-disposition: form-data;") + 1;
 	if (!(line_begin=strchr(line_begin, ';'))){
-		printf("We dont support multi-field upload.\n");
-		javascriptUpdate(0);
+		printf("We dont support multi-field upload.");
 		goto err;
 	}
 	//  shift to filename="..."
 	//  if we can't find the "filename=" thaa means we got the wrong format
 	line_begin += 2;
 	if (strncasecmp(line_begin, "filename=", strlen("filename="))) {
-		printf("%s %d", RFC_ERROR, 4);
-		javascriptUpdate(0);
+		printf("%s(%d)", RFC_ERROR, 4);
 		goto err;
 	}
 
@@ -324,14 +363,12 @@ getenv("SERVER_SOFTWARE"));
 	//  find 2 times "\r\n"
 	//  if not that means we got the wrong file content
 	if ((line_end = strstr(line_begin, "\r\n")) == 0) {
-		printf("%s %d", RFC_ERROR, 5);
-		javascriptUpdate(0);
+		printf("%s(%d)", RFC_ERROR, 5);
 		goto err;
 	}
 	line_begin = line_end + 2;
 	if ((line_end = strstr(line_begin, "\r\n")) == 0) {
-		printf("%s %d", RFC_ERROR, 6);
-		javascriptUpdate(0);
+		printf("%s(%d)", RFC_ERROR, 6);
 		goto err;
 	}
 	//  shift to the start of the firmware file
@@ -340,14 +377,20 @@ getenv("SERVER_SOFTWARE"));
 	header = (image_header_t *)line_begin;
 	//  get the kernel size from header
 	if (inLen <= (ntohl(header->ih_ksz)+64)) {
-		printf("wrong length of content from client!\n");
-		javascriptUpdate(0);
+		printf("Size not correct!");
 		goto err;
 	}
+
+	if (strstr(header->ih_name, getType()) == NULL) {
+		printf("Wrong TX/RX type!");
+		goto err;
+	}
+
 	//  need to add the size of header
 	write_remainder = real_file_size = ntohl(header->ih_ksz)+64;
 	//  write the first 1M bytes to the temp file, but needs to reduce the header of HTML
 	fwrite(line_begin, 1, MAX_BUFFER_SIZE-(line_begin-inStr), fp);
+	
 
 	//  count the file size
 	write_remainder -= MAX_BUFFER_SIZE-(line_begin-inStr);
@@ -376,8 +419,8 @@ getenv("SERVER_SOFTWARE"));
 	// examination
 #if defined (UPLOAD_FIRMWARE_SUPPORT)
 	if(!check(UPLOAD_FILE, 0, real_file_size, err_msg) ){
-		printf("Not a valid firmware. %s", err_msg);
-		javascriptUpdate(0);
+		unlink(UPLOAD_FILE);
+		printf("%s", err_msg);
 		goto err;
 	}
 
@@ -390,8 +433,9 @@ getenv("SERVER_SOFTWARE"));
 #endif
 	// flash write
 	if( mtd_write_firmware(UPLOAD_FILE, 0, real_file_size) == -1){
-		printf("mtd_write fatal error! The corrupted image has ruined the flash!!");
-		javascriptUpdate(0);
+		//printf("mtd_write fatal error! The corrupted image has ruined the flash!!");
+		unlink(UPLOAD_FILE);
+		printf("FAILED-WRITE");
 		goto err;
 	}
 #elif defined (UPLOAD_BOOTLOADER_SUPPORT)
@@ -400,22 +444,24 @@ getenv("SERVER_SOFTWARE"));
 #error "no upload support defined!"
 #endif
 
-	printf("Done...rebooting");
-	javascriptUpdate(1);
-	webFoot();
-#if 0
+	unlink(UPLOAD_FILE);
+	printf("DONE");
 	free(boundary);
 	free(inStr);
 	fclose(fp);
-#endif
-	system("sleep 3 && reboot &");
+	//  red LED
+	do_system("gpio l 14 0 4000 0 1 4000");
+	do_system("gpio l 52 4000 0 1 0 4000");
 	exit(0);
 
 err:
-	webFoot();
+	read_remainder(inStr, inLen, receive_size);
 	free(boundary);
 	free(inStr);
 	fclose(fp);
+	//  green LED
+	do_system("gpio l 14 4000 0 1 0 4000");
+	do_system("gpio l 52 0 4000 0 1 4000");
 	exit(-1);
 }
 

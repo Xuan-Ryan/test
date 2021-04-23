@@ -168,6 +168,7 @@ table.inner_table_page td {
 </style>
 <script type="text/javascript">
 var WiFiMac = '<!--#exec cmd="web rtdev sys wifiMacAddr"-->';
+var Type = '<!--#exec cmd="web 2860 nvram Type"-->';
 function check_page_action()
 {
 	if ($('#processing').val() == 'yes')
@@ -216,99 +217,14 @@ $(function(){
 $(document).ready(function() {
 });
 
-function submit(index)
-{
-	var url = '/cgi-bin/onlinetest.cgi';
-	var formdata = {};
-
-	if (testing == 1) {
-		console.info('There is another testing procedure running right now.');
-		return;
-	}
-	testing = 1;
-
-	if (index == 1) {
-		formdata = {
-			'page'         : 'onlinetest',
-			'item'         : 'USB',
-		};
-		$('#usb_result').html('<div class="loading_user">');
-		USB_Result = 'testing';
-	} else if (index == 2) {
-		formdata = {
-			'page'         : 'onlinetest',
-			'item'         : 'LED',
-		};
-		$('#led_result').html('<div class="loading_user">');
-	} else if (index == 3) {
-		formdata = {
-			'page'         : 'onlinetest',
-			'item'         : 'trigger',
-		};
-		$('#trigger_result').html('<div class="loading_user">');
-	} else if (index == 4) {
-		formdata = {
-			'page'         : 'onlinetest',
-			'item'         : 'ethernet',
-		};
-		$('#ethernet_result').html('<table width="100%" height="100%"><tr><td style="padding:10px;vertical-align:middle"><div class="loading_user"></td></tr></table>');
-		ETH_Result = 'testing';
-	} else if (index == 5) {
-		formdata = {
-			'page'         : 'onlinetest',
-			'item'         : 'wifi',
-		};
-		$('#wifi_result').html('<table width="100%" height="100%"><tr><td style="padding:10px;vertical-align:middle"><div class="loading_user"></td></tr></table>');
-		Wifi_Result = 'testing';
-	}
-
-	$.ajax({
-		url               : url,
-		type              : 'POST',
-		data              : formdata,
-		cache             : false,
-		timeout           : 60000
-	}).done(function(data) {
-		if (index == 1) {
-			USB_Result = data;
-			parse_usb_result(USB_Result);
-		} else if (index == 2) {
-			parse_led_result(data);
-		} else if (index == 3) {
-			parse_trigger_result(data);
-		} else if (index == 4) {
-			ETH_Result = data;
-			parse_ethernet_result(ETH_Result);
-		} else if (index == 5) {
-			Wifi_Result = data;
-			parse_wifi_result(Wifi_Result);
-		}
-		testing = 0;
-	}).error(function(jqXHR, textStatus, errorThrown) {
-	});
-}
-
 function clear_field()
 {
 	$('#processing').val('no');
-	/*$('#usb_result').html('');
-	$('#led_result').html('');
-	$('#trigger_result').html('');
-	$('#image_result').html('');
-	$('#ethernet_result').html('');
-	$('#wifi_result').html('');*/
 	$('#lan_mac').text('');
 
 	$('#ModelName').text('');
-	/*$('#wifi24g_info').text('');*/
 	$('#wifi5g_info').text('');
-	/*$('#wifi1_mac').text('');
-	$('#wan_mac').text('');*/
 	$('#wifi2_mac').text('');
-	USB_Result = '';
-	ETH_Result = '';
-	Wifi_Result = '';
-	done = 0;
 }
 
 function clear_btn()
@@ -391,54 +307,55 @@ function reset_to_default()
 		reseting = 0;
 	}).error(function(jqXHR, textStatus, errorThrown) {
 		closeModal();
-		show_alert('內部錯誤', '操作失敗');
+		show_alert('錯誤', '操作失敗');
 		$('#processing').val('no');
 		testing = 0;
 		reseting = 0;
 	});
 }
 
-var fw_name = '<!--#exec cmd="web 2860 sys check_fw_file"-->';
+function show_error(title, msg)
+{
+	$.messager.alert({
+		icon: 'error',
+		title: title,
+		msg: msg,
+		width: 300,
+		showType: 'slide',
+	});
+}
+
+function clear_all_update_files()
+{
+	var formdata = {
+		'page'            : 'misc',
+		'going'           : 'clear_all_update_files',
+	};
+
+	$.ajax({
+		url         : '/cgi-bin/misc.cgi',
+		type        : 'POST',
+		data        : formdata,
+		cache       : false, 
+		timeout     : 15000,
+	}).done(function(data) {
+	}).error(function(jqXHR, textStatus, errorThrown) {
+	});
+}
+
+var burn_retry = 0;
 var update_done = 0;
-var burn_failed = 0;
-var auto_burn_retry = 0;
-var checking = 0;
-var doing_item = 0;
-var bootloader_fw = 0;
-var sys_fw = 0;
-var t6_fw = 0;
 function get_burning_st()
 {
-	var percent = 0.0;
-	var c_val = 0;
-	var base = 0;
-
-	if (burn_failed == 1) {
-		console.info('Failed to update for the last operate.');
-		return;
-	}
-
-	/*  we've done in confirm_update  */
-	if (update_done == 1) {
-		console.info('We have done for update procedure');
-		return;
-	}
-
 	var formdata = {
 		'page'            : 'misc',
 		'going'           : 'update_burningst',
 	};
 
-	if (checking == 0) {
-		if (doing_item == 0)
-			formdata.going = 'update_blburningst';
-		else if (doing_item == 1)
-			formdata.going = 'update_burningst';
-		else
-			formdata.going = 'update_displayst';
-		openModal('burning');
-	} else {
-		formdata.going = 'update_checking';
+	if (__burn_failed == 1) {
+		__burn_failed = 0;
+		console.info('We got burn failed on FW update manually');
+		return;
 	}
 
 	$.ajax({
@@ -448,231 +365,209 @@ function get_burning_st()
 		cache             : false, 
 		timeout           : 6000,
 	}).done(function(data) {
-		var progress;
-
 		if (data.length > 0) {
-			if (data == 'checked') {
-				checking = 0;
+			burn_retry = 0;
+			var progress = parseInt(data);
+			if (progress !== parseInt(data, 10)) {
 				setTimeout(get_burning_st, 1000);
-				return;
-			} else if (data == 'checking') {
+			} else if (progress < 0) {
+				show_error('錯誤', '進度列小於1');
+				_singleton = 0;
+				$('#processing').val('no');
+				closeModal();
+			} else if (progress >= 100) {
+				/*  DONE  */
+				$('#burn_progress').progressbar('setValue', 100);
+				update_done = 1;
+				clear_all_update_files();
+				$('#processing').val('no');
+				closeModal();
+			} else {
+				$('#burn_progress').progressbar('setValue', progress);
 				setTimeout(get_burning_st, 1000);
-				return;
-			}
-			auto_burn_retry = 0;
-			switch(doing_item) {
-			case 0:
-				progress = parseInt(data);
-				if (progress >= 100) {
-					if (sys_fw == 1 && t6_fw == 1)
-						c_val = 20;
-					else if (sys_fw == 1)
-						c_val = 30;
-					else if (t6_fw == 1)
-						c_val = 40;
-
-					if (sys_fw == 1) {
-						doing_item = 1;
-					} else if (t6_fw == 1) {
-						doing_item = 2;
-					} else {
-						/*  no other item  */
-						$('#burn_progress').progressbar('setValue', 100);
-						$('#processing').val('no');
-						return;
-					}
-					$('#burn_progress').progressbar('setValue', c_val);
-				} else {
-					if (progress === parseInt(data, 10)) {
-						if (sys_fw == 1 && t6_fw == 1)
-							percent = 0.2;
-						else if (sys_fw == 1)
-							percent = 0.3;
-						else if (t6_fw == 1)
-							percent = 0.4;
-						else
-							percent = 1.0;
-						progress = Math.floor(progress * percent);
-						$('#burn_progress').progressbar('setValue', progress);
-					}
-				}
-				setTimeout(get_burning_st, 1000);
-				break;
-			case 1:
-				progress = parseInt(data);
-				if (progress >= 100) {
-					if (bootloader_fw == 1 && t6_fw == 1)
-						c_val = 70;
-					else if (bootloader_fw == 1)
-						c_val = 100;
-					else if (t6_fw == 1)
-						c_val = 60;
-
-					if (t6_fw == 1) {
-						doing_item = 2;
-					} else {
-						/*  no other item  */
-						$('#burn_progress').progressbar('setValue', 100);
-						$('#processing').val('no');
-						return;
-					}
-					$('#burn_progress').progressbar('setValue', c_val);
-				} else {
-					if (progress === parseInt(data, 10)) {
-						if (bootloader_fw == 1 && t6_fw == 1) {
-							percent = 0.5;
-							base = 20;
-						} else if (bootloader_fw == 1) {
-							percent = 0.7;
-							base = 30;
-						} else if (t6_fw == 1) {
-							percent = 0.6;
-						} else {
-							percent = 1.0;
-						}
-						progress = Math.floor(progress * percent)+base;
-						$('#burn_progress').progressbar('setValue', progress);
-					}
-				}
-				setTimeout(get_burning_st, 1000);
-				break;
-			case 2:
-				if (data[0] == '0') {
-					$('#burn_progress').progressbar('setValue', 100);
-					$('#processing').val('no');
-				} else if (data[0] == '1') {
-					var field = data.split(',');
-					progress = 1*field[1];
-					if (bootloader_fw == 1 && sys_fw == 1) {
-						percent = 0.3;
-						base = 70;
-					} else if (bootloader_fw == 1) {
-						percent = 0.6;
-						base = 40;
-					} else if (sys_fw == 1) {
-						percent = 0.4;
-						base = 60;
-					} else {
-						percent = 1.0;
-						base = 0;
-					}
-					progress = Math.floor(progress * percent) + base;
-					$('#burn_progress').progressbar('setValue', progress);
-					setTimeout(get_burning_st, 1000);
-				} else if (data[0] == '2') {
-					var errstr = data.split(',');
-					console.info('錯誤碼:'+errstr[1]);
-					$('#processing').val('no');
-					closeModal();
-					show_alert('錯誤通知', '錯誤碼:'+errstr[1], -1, 300, 200, 'slide');
-				} else {
-					setTimeout(get_burning_st, 1000);
-				}
-				break;
 			}
 		} else {
-			if (auto_burn_retry > 20) {
-				console.info('操作錯誤');
+			if (burn_retry > 10) {
+				show_error('錯誤', '重試超過10次');
+				_singleton = 0;
 				$('#processing').val('no');
-				auto_burn_retry = 0;
 				closeModal();
-				show_alert('錯誤通知', '操作錯誤', -1, 300, 200, 'slide');
-				return;
+				clear_all_update_files();
 			} else {
+				burn_retry++;
 				setTimeout(get_burning_st, 1000);
 			}
-			auto_burn_retry++;
 		}
 	}).error(function(jqXHR, textStatus, errorThrown) {
-		if (auto_burn_retry > 20) {
-			console.info('操作逾時');
-			auto_burn_retry = 0;
+		if (burn_retry > 3) {
+			show_error('錯誤', '無法取得燒錄進度');
+			_singleton = 0;
 			$('#processing').val('no');
 			closeModal();
-			show_alert('錯誤通知', '操作逾時', -1, 300, 200, 'slide');
-			return;
+			clear_all_update_files();
 		} else {
+			burn_retry++;
 			setTimeout(get_burning_st, 1000);
 		}
-		auto_burn_retry++;
 	});
 }
 
+function openProgressModal()
+{
+	$('#fade').show();
+
+	$('#box').removeClass();
+	$('#box').addClass('modal');
+	$('#modal_pic_container').removeClass();
+	$('#modal_pic_container').addClass('loading');
+
+	$('#burn_progress_box').show();
+
+	var h = $(window).height();
+	var w = $(window).width();
+	var padding = $('#box').css('padding-left');
+	var image_h = $('#box').height()+parseInt(padding)*2;
+	var image_w = $('#box').width()+parseInt(padding)*2;
+	var top = (h-image_h)/2;
+	var left = (w-image_w)/2;
+	$('#box').css({top:top, left:left, position:'absolute'});
+	$('#box').show();
+}
+
 var updating = 0;
+var _singleton = 0;
+var __burn_failed = 0;
+
 function confirm_update()
 {
+	if ($('[name=fwname]')[0].files[0].size >= (1024*1024*15)) {
+		closeModal();
+		$('#verify_dlg').window('close');
+		/*  this FW file is too big to upload  */
+		console.warn('this FW is too big to upload');
+		show_error('錯誤', '韌體檔案太大了!');
+		return;
+	}
+
 	$('#verify_dlg').window('close');
 	$('#processing').val('yes');
 	updating = 1;
 
-	var formdata = {
-		'page'            : 'onlinetest',
-		'item'            : 'auto_update',
-	};
-
-	openModal('processing');
-	checking = 1;
-	setTimeout(get_burning_st, 1000);
-
-	$.ajax({
-		url               : '/cgi-bin/onlinetest.cgi',
-		type              : 'POST',
-		data              : formdata,
-		cache             : false, 
-		timeout           : 600000,
-	}).done(function(data) {
-		closeModal();
-		update_done = 1;
-		$('#processing').val('no');
-		if (data == "DONE") {
-			show_alert('系統通知', '更新完成', -1, 300, 200, 'slide');
-			$('#updatebtn').text('更新完成');
-		} else if (data == "NO_FILE") {
-			show_alert('錯誤通知', '沒有掛載USB磁碟或沒有正確放置軔體檔案', -1, 300, 200, 'slide');
-			burn_failed = 1;
-			$('#updatebtn').text('更新失敗');
-		} else if (data == "FAILED:NO_SYSINFO") {
-			show_alert('錯誤通知', '沒有系統軔體資訊檔', -1, 300, 200, 'slide');
-			burn_failed = 1;
-			$('#updatebtn').text('更新失敗');
-		} else if (data == "FAILED:WRONG_SYSFW") {
-			show_alert('錯誤通知', '錯誤的系統軔體檔', -1, 300, 200, 'slide');
-			burn_failed = 1;
-			$('#updatebtn').text('更新失敗');
-		} else if (data == "FAILED:NO_SYSFW") {
-			show_alert('錯誤通知', '沒有系統軔體檔', -1, 300, 200, 'slide');
-			burn_failed = 1;
-			$('#updatebtn').text('更新失敗');
-		} else if (data == "FAILED:NO_T6INFO") {
-			show_alert('錯誤通知', 'T6軔體資訊檔資訊錯誤', -1, 300, 200, 'slide');
-			burn_failed = 1;
-			$('#updatebtn').text('更新失敗');
-		} else if (data == "FAILED:WRONG_T6FW") {
-			show_alert('錯誤通知', '錯誤的T6軔體檔', -1, 300, 200, 'slide');
-			burn_failed = 1;
-			$('#updatebtn').text('更新失敗');
-		} else if (data == "FAILED:NO_T6FW") {
-			show_alert('錯誤通知', '沒有T6軔體檔', -1, 300, 200, 'slide');
-			burn_failed = 1;
-			$('#updatebtn').text('更新失敗');
-		} else if (data == "FAILED:NO_BOOTLOADERINFO") {
-			show_alert('錯誤通知', '沒有BootLoader軔體資訊檔', -1, 300, 200, 'slide');
-			burn_failed = 1;
-			$('#updatebtn').text('更新失敗');
-		} else if (data == "FAILED:WRONG_BOOTLOADER") {
-			show_alert('錯誤通知', '錯誤的BootLoader軔體檔', -1, 300, 200, 'slide');
-			burn_failed = 1;
-			$('#updatebtn').text('更新失敗');
-		} else if (data == "FAILED:NO_BOOTLOADER") {
-			show_alert('錯誤通知', '沒有BootLoader軔體檔', -1, 300, 200, 'slide');
-			burn_failed = 1;
-			$('#updatebtn').text('更新失敗');
-		}
-		updating = 0;
-	}).error(function(jqXHR, textStatus, errorThrown) {
-		console.info('error status:'+textStatus);
-		$('#processing').val('no');
+	openProgressModal();
+	var data = new FormData();
+	jQuery.each(jQuery('[name=fwname]')[0].files, function(i, file) {
+		data.append('file-'+i, file);
 	});
+
+	if (check_browser() == 5) {
+		/*  EDGE  */
+		openModal('processing');
+		$.ajax({
+			url         : '/cgi-bin/upload.cgi',
+			type        : 'POST',
+			contentType : false,
+			processData : false,
+			data        : data,
+			cache       : false, 
+			timeout     : 1200000,
+		}).done(function(data) {
+			closeModal();
+			if (data == 'DONE') {
+				$('#fwupdate_btn').text('完成');
+				update_done = 1;
+			} else {
+				if (data == 'FAILED-WRITE')
+					show_error('錯誤', '韌體更新有問題, 別斷電! 快，再燒一次，免得開不了機');
+				else {
+					if (data == 'Wrong TX/RX type!') {
+						if (Type == 'RX')
+							show_error('錯誤', '你上傳了TX的firmware了');
+						else
+							show_error('錯誤', '你上傳了RX的firmware了');
+					} else if (data == 'Size not correct!') {
+						show_error('錯誤', '上傳的檔案大小有誤，再確認一下是不是上傳錯了');
+					} else {
+						show_error('錯誤', '錯誤原因: '+data);
+					}
+				}
+				$('#processing').val('no');
+				__burn_failed = 1;
+			}
+			_singleton = 0;
+		}).error(function(jqXHR, textStatus, errorThrown) {
+			closeModal();
+			if (textStatus === 'timeout')
+				show_error('錯誤', '網頁傳輸逾時');
+			else if (jqXHR.status == 500)
+				show_error('錯誤', message);
+			else
+				show_error('錯誤', '網路連線異常，請確認無線網路是否有連上');
+			_singleton = 0;
+			$('#processing').val('no');
+			__burn_failed = 1;
+		});
+	} else {
+		$.ajax({
+			url         : '/cgi-bin/upload.cgi',
+			type        : 'POST',
+			contentType : false,
+			processData : false,
+			data        : data,
+			cache       : false, 
+			timeout     : 1200000,
+			xhr: function() {
+				var xhr = new window.XMLHttpRequest();
+				xhr.upload.addEventListener("progress", function(evt) {
+					if (evt.lengthComputable) {
+						var percentComplete = evt.loaded / evt.total;
+						percentComplete = parseInt(percentComplete * 100);
+						$('#burn_progress').progressbar('setValue', percentComplete);
+						if (percentComplete === 100) {
+							openModal('burning');
+							$('#burn_progress').progressbar('setValue', 0);
+							setTimeout(get_burning_st, 1000);
+						}
+					}
+				}, false);
+				return xhr;
+			},
+		}).done(function(data) {
+			closeModal();
+			if (data == 'DONE') {
+				$('#fwupdate_btn').text('完成');
+				update_done = 1;
+			} else {
+				if (data == 'FAILED-WRITE')
+					show_error('錯誤', '韌體更新有問題, 別斷電! 快，再燒一次，免得開不了機');
+				else {
+					if (data == 'Wrong TX/RX type!') {
+						if (Type == 'RX')
+							show_error('錯誤', '你上傳了 TX 的firmware');
+						else
+							show_error('錯誤', '你上傳了 RX 的firmware');
+					} else if (data == 'Size not correct!') {
+						show_error('錯誤', '上傳的檔案大小有誤，再確認一下是不是上傳錯了');
+					} else {
+						show_error('錯誤', '錯誤原因: '+data);
+					}
+				}
+				__burn_failed = 1;
+			}
+			$('#processing').val('no');
+			_singleton = 0;
+		}).error(function(jqXHR, textStatus, message) {
+			closeModal();
+			if (textStatus === 'timeout')
+				show_error('錯誤', '網頁傳輸逾時');
+			else if (jqXHR.status == 500)
+				show_error('錯誤', message);
+			else
+				show_error('錯誤', '網路連線異常，請確認無線網路是否有連上');
+			_singleton = 0;
+			$('#processing').val('no');
+			__burn_failed = 1;
+		});
+	}
 }
 
 function system_cmd()
@@ -683,222 +578,27 @@ function system_cmd()
 
 function update_fw()
 {
-	/*stop_service();*/
-	/*  load the firmware page  */
-	window.location.href = 'upload_firmware.shtml?time='+Math.random()*10000000000000000;
-	return;
-
 	var i = 0;
 	var w = $(window).width();
 	var h = $(window).height();
-
+	
 	if (update_done == 1) {
-		show_alert('系統通知', '已經更新完畢', -1, 300, 200, 'slide');
+		console.info('you have done this before.');
 		return;
 	}
 
-	if (!fw_name.length) {
-		$.messager.alert({
-			title: '更新軔體',
-			msg: '沒有找到可以更新的檔案',
-			width: 300,
-			showType: 'slide',
-			ok: '確定',
-			icon: 'info',
-			top: '230px',
-		});
+	if (!$('[name=fwname]').val()) {
+		console.warn('you didn\'t select any files.');
+		show_error('錯誤', '你還沒有選擇檔案啦');
 		return;
-	}
-
-	var field = fw_name.split('~');
-	for (i=0; i<field.length; i++) {
-		var subfield = field[i].split(':');
-		if (subfield[0] == '1')
-			bootloader_fw = 1;
-		else if (subfield[0] == '2')
-			sys_fw = 1;
-		else if (subfield[0] == '3')
-			t6_fw = 1;
-	}
-
-	if (t6_fw == 1) {
-		doing_item = 2;
-	}
-	if (sys_fw == 1) {
-		doing_item = 1;
-	}
-	if (bootloader_fw == 1) {
-		doing_item = 0;
 	}
 
 	var cx = (w-300)/2;
 	var cy = (h-250)/2-50;
 	$('#verify_dlg').dialog({left:cx,top:cy});
+	$('#verify_dlg').dialog('setTitle', '更新');
 	$("#ok_btn").attr("onclick","confirm_update()");
 	$('#verify_dlg').dialog('open');
-}
-
-function parse_usb_result(data)
-{
-	if (data.length > 0) {
-		var field = data.split('-');
-		if (field[0] == '2') {
-			if (field[1] == '1') {
-				$('#usb_result').html('<font class="error_item_font">沒有掛載USB磁碟!</font> <img src="/images/UI/cancel.png" width="16" height="16">');
-			} else if (field[1] == '2') {
-				$('#usb_result').html('<font class="error_item_font">執行測試程序失敗!</font> <img src="/images/UI/cancel.png" width="16" height="16">');
-			} else if (field[1] == '3') {
-				$('#usb_result').html('<font class="error_item_font">無法取得測試結果!</font> <img src="/images/UI/cancel.png" width="16" height="16">');
-			}
-		} else if (field[0] == '1') {
-			$('#usb_result').html('<font class="item_font">測試成功，速度:'+field[1]+'</font> <img src="/images/UI/ok.png" width="16" height="16">');
-		} else {
-			$('#usb_result').html('測試中 <div class="loading_user">');
-		}
-	}
-}
-
-function parse_led_result(data)
-{
-	if (data == 'DONE') {
-		$('#led_result').html('<table class="item_font" width="100%" height="100%"><tr><td width="400px" height="100%" style="padding:0px;vertical-align:middle">檢視LED是否有點亮？</td><td height="100%" style="padding:0px;text-align:right;vertical-align:middle"><input name="led" type="radio">正確</input>&nbsp;&nbsp;&nbsp;<input name="led" type="radio">錯誤</input></td></tr></table>');
-	}
-}
-
-function parse_trigger_result(data)
-{
-	if (data == 'DONE') {
-		$('#trigger_result').html('<table class="item_font" width="100%" height="100%"><tr><td width="400px" height="100%" style="padding:0px;vertical-align:middle">確認喇叭是否有發出聲音？VGA/HDMI是否有輸出畫面？</td><td height="100%" style="padding:0px;text-align:right;vertical-align:middle"><input name="vga" type="radio">正確</input>&nbsp;&nbsp;&nbsp;<input name="vga" type="radio">錯誤</input></td></tr></table>');
-	}
-}
-
-function parse_ethernet_result(data)
-{
-	var field;
-	var subfield;
-	var html = '';
-	var html2 = '';
-	var i = 0;
-	var result;
-	var style1 = '';
-	var style2 = '';
-
-	if (data.length > 0) {
-		field = data.split(',');
-		html = '<table class="ethernet_table">';
-
-		style1 = 'width:20%;padding:2px;text-align:center;vertical-align:middle;border-right:1px solid #DDDDDD;border-bottom:1px solid #DDDDDD';
-		style2 = 'width:20%;padding:2px;text-align:center;vertical-align:middle;border-right:1px solid #DDDDDD';
-		subfield = field[0].split('-');
-		if (subfield[0] == '1') {
-			if (subfield[1].length > 0 && subfield[1] != 'Connect Failed') {
-				html += '<tr><td height="50%" style="'+style1+'">WAN <img src="/images/UI/ok.png" width="16" height="16"></td>';
-				result = parseFloat(subfield[1])/1024.0/1024.0;
-				result = result.toFixed(2)+' Mbps';
-				html2 += '<tr><td height="50%" style="'+style2+'">'+result+'</td>';
-			} else {
-				html += '<tr><td style="'+style1+'">WAN <img src="/images/UI/cancel.png" width="16" height="16"></td>';
-				html2 += '<tr><td style="'+style2+'" class="error_item_font">連線失敗</td>';
-				
-			}
-		} else if (subfield[0] == '2') {
-			html += '<tr><td style="'+style1+'">WAN <img src="/images/UI/cancel.png" width="16" height="16"></td>';
-			html2 += '<tr><td style="'+style2+'" class="error_item_font">網路線未連接</td>';
-		} else {
-			html += '<tr><td style="'+style1+'">WAN <div class="loading_user"></td>';
-			html2 += '<tr><td style="'+style2+'"></td>';
-		}
-		for (i=1; i<field.length; i++) {
-			subfield = field[i].split('-');
-			if (i == field.length-1) {
-				style1 = 'width:20%;padding:2px;text-align:center;vertical-align:middle;border-bottom:1px solid #DDDDDD';
-				style2 = 'width:20%;padding:2px;text-align:center;vertical-align:middle';
-			}
-			if (subfield[0] == '1') {
-				if (subfield[1].length > 0 && subfield[1] != 'Connect Failed') {
-					html += '<td style="'+style1+'">LAN '+i+' <img src="/images/UI/ok.png" width="16" height="16"></td>';
-					result = parseFloat(subfield[1])/1024.0/1024.0;
-					result = result.toFixed(2)+' Mbps';
-					html2 += '<td style="'+style2+'">'+result+'</td>';
-				} else {
-					html += '<td style="'+style1+'">LAN '+i+' <img src="/images/UI/cancel.png" width="16" height="16"></td>';
-					html2 += '<td style="'+style2+'" class="error_item_font">連線失敗</td>';
-				}
-			} else if (subfield[0] == '2') {
-				html += '<td style="'+style1+'">LAN '+i+' <img src="/images/UI/cancel.png" width="16" height="16"></td>';
-				html2 += '<td style="'+style2+'" class="error_item_font">網路線未連接</td>';
-			} else {
-				html += '<td style="'+style1+'">LAN '+i+' <div class="loading_user"></td>';
-				html2 += '<td style="'+style2+'"></td>';
-			}
-		}
-		html += '</tr>';
-		html += html2;
-		html += '</tr></table>';
-		$('#ethernet_result').html(html);
-	} else {
-		$('#ethernet_result').text('無法取得網路狀態');
-	}
-}
-
-function parse_wifi_result(data)
-{
-	var html = '';
-	var html2 = '';
-	var field;
-	var subfield;
-	var i = 0;
-	var result;
-	var wifi_tag = '';
-	var style1 = '';
-	var style2 = '';
-
-	if (data.length > 0) {
-		field = data.split(',');
-		html = '<table class="ethernet_table">';
-		for (i=0; i<field.length; i++) {
-			subfield = field[i].split('-');
-			switch(i) {
-			case 0: wifi_tag = '無線 2.4G'; break;
-			case 1: wifi_tag = '無線 5G'; break;
-			default: wifi_tag = '無線 2.4G'; break;
-			}
-			if (i == 0) {
-				html += '<tr>';
-				html2 += '<tr>';
-			}
-			if (i < (field.length-1)) { /*  last one  */
-				style1 = 'width:50%;height:50%;padding:2px;text-align:center;vertical-align:middle;border-right:1px solid #DDDDDD;border-bottom:1px solid #DDDDDD';
-				style2 = 'width:50%;height:50%;padding:2px;text-align:center;vertical-align:middle;border-right:1px solid #DDDDDD';
-			} else {
-				style1 = 'width:50%;height:50%;padding:2px;text-align:center;vertical-align:middle;border-bottom:1px solid #DDDDDD';
-				style2 = 'width:50%;height:50%;padding:2px;text-align:center;vertical-align:middle';
-			}
-			if (subfield[0] == '1') {
-				if (subfield[1].length > 0 && subfield[1] != 'Connect Failed') {
-					html += '<td style="'+style1+'">'+wifi_tag+' <img src="/images/UI/ok.png" width="16" height="16"></td>';
-					result = parseFloat(subfield[1])/1024.0/1024.0;
-					result = result.toFixed(2)+' Mbps';
-					html2 += '<td style="'+style2+'">'+result+'</td>';
-				} else {
-					html += '<td style="'+style1+'">'+wifi_tag+' <img src="/images/UI/cancel.png" width="16" height="16"></td>';
-					html2 += '<td style="'+style2+'" class="error_item_font">連線失敗</td>';
-				}
-			} else if (subfield[0] == '2') {
-				html += '<td style="'+style1+'">'+wifi_tag+' <img src="/images/UI/cancel.png" width="16" height="16"></td>';
-				html2 += '<td style="'+style2+'" class="error_item_font">裝置未連線</td>';
-			} else {
-				html += '<td style="'+style1+'">'+wifi_tag+' <div class="loading_user"></td>';
-				html2 += '<td style="'+style2+'"></td>';
-			}
-		}
-		html += '</tr>';
-		html += html2;
-		html += '</tr></table>';
-		$('#wifi_result').html(html);
-	} else {
-		$('#ethernet_result').text('無法取得無線網路狀態');
-	}
 }
 
 function parse_dev_info(obj)
@@ -913,11 +613,7 @@ function parse_dev_info(obj)
 	return '';
 }
 
-var done = 0;
 var push_btn = 0;
-var USB_Result = '';
-var ETH_Result = '';
-var Wifi_Result = '';
 function get_result()
 {
 	var url = '/cgi-bin/onlinetest.cgi';
@@ -925,11 +621,6 @@ function get_result()
 		'page'         : 'onlinetest',
 		'item'         : 'result',
 	};
-
-	if (reseting == 1 || updating == 1) {
-		setTimeout(get_result, 1000);
-		return;
-	}
 
 	$.ajax({
 		url               : url,
@@ -1137,7 +828,7 @@ function setregion(type)
 		$('#processing').val('no');
 	}).error(function(jqXHR, textStatus, errorThrown) {
 		closeModal();
-		show_alert('內部錯誤', '操作失敗');
+		show_alert('錯誤', '操作失敗');
 		$('#processing').val('no');
 		if (type == 1) {
 			setregion5g = 0;
@@ -1177,34 +868,8 @@ function setmodelname()
 	}).error(function(jqXHR, textStatus, errorThrown) {
 		$('#processing').val('no');
 		closeModal();
-		show_alert('內部錯誤', '操作失敗');
+		show_alert('錯誤', '操作失敗');
 	});
-}
-
-function init_fw_name()
-{
-	var i = 0;
-	var field = fw_name.split('~');
-	var subfield;
-	var code;
-	var cnt = 0;
-	code = '<table>';
-	subcode = '';
-	if (fw_name.length) {
-		for (i=0; i<field.length; i++) {
-			subfield = field[i].split(':');
-			if (subfield.length == 2) {
-				cnt++;
-				code += '<tr><td>'+cnt+':'+subfield[1]+'</td></tr>';
-			}
-		}
-		if (cnt == 0)
-			code += '<tr><td>沒有找到可以更新的檔案</td></tr>';
-	} else {
-		code += '<tr><td>沒有找到可以更新的檔案</td></tr>';
-	}
-	code += '</table>';
-	$('#fw_name_container').html(code);
 }
 
 function init_ssid()
@@ -1255,11 +920,14 @@ function initValue()
 		console.info('This device has beed calibrated');
 	}
 
+	$('#update_fw').filebox({
+		buttonText: '瀏覽',
+		prompt: '選擇檔案...',
+	});
+
 	init_ssid();
 
 	$('#ModelName').text('線上測試 '+modelName+'('+dev_type+')'+' 版本：'+version);
-
-	/*init_fw_name();*/
 
 	parse_cookie();
 
@@ -1280,6 +948,37 @@ function initValue()
 function cancel_btn()
 {
 	$('#verify_dlg').window('close');
+}
+
+var rebooted = 0;
+
+function reboot_submit()
+{
+	var formdata = {
+		'page'            : 'reboot',
+	};
+	
+	if (rebooted == 1) {
+		console.info('you have done this before');
+		return;
+	}
+
+	openModal('rebooting');
+
+	$.ajax({
+		url               : '/cgi-bin/adm.cgi',
+		type              : 'POST',
+		data              : formdata,
+		cache             : false, 
+		timeout           : 60000,
+	}).done(function(data) {
+		rebooted = 1;
+		$('#rebootbtn').text('完成');
+		setTimeout(closeModal, 40000);
+	}).error(function(jqXHR, textStatus, errorThrown) {
+		$('#rebootbtn').text('完成');
+		setTimeout(closeModal, 40000);
+	});
 }
 
 </script>
@@ -1336,93 +1035,6 @@ function cancel_btn()
                      </table>
                     </td>
                    </tr>
-                   <!--<tr>
-                    <td height="70px" style="vertical-align:middle;border:1px solid #DDDDDD">
-                     <table width="100%" style="padding:0px">
-                      <tr>
-                       <td class="item_font" style="vertical-align:middle;padding:0px">USB插槽</td>
-                       <td style="vertical-align:middle;text-align:right;padding:0px">
-                        <div style="display:inline-block">
-                         <a href="javascript:submit(1)">
-                          <div align="center" class="button" style="width:50px">測試</div>
-                         </a>
-                        </div>
-                       </td>
-                      </tr>
-                     </table>
-                    </td>
-                    <td id="usb_result" style="vertical-align:middle;border:1px solid #DDDDDD"></td>
-                   </tr>
-                   <tr>
-                    <td height="70px" style="vertical-align:middle;border:1px solid #DDDDDD">
-                     <table width="100%" style="padding:0px">
-                      <tr>
-                       <td class="item_font" style="vertical-align:middle;padding:0px">LED燈號</td>
-                       <td style="vertical-align:middle;text-align:right;padding:0px">
-                        <div style="display:inline-block">
-                         <a href="javascript:submit(2)">
-                          <div align="center" class="button" style="width:50px">測試</div>
-                         </a>
-                        </div>
-                       </td>
-                      </tr>
-                     </table>
-                    </td>
-                    <td id="led_result" style="vertical-align:middle;border:1px solid #DDDDDD" class="item_font"></td>
-                   </tr>
-                   <tr>
-                    <td height="70px" style="vertical-align:middle;border:1px solid #DDDDDD">
-                     <table width="100%" style="padding:0px">
-                      <tr>
-                       <td class="item_font" style="vertical-align:middle;padding:0px">聲音/VGA/HDMI</td>
-                       <td style="vertical-align:middle;text-align:right;padding:0px">
-                        <div style="display:inline-block">
-                         <a href="javascript:submit(3)">
-                          <div align="center" class="button" style="width:50px">測試</div>
-                         </a>
-                        </div>
-                       </td>
-                      </tr>
-                     </table>
-                    </td>
-                    <td id="trigger_result" style="vertical-align:middle;border:1px solid #DDDDDD" class="item_font"></td>
-                   </tr>
-                   <tr>
-                    <td height="70px" style="vertical-align:middle;border:1px solid #DDDDDD">
-                     <table width="100%" style="padding:0px">
-                      <tr>
-                       <td class="item_font" style="vertical-align:middle;padding:0px">LAN/WAN</td>
-                       <td style="vertical-align:middle;text-align:right;padding:0px">
-                        <div style="display:inline-block">
-                         <a href="javascript:submit(4)">
-                          <div align="center" class="button" style="width:50px">測試</div>
-                         </a>
-                        </div>
-                       </td>
-                      </tr>
-                     </table>
-                    </td>
-                    <td id="ethernet_result" style="vertical-align:middle;border:1px solid #DDDDDD;padding:0px" class="item_font">
-                    </td>
-                   </tr>
-                   <tr>
-                    <td height="70px" class="item_font" style="vertical-align:middle;border:1px solid #DDDDDD">
-                     <table width="100%" style="padding:0px">
-                      <tr>
-                       <td class="item_font" style="vertical-align:middle;padding:0px">Wi-Fi</td>
-                       <td style="vertical-align:middle;text-align:right;padding:0px">
-                        <div style="display:inline-block">
-                         <a href="javascript:submit(5)">
-                          <div align="center" class="button" style="width:50px">測試</div>
-                         </a>
-                        </div>
-                       </td>
-                      </tr>
-                     </table>
-                    </td>
-                    <td id="wifi_result" style="width:75%;vertical-align:middle;border:1px solid #DDDDDD;padding:0px" class="item_font">
-                    </td>
-                   </tr>-->
                    <tr>
                     <td height="50px" class="item_font" style="vertical-align:middle;border:1px solid #DDDDDD">
                     設定頻段
@@ -1472,6 +1084,23 @@ function cancel_btn()
                     </td>
                    </tr>
                    <tr>
+                    <td height="50px" class="item_font" style="vertical-align:middle;border:1px solid #DDDDDD">
+                     系統更新
+                    </td>
+                    <td style="vertical-align:middle;border:1px solid #DDDDDD">
+                     <table width="100%" height="100%">
+                      <tr>
+                       <td width="80%" class="item_font" style="vertical-align:middle">
+                        <input id="update_fw" class="easyui-filebox" style="border-color:#557Fb9;width:80%;max-width:280px" data-options="prompt:'選擇軔體',buttonAlign:'left'" name="fwname">
+                       </td>
+                       <td class="item_font" style="vertical-align:middle;text-align:center">
+                        <a href="javascript:update_fw()"><div id="fwupdate_btn" align="center" class="button" style="width:100px">更新</div></a>
+                       </td>
+                      </tr>
+                     </table>
+                    </td>
+                   </tr>
+                   <tr>
                     <td colspan="2" class="onlinetest_table_lower"  style="width:100%; padding:0px;vertical-align:middle">
                      <table class="inner_table_page_tail">
                       <tr>
@@ -1509,7 +1138,7 @@ function cancel_btn()
                  <td align="right" style="width:300px;vertical-align:middle">
                   <table height="100%"><tr>
                    <td style="width:100%;text-align:right;vertical-align:middle;padding:0px"><a href="javascript:system_cmd()"><div id="updatebtn" align="center" class="button" style="width:100px;text-align:center;vertical-align:middle">系統命令</div></a></td>
-                   <td style="width:100%;text-align:right;vertical-align:middle;padding:0px"><a href="javascript:update_fw()"><div id="updatebtn" align="center" class="button" style="width:100px;text-align:center;vertical-align:middle">系統更新</div></a></td></tr></table>
+                   <td style="width:100%;text-align:right;vertical-align:middle;padding:0px"><a href="javascript:reboot_submit()"><div id="rebootbtn" align="center" class="button" style="width:100px;text-align:center;vertical-align:middle">重新開機</div></a></td></tr></table>
                  </td>
                 </tr>
                </table>

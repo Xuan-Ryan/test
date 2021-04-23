@@ -1798,7 +1798,7 @@ int main(int argc, char *argv[])
 	method = getenv("REQUEST_METHOD");
 
 	if (method == NULL) {
-		show_error_page("online_test.shtml");
+		show_error_page();
 		goto leave;
 	}
 
@@ -1808,14 +1808,14 @@ int main(int argc, char *argv[])
 	if (is_post == 1) {
 		len = getenv("CONTENT_LENGTH");
 		if(len == NULL) {
-			show_error_page("online_test.shtml");
+			show_error_page();
 			goto leave;
 		}
 
 		input_len = strtol(len, NULL, 10);
 		input_len &= 0x7FFFFFFF;
 		if (input_len <= 0) {
-			show_error_page("online_test.shtml");
+			show_error_page();
 			goto leave;
 		}
 	} else {
@@ -1824,7 +1824,7 @@ int main(int argc, char *argv[])
 		input_len = strlen(query_str);
 
 		if (input_len <= 0 || query_str == NULL) {
-			show_error_page("online_test.shtml");
+			show_error_page();
 			goto leave;
 		}
 	}
@@ -1833,7 +1833,7 @@ int main(int argc, char *argv[])
 
 	input_buf = malloc(input_len);
 	if(input_buf == NULL) {
-		show_error_page("online_test.shtml");
+		show_error_page();
 		goto leave;
 	}
 
@@ -1846,16 +1846,16 @@ int main(int argc, char *argv[])
 
 	page = strdup(web_get("page", input_buf, 0));
 	if (page == NULL || strlen(page) <= 0) {
-		show_error_page("online_test.shtml");
+		show_error_page();
 		goto leave;
 	}
 
 	going = strdup(web_get("going", input_buf, 0));
 	if(going == NULL || strlen(going) <= 0) {
-		show_error_page("online_test.shtml");
+		show_error_page();
 		goto leave;
 	}
-
+DBG_MSG("going = %s\n", going);
 	if (strcmp(going, "set_lang") == 0) {
 		set_lang(input_buf);
 	} else if (strcmp(going, "ack") == 0) {
@@ -1956,7 +1956,8 @@ int main(int argc, char *argv[])
 	} else if (!strcmp(going, "clear_all_update_files")) {
 		clear_update_files();
 	} else {
-		show_error_page("online_test.shtml");
+DBG_MSG("");
+		show_error_page();
 	}
 
 	//  ************************
