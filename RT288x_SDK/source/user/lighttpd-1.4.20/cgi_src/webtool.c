@@ -6318,6 +6318,9 @@ void WebSysGet(char *argv[])
 		printf("</tr></table></td></tr></table>");
 		printf("</div>\n");
 		printf("<input type='hidden' id='processing' value='no'>\n");
+	} else if (!strcmp(argv[3], "random_num")) {
+		srand(time(NULL));
+		printf("%d", rand());
 	}
 }
 
