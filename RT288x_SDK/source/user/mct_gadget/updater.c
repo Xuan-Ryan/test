@@ -1,209 +1,544 @@
-#include <stdio.h>
+/*****************************************************************************
+ * updater_device.c    "device Process"
+ ***************************************************************************** 
+ * second broadcast when receive PC broadcast
+ * Receive head {TAG、TotalLength、XactType、HdrSize、Flags、Payloadlength、CRC}
+ * Receive packet 、calculate current packet 、rest packet and write each packet 
+ * Check CRC and send CRC result
+ * Write progress 、read Program process and send
+ * Finish
+*/
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <time.h>
 #include <pthread.h>
-#include <fcntl.h>		/* open */
-#include <sys/ioctl.h>		/* ioctl */
-#include <pthread.h>
+#include <arpa/inet.h> //inet_ntoa
+#include <sys/types.h> /* open socket */
+#include <unistd.h>	   /* open */
+#include <sys/stat.h>  /* open */
+#include <fcntl.h>	   /* open */
+#include <sys/ioctl.h> /* ioctl */
 #include <signal.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <semaphore.h>
-#include <arpa/inet.h>
 #include <stdbool.h>
 #include <linux/types.h>
 #include <linux/input.h>
 #include <linux/hidraw.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <errno.h>
-#include <linux/autoconf.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <ifaddrs.h>
 
-#include "mnspdef.h"
-#include "t6bulkdef.h"
-#include "queue.h"
-#include "t6usbdongle.h"
-#include "displayserver.h"
-#include "jwr2100_tcp_cmddef.h"
+//#include <linux/autoconf.h>
 
-unsigned char MT7620_update_flag = 0;
-unsigned char MT7620_tcp_accept_flag = 0;
-char * my_server_ip_addr = "10.10.10.253";
-void * RomUpdateTcp()
+#include "updater.h"
+#include "CRC.h"
+
+#define KGRN "\033[0;32;32m"
+#define RESET "\033[0m"
+#define FILE_NAME "/var/tmpFW" //   UVC-j5-RX-0.0.0.1.bin
+#define PACKET_LENGTH 32 * 1024
+#define DEVICE_NAME "TEST_NAME"
+#define MY_SERVER_IP "192.168.1.121"
+#define PORT 55551
+#define BROADCAST_IP "255.255.255.255"
+#define BROADCAST_SEND 55550
+#define HEAD_SIZE 32
+
+int tcp_sd, brdcfd, acceptfd;
+unsigned int tcptotalget;
+struct sockaddr_in server; //br receform
+struct sockaddr_in form;   //br sendto
+
+void close_socket(int acceptfd, int tcp_sd, int brdcfd)
 {
-	int ret, i;
-	unsigned char buf[20*1024];
-	unsigned char *rom_buf;
-	struct sockaddr_in from;
-	struct timeval tv;
-	socklen_t len;
-	char *ptr_image_pice ;
-	char *ptr_image ;
-	char *image_data = NULL;
-
-	int packet_frist = -1;
-	int packet_id = -1;
-	int packet_len = -1;
-	int ipAddr = 0 ;
-	int image_size = -1;
-	struct sockaddr_in their_addr;
-	int clientSocket = -1 ;
-	int sin_size = sizeof(struct sockaddr_in);
-
-	len = sizeof(from);
-
-	int fd = socket(AF_INET,SOCK_STREAM,0);
-	if (fd == -1) {
-	 	DEBUG_PRINT("socket create error!\n");
-	 	return;
+	if (acceptfd > 0)
+	{
+		close(acceptfd);
+		acceptfd = 0;
 	}
-	DEBUG_PRINT("test cursor socket fd=%d ip = %s port=%d \n",fd,my_server_ip_addr,JWR_ROM_TCP_PORT);
-
-	struct sockaddr_in addr;
-	addr.sin_family=AF_INET;
-	addr.sin_port=htons(JWR_ROM_TCP_PORT);
-	addr.sin_addr.s_addr=inet_addr(my_server_ip_addr);
-
-/*
-	tv.tv_sec =  1;
-	tv.tv_usec = 0;
-	if ( setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval)) == -1) {
-		DEBUG_PRINT("setsockopt SO_RCVTIMEO  error\n");
-		close(fd);
-		return ;
+	if (tcp_sd > 0)
+	{
+		close(tcp_sd);
+		tcp_sd = 0;
 	}
-*/
-	int n = TCP_MAX_BUFFER ;
-	if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1) {
-  		DEBUG_PRINT("setsockopt SO_RCVBUF  error");
-		close(fd);
-		return ;
+	if (brdcfd > 0)
+	{
+		close(brdcfd);
+		brdcfd = 0;
 	}
-
-	ret = bind(fd,(struct sockaddr*)&addr,sizeof(addr));
-	if (ret == -1) {
-		DEBUG_PRINT("test cursor Bind error!\n");
-		close(fd);
-		return ;
+}
+void printmessage(PJUVCHDR t6_head, PDEVICEINFO t6_info) //print head message
+{
+	if (t6_head != NULL)
+	{
+		printf("t6_head->Tag = %u\n", t6_head->Tag);
+		printf("t6_head->XactType = %d\n", t6_head->XactType);
+		printf("t6_head->Flags = %u\n", t6_head->Role);
+		printf("t6_head->XactId = %u\n", t6_head->XactId);
+		printf("t6_head->TotalLength = %u\n", t6_head->TotalLength);
+		printf("t6_head->HdrSize = %d\n", t6_head->HdrSize);
 	}
-	DEBUG_PRINT("test cursor Bind successfully.\n");
-
-	if ((ret = listen(fd, 32)) < 0) {
-		DEBUG_PRINT("Server-listen() error");
-		close(fd);
-		fd = -1;
-		return -4;
-	} else {
-		printf("Server-Ready for client connection...\n");
+	if (t6_info != NULL)
+	{
+		printf("t6_info->crc32 = %u\n", t6_info->crc32);
+		printf("t6_info->name = %s\n", t6_info->name);
+		printf("t6_info->port = %d\n", t6_info->port);
 	}
+	printf("=========================================================\n");
+}
+void Broadcast_create()
+{
+	//=================================Broadcast Create============================================
+	int flag, ret, i;
+	char recvbuf[HEAD_SIZE] = {0};
+	//struct timeval tv;
 
-	while(1) {
-		if ((clientSocket = accept(fd, (struct sockaddr *)&their_addr, &sin_size)) < 0) {
-			printf("Server-accept() error \n" );
-			close(fd);
-			fd = -1;
-			return -2;
-		} else {
-			printf("Server-accept() is OK\n");
-			/*client IP*/
-			printf("Server-new socket, clientSocket is OK...\n");
-			printf("Got connection from the client: %s\n", inet_ntoa(their_addr.sin_addr));
-			//printf("Got connection from the client: %d\n", *paddr);
-			MT7620_tcp_accept_flag = 1;
-			FILE *fpeng001 = open("/tmp/MT7620_tcp_accept_flag", O_RDWR | O_CREAT);
-			write(fpeng001, &MT7620_tcp_accept_flag, 1);
-			close(fpeng001);
+	brdcfd = socket(PF_INET, SOCK_DGRAM, 0);
+	i = 0;
+	while (brdcfd < 0 && i < 5) //fail mechanism
+	{
+		printf("Socket Fail\n");
+		brdcfd = socket(PF_INET, SOCK_DGRAM, 0);
+		i++;
+		if (i == 4)
+		{
+			printf("Please Retry!............\n");
+			exit(1);
 		}
+	}
 
-		fd_set read_sd;
-		FD_ZERO(&read_sd);
-		FD_SET(clientSocket, &read_sd);
+	//ret = setsockopt(brdcfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+	flag = 1;
+	ret = setsockopt(brdcfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&flag, sizeof(flag));
+	//ret = setsockopt(brdcfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+	ret = setsockopt(brdcfd, SOL_SOCKET, SO_BROADCAST, &flag, sizeof(flag));
 
-		while(clientSocket) {
-			fd_set rsd = read_sd;
-			int sel = select(clientSocket + 1, &rsd, 0, 0, 0);
+	bzero(&server, sizeof(struct sockaddr_in));
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = 0x00; //INADDR_ANY = 0
+	server.sin_port = htons(BROADCAST_SEND);
 
-			if (sel > 0) {
-				//ipAddr = g_active_display_ip;
-				PT6BULKDMAHDR t6_head = (PT6BULKDMAHDR)buf;
-				unsigned int tcptotalget = 0;
-				unsigned int tcptotallength = 0;
-				unsigned int align64k_len = 0;
+	form.sin_family = AF_INET;
+	form.sin_addr.s_addr = htonl(INADDR_BROADCAST); //255.255.255.255
+	form.sin_port = htons(55550);
+	i = 0;
+	while ((ret = bind(brdcfd, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) < 0 && i < 5)
+	{
+		printf("bind Fail = %d\n", ret);
+		ret = bind(brdcfd, (struct sockaddr *)&server, sizeof(struct sockaddr_in));
+		i++;
+		if (i == 4)
+		{
+			printf("Please Retry!............\n");
+			close_socket(acceptfd, brdcfd, tcp_sd);
+			exit(1);
+		}
+	}
+}
+void TCP_create()
+{
+	int ret, flag;
+	tcp_sd = socket(AF_INET, SOCK_STREAM, 0);
+	flag = 0;
+	while (tcp_sd < 0 && flag < 5)
+	{
+		printf("Socket Create Error!\n");
+		tcp_sd = socket(AF_INET, SOCK_STREAM, 0);
+		sleep(1);
+		if (flag == 4)
+		{
+			printf("Please Retry!............\n");
+			exit(1);
+		}
+	}
+	printf("test cursor socket tcp_sd = %d ip = %s port = %d \n", tcp_sd, "INADDR_ANY", PORT);
+	flag = 1;
+	ret = setsockopt(tcp_sd, SOL_SOCKET, SO_REUSEADDR, (const char *)&flag, sizeof(flag));
 
-				ret =recv(clientSocket,&buf[tcptotalget],32,0);
-				if (ret <= 0){
-					//DEBUG_PRINT("cusor recvfrom  error = %d \n",ret);
-					continue;
-				}
+	struct sockaddr_in tcp_addr;
+	tcp_addr.sin_family = AF_INET;
+	tcp_addr.sin_port = htons(PORT);
+	tcp_addr.sin_addr.s_addr = INADDR_ANY; //inet_addr(ip[1]);
 
-				DEBUG_PRINT("rom recvfrom ret = %d \n",ret);
+	ret = bind(tcp_sd, (struct sockaddr *)&tcp_addr, sizeof(tcp_addr));
+	flag = 0;
+	while (ret < 0 && flag < 5)
+	{
+		printf("TCP Bind error!\n");
+		ret = bind(tcp_sd, (struct sockaddr *)&tcp_addr, sizeof(tcp_addr));
+		sleep(1);
+		flag++;
+		if (flag == 4)
+		{
+			printf("Please Retry !............\n");
+			close_socket(acceptfd, brdcfd, tcp_sd);
+			exit(1);
+		}
+	}
+	printf("test cursor Bind successfully.\n");
+	ret = listen(tcp_sd, 5);
+	flag = 0;
+	while (ret < 0 && flag < 5)
+	{
+		printf("Server-listen() Error");
+		ret = listen(tcp_sd, 32);
+		sleep(1);
+		flag++;
+		if (flag == 4)
+		{
+			printf("Please Retry !............\n");
+			close_socket(acceptfd, brdcfd, tcp_sd);
+			exit(1);
+		}
+	}
 
-				if (t6_head->Signature != 0x05){
-					DEBUG_PRINT("Signature error\n");
-					//Dump_MnspXactHdr(t6_head);
-					continue;
-				}
+	printf("Server-Ready for client connection...\n");
+}
+int Receive_data(int sd)
+{
 
-				rom_buf = malloc(t6_head->PayloadLength + 32);
-				memcpy(rom_buf, &buf[tcptotalget], 32);
-				tcptotallength = t6_head->PayloadLength;
-				tcptotalget = tcptotalget + 32;
-				PWIFIDONGLEROMHDR rom_head = (PWIFIDONGLEROMHDR)&rom_buf[32+0x40000];
-				MT7620_update_flag = 1;
-				FILE *fpeng000 = open("/tmp/MT7620_update_flag", O_RDWR | O_CREAT);
-				write(fpeng000, &MT7620_update_flag, 1);
-				close(fpeng000);
-				while(tcptotallength) {
-				 	ret =recv(clientSocket,&rom_buf[tcptotalget],tcptotallength,0);
-					if (ret <= 0){
-						//DEBUG_PRINT("cusor recvfrom  error = %d \n",ret);
-						continue;
-					}
-					DEBUG_PRINT("rom recvfrom ret = %d \n",ret);
-					tcptotalget = tcptotalget + ret;
-					tcptotallength = tcptotallength - ret;
-				}
+	int ret, calculate_file;
+	unsigned char buf[64] = {0};
+	unsigned char *rom_buf;
+	unsigned int write_length, percentage, tcptotallength;
+	PJUVCHDR t6_head;
+	PJUVCHDR pJUVHdr;
+	FILE *fp = NULL;
 
-				if (rom_head->FW_for_dest == FW_DEST_RX) {
-					FILE *fpeng = open("/var/RusbFW", O_RDWR | O_CREAT);
-					char cmd[512];
-					int status;
-					write(fpeng, &rom_buf[32 + 512 + 0x40000], rom_head->PayloadLength);
-					printf("rom_head->PayloadLength:%d\n",rom_head->PayloadLength);
-					snprintf(cmd, sizeof(cmd), "/bin/mtd_write -o %d -l %d write %s Kernel", 0, rom_head->PayloadLength, "/var/RusbFW");
-					status = system(cmd);
-					send(clientSocket, &MT7620_update_flag, 1, 0);
-					close(clientSocket);
-					system("reboot");
-				}
-			} else if (sel < 0) {
+	//==============================Receive head===================================
+	fp = fopen(FILE_NAME, "w");
+	if (fp == NULL)
+	{
+		return -1;
+	}
+	tcptotallength = 0;
+	bzero(buf, sizeof(buf));
+	ret = recv(sd, buf, 32, 0);
+	if (ret <= 0) //  other side disconnected
+	{
+		printf("Receive head Error = %d \n", ret);
+		printf("Re-receive Broadcast !...........\n");
+		fclose(fp);
+		return -1;
+	}
+	t6_head = (PJUVCHDR)buf;
+	printf("rom recvfrom length ret = %d \n", ret);
+	printmessage(t6_head, NULL);
+	tcptotallength = t6_head->TotalLength - 32;
+	if (t6_head->Tag != 1247106627) //JUVC
+	{
+		printf("Tag Error %d\n", t6_head->Tag);
+		printf("Re-receive Broadcast and check Tag !...........\n");
+		fclose(fp);
+		return -1;
+	}
+	if (tcptotallength > (15 * 1024 * 1024)) //JUVC
+	{
+		printf("File size overload %d\n", tcptotallength);
+		printf("Re-receive Broadcast and check File !...........\n");
+		fclose(fp);
+		return -1;
+	}
+	if (tcptotallength <= 0) //JUVC
+	{
+		printf("File size Error %d\n", tcptotallength);
+		printf("Re-receive Broadcast and check File !...........\n");
+		fclose(fp);
+		return -1;
+	}
+	bzero(buf, sizeof(buf));
+	if (t6_head->XactType == 6) // 6 ready
+	{
+		t6_head->Role = 1;
+		send(sd, t6_head, 32, 0);
+	}
+
+	/*=====Receive packet 、calculate current packet 、rest packet and write each packet=====*/
+	rom_buf = malloc(PACKET_LENGTH);
+	tcptotalget = 0;
+	calculate_file = tcptotallength;
+
+	while (tcptotallength)
+	{
+		bzero(rom_buf, PACKET_LENGTH);
+		ret = recv(sd, rom_buf, PACKET_LENGTH, 0);
+		if (ret <= 0) //disable = 0 ERROR = -1
+		{
+			printf("Recvfrom  Error = %d \n", ret);
+			printf("Re-receive Broadcast !..........\n");
+		}
+		else
+		{
+			write_length = fwrite(rom_buf, 1, ret, fp);
+			printf("write_length = %d\n", write_length);
+			if (write_length < ret)
+			{
+				printf("File:\t%s Write Failed!\n", FILE_NAME);
+				printf("Re-receive Broadcast !..........\n");
 				break;
 			}
+			printf("rom recvfrom ret = %d \n", ret);
+			tcptotalget += ret;
+			tcptotallength -= ret;
+			percentage = ((float)tcptotalget / calculate_file) * 100;
+			printf("percentage = %d\n", percentage);
+			printf("tcptotalget =  %d\n", tcptotalget);
+			printf("tcptotallength REST =  %d\n", tcptotallength);
+			bzero(buf, sizeof(buf));
+			pJUVHdr = (PJUVCHDR)buf;
+			pJUVHdr->Tag = 1247106627;
+			pJUVHdr->XactType = 3; //XactType = 3 (status)
+			pJUVHdr->HdrSize = 32;
+			pJUVHdr->TotalLength = 64;
+			memcpy(buf + 32, &percentage, sizeof(percentage));
+			send(sd, buf, 64, 0);
 		}
-
-		close(clientSocket);
 	}
 
-	if (image_data != NULL) {
-		free(image_data);
-		image_data = NULL;
+	if (write_length < ret || ret <= 0)
+	{
+		free(rom_buf);
+		fclose(fp);
+		close_socket(acceptfd, brdcfd, tcp_sd);
+		return -1;
 	}
-	close(fd);
+	free(rom_buf);
+	fclose(fp);
+	printf(KGRN "File:\t%s Receive Finished!", FILE_NAME);
+	printf("\n" RESET);
+	return 0;
 }
-
-int main(int argc ,char* avg[])
+int CRC_checksum(int sd)
 {
-	pthread_t pthr_cursor_tcp;
+	int calculate_CRC, receiveCRC;
+	char *file_buffer;
+	unsigned char buf[64] = {0};
+	PDEVICEINFO t6_info;
+	PJUVCHDR pJUVHdr;
+	FILE *fp;
+	image_header_t head;
+	//====================Check CRC and send CRC result==========================
+	file_buffer = (char *)malloc(tcptotalget);
 
-	FILE *fpeng001 = open("/tmp/MT7620_tcp_accept_flag", O_RDWR | O_CREAT);
-	write(fpeng001, &MT7620_tcp_accept_flag, 1);
-	close(fpeng001);
+	fp = fopen(FILE_NAME, "r");
+	if (fp == NULL)
+		printf("open file error !......\n");
+	printf("file_size = %d\n", tcptotalget);
+	bzero(file_buffer, tcptotalget);
+	fread(file_buffer, 1, tcptotalget, fp);
+	t6_info = (PDEVICEINFO)(buf + 32);
+	t6_info->crc32 = crc32(0, (const unsigned char *)file_buffer + sizeof(image_header_t), tcptotalget - sizeof(image_header_t)); //32 file crc
+	calculate_CRC = t6_info->crc32;
 
-	FILE *fpeng000 = open("/tmp/MT7620_update_flag", O_RDWR | O_CREAT);
-	write(fpeng000, &MT7620_update_flag, 1);
-	close(fpeng000);
+	fp = fopen(FILE_NAME, "r");
+	if (fp == NULL)
+		printf("open file error !......\n");
+	fread(&head, 1, sizeof(image_header_t), fp); //read data CRC
+	receiveCRC = ntohl(head.ih_dcrc);
 
-	RomUpdateTcp();
+	bzero(buf, sizeof(buf));
+	pJUVHdr = (PJUVCHDR)buf;
+	pJUVHdr->Tag = 1247106627;
+	pJUVHdr->XactType = 4; //XactType = 4 (CRC)
+	pJUVHdr->HdrSize = 32;
+	pJUVHdr->TotalLength = 64;
+	fclose(fp);
+	char str[20] = {};
+	char str2[15] = {};
+	if (calculate_CRC != receiveCRC)
+	{
+		printf("Accept File Content is Error !.........\n");
+		printf("calculation CRC32 = %u\n", calculate_CRC);
+		printf("Recive t6_head->DeviceInfo.crc32 = %u\n", receiveCRC);
+		strcat(str, "CRC = ");
+		sprintf(str2, "%u", calculate_CRC);
+		strncat(str, str2, strlen(str2));
+		memcpy(buf + 32, str, strlen(str));
+		send(sd, buf, sizeof(buf), 0);
+		printf("%s\n", str);
+		free(file_buffer);
+		close(sd);
+		return -1;
+	}
+	else
+	{
+		printf("calculation CRC32 = %u\n", calculate_CRC);
+		printf("Recive t6_head->DeviceInfo.crc32 = %u\n", receiveCRC);
+		printf("Accept Content is Complete !.........\n");
+		memcpy(buf + 32, "CRC Complete", 13);
+		send(sd, buf, sizeof(buf), 0);
+	}
+	sleep(1);
+	free(file_buffer);
+	return 0;
+}
+int Write_progress(int sd)
+{
+	/*============Write progress 、read Program process and send=================*/
+	int progress, fpeng;
+	unsigned int status;
+	unsigned char writebuf[4] = {0};
+	unsigned char cmd[512] = {0};
+	unsigned char buf[64] = {0};
+	PJUVCHDR pJUVHdr;
+	FILE *fp_progress;
+
+	printf("File_TotalLength:%d\n", tcptotalget);
+	snprintf(cmd, sizeof(cmd), "mtd_write -o %d -l %d write %s Kernel &", 0, tcptotalget, FILE_NAME); //FILE_NAME
+	status = system(cmd);
+
+	system("rm /var/mtd_write.log");
+	system("touch /var/mtd_write.log");
+
+	progress = 0;
+	while (progress < 100)
+	{
+		fp_progress = fopen("/var/mtd_write.log", "r"); ///var/mtd_write.log
+		if (fp_progress == NULL)
+		{
+			printf("File open fail, %d\n", errno);
+			break;
+		}
+		bzero(writebuf, sizeof(writebuf));
+		fread(writebuf, 1, sizeof(writebuf), fp_progress);
+		sscanf(writebuf, "%d", &progress);
+		//printf("Font progress : %d\n", progress);
+		bzero(buf, sizeof(buf));
+		pJUVHdr = (PJUVCHDR)buf;
+		pJUVHdr->Tag = 1247106627;
+		pJUVHdr->XactType = 3; //XactType = 3 (status)
+		pJUVHdr->HdrSize = 32;
+		pJUVHdr->TotalLength = 64;
+		memcpy(buf + 32, &progress, sizeof(progress));
+		send(sd, buf, 64, 0);
+		fclose(fp_progress);
+		usleep(200000);
+	}
+
+	return 0;
+}
+int main(int argc, char *avg[])
+{
+	int recvbytes, sendBytes, fromlen, ret, CRCret;
+	unsigned int sin_size, write_length, maxfd;
+	unsigned char buf[64] = {0};
+	PJUVCHDR t6_head;
+	PDEVICEINFO t6_info;
+	struct timeval tv;
+
+	struct sockaddr_in their_addr;
+	Broadcast_create();
+	TCP_create();
+	ret = 0;
+	printf("Waiting Receive BroadCast !.......  ret = %d\n", ret);
+	fd_set read_sd;
+	FD_ZERO(&read_sd);
+
+	while (1)
+	{
+		FD_SET(tcp_sd, &read_sd);
+		FD_SET(brdcfd, &read_sd);
+		tv.tv_sec = 6;
+		tv.tv_usec = 0;
+		maxfd = (tcp_sd > brdcfd) ? (tcp_sd + 1) : (brdcfd + 1); //which max+1
+		ret = select(maxfd + 1, &read_sd, 0, 0, &tv);
+
+		if (ret == -1)
+		{ //fail
+			printf("Select Error Re-receive Broadcast !...... ret = %d\n", ret);
+			Broadcast_create();
+			TCP_create();
+			FD_ZERO(&read_sd);
+			ret = 0;
+		}
+		else if (ret == 0) //timeout
+			printf("Waiting Receive BroadCast !.......  ret = %d\n", ret);
+		else if (FD_ISSET(tcp_sd, &read_sd))
+		{
+			sin_size = sizeof(struct sockaddr_in);
+			acceptfd = accept(tcp_sd, (struct sockaddr *)&their_addr, &sin_size);
+			if (acceptfd < 0)
+			{
+				printf("Server-accept() Error Re-receive Broadcast !......\n");
+				close_socket(acceptfd, tcp_sd, brdcfd);
+				acceptfd = 0;
+				break;
+			}
+			printf("Server-accept() is OK\n");
+			printf("Server-new socket, acceptfd is OK...\n");
+			printf("Got connection from the client: %s\n", inet_ntoa(their_addr.sin_addr)); // *client IP
+
+			FD_SET(acceptfd, &read_sd); // 新增到 master set
+			if (acceptfd >= maxfd)
+			{ // 持續追蹤最大的 fd
+				maxfd = acceptfd;
+			}
+
+			if (FD_ISSET(acceptfd, &read_sd))
+			{
+				if ((ret = Receive_data(acceptfd)) == -1)
+				{
+					close_socket(acceptfd, tcp_sd, brdcfd);
+					printf("Receive_data = %d\n", ret);
+					break;
+				}
+
+				//* CRC Checksum *//
+				if ((CRCret = CRC_checksum(acceptfd)) == -1)
+				{
+					close_socket(acceptfd, tcp_sd, brdcfd);
+					printf("CRC_checksum = %d\n", CRCret);
+					break;
+				}
+
+				if ((ret = Write_progress(acceptfd)) == -1)
+				{
+					close_socket(acceptfd, tcp_sd, brdcfd);
+					printf("Write_progress = %d\n", ret);
+					break;
+				}
+
+				close_socket(acceptfd, tcp_sd, brdcfd);
+				printf(KGRN "Update Complete!");
+				printf("\n" RESET);
+				sleep(1);
+				//system("reboot");
+				return;
+			}
+			/*Broadcast*/
+		}
+		else if (FD_ISSET(brdcfd, &read_sd))
+		{
+			fromlen = sizeof(struct sockaddr_in);
+			bzero(buf, sizeof(buf));
+			recvfrom(brdcfd, buf, 32, 0, (struct sockaddr *)&server, &fromlen);
+			t6_head = (PJUVCHDR)buf;
+			if (t6_head->XactType == JUVC_TYPE_DISCOVER) //JUVC_TYPE_DISCOVER =5
+			{
+				if (CRCret == -1)
+					printf("CRCret = %d\n", CRCret);
+				else
+					printf("ret = %d\n", ret);
+				bzero(buf, sizeof(buf));
+				t6_head = (PJUVCHDR)buf;
+				t6_info = (PDEVICEINFO)(buf + 32);
+				t6_head->Tag = 1247106627;
+				t6_head->XactType = 1;
+				t6_head->Role = JUVC_DEVICE_TYPE_TX; //TX or RX select
+				t6_head->XactId = 204;
+				t6_head->HdrSize = 32;
+				t6_info->port = 55551;
+				strcpy(t6_info->name, DEVICE_NAME);
+				sendBytes = sendto(brdcfd, buf, sizeof(struct deviceinfo) + sizeof(struct juvc_hdr_packet), 0, (struct sockaddr *)&form, sizeof(struct sockaddr_in));
+				printmessage(t6_head, t6_info);
+			}
+		}
+	}
 }
