@@ -315,9 +315,9 @@ void RunAudioCapture(struct audio_para *par)
 			//ret = TcpWrite(par->socket,buf,len);
 #endif			
 		}
-		//ret = TcpWrite(par->socket,udpptr,len);
+		ret = TcpWrite(par->socket,udpptr,len);
 		//ret = UdpWrite(par->socket,"10.10.10.254",GADGET_MIC_PORT,udpptr,len);
-
+/*
 		if(len >= udpremain ){
 		    int buflen = 0;
 		    memcpy(udpbuf[udpindex]+ udpoffset,udpptr ,udpremain);
@@ -339,9 +339,9 @@ void RunAudioCapture(struct audio_para *par)
             udpremain = udpremain - len;
 		}
      
-
+*/
 		
-	    //printf("audio socket write r = %d  \n",ret);
+	   // printf("audio socket write r = %d  \n",ret);
 	
 		if(ret < 0){
 			printf("audio socket write failed \n");

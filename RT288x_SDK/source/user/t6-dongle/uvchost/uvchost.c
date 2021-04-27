@@ -2118,7 +2118,7 @@ void* uvc_audio_system(void *lp)
 		}
 		
 #ifndef WRITE_FILE	
-		pudev->socket=  UdpInit(); //TcpConnect("10.10.10.254",GADGET_MIC_PORT,3);
+		pudev->socket=  TcpConnect("10.10.10.254",GADGET_MIC_PORT,3);//UdpInit();
 		if(pudev->socket < 0){
 			printf("Tcp audio link failed\n");
 			closeSocket(pudev->cmd_socket);

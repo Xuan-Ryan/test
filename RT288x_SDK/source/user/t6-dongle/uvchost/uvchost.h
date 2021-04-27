@@ -193,6 +193,7 @@ struct uvc_ctrl_list{
 	struct uvc_ctrl_cmd* pcmd_buf;
 };
 
+#pragma pack(pop)
 
 
 
