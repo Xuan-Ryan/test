@@ -15,9 +15,9 @@
 #include <pthread.h>
 #include <arpa/inet.h> //inet_ntoa
 #include <sys/types.h> /* open socket */
-#include <unistd.h>	   /* open */
+#include <unistd.h>	/* open */
 #include <sys/stat.h>  /* open */
-#include <fcntl.h>	   /* open */
+#include <fcntl.h>	 /* open */
 #include <sys/ioctl.h> /* ioctl */
 #include <signal.h>
 #include <sys/ipc.h>
@@ -51,12 +51,13 @@
 #define BROADCAST_SEND 55550
 #define HEAD_SIZE 32
 
-int tcp_sd, brdcfd, acceptfd;
+int tcp_sd, brdcfd;
 unsigned int tcptotalget;
 struct sockaddr_in server; //br receform
 struct sockaddr_in form;   //br sendto
+struct timeval tv;
 
-void close_socket(int acceptfd, int tcp_sd, int brdcfd)
+void Close_socket(int acceptfd, int tcp_sd, int brdcfd)
 {
 	if (acceptfd > 0)
 	{
@@ -99,6 +100,8 @@ void Broadcast_create()
 	int flag, ret, i;
 	char recvbuf[HEAD_SIZE] = {0};
 	//struct timeval tv;
+	tv.tv_sec = 3;
+	tv.tv_usec = 0;
 
 	brdcfd = socket(PF_INET, SOCK_DGRAM, 0);
 	i = 0;
@@ -117,7 +120,7 @@ void Broadcast_create()
 	//ret = setsockopt(brdcfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 	flag = 1;
 	ret = setsockopt(brdcfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&flag, sizeof(flag));
-	//ret = setsockopt(brdcfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+	ret = setsockopt(brdcfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 	ret = setsockopt(brdcfd, SOL_SOCKET, SO_BROADCAST, &flag, sizeof(flag));
 
 	bzero(&server, sizeof(struct sockaddr_in));
@@ -137,7 +140,7 @@ void Broadcast_create()
 		if (i == 4)
 		{
 			printf("Please Retry!............\n");
-			close_socket(acceptfd, brdcfd, tcp_sd);
+			Close_socket(0, brdcfd, tcp_sd);
 			exit(1);
 		}
 	}
@@ -145,6 +148,9 @@ void Broadcast_create()
 void TCP_create()
 {
 	int ret, flag;
+	tv.tv_sec = 3;
+	tv.tv_usec = 0;
+
 	tcp_sd = socket(AF_INET, SOCK_STREAM, 0);
 	flag = 0;
 	while (tcp_sd < 0 && flag < 5)
@@ -161,6 +167,7 @@ void TCP_create()
 	printf("test cursor socket tcp_sd = %d ip = %s port = %d \n", tcp_sd, "INADDR_ANY", PORT);
 	flag = 1;
 	ret = setsockopt(tcp_sd, SOL_SOCKET, SO_REUSEADDR, (const char *)&flag, sizeof(flag));
+	ret = setsockopt(tcp_sd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
 	struct sockaddr_in tcp_addr;
 	tcp_addr.sin_family = AF_INET;
@@ -178,7 +185,7 @@ void TCP_create()
 		if (flag == 4)
 		{
 			printf("Please Retry !............\n");
-			close_socket(acceptfd, brdcfd, tcp_sd);
+			Close_socket(0, brdcfd, tcp_sd);
 			exit(1);
 		}
 	}
@@ -194,7 +201,7 @@ void TCP_create()
 		if (flag == 4)
 		{
 			printf("Please Retry !............\n");
-			close_socket(acceptfd, brdcfd, tcp_sd);
+			Close_socket(0, brdcfd, tcp_sd);
 			exit(1);
 		}
 	}
@@ -203,7 +210,6 @@ void TCP_create()
 }
 int Receive_data(int sd)
 {
-
 	int ret, calculate_file;
 	unsigned char buf[64] = {0};
 	unsigned char *rom_buf;
@@ -231,51 +237,58 @@ int Receive_data(int sd)
 	t6_head = (PJUVCHDR)buf;
 	printf("rom recvfrom length ret = %d \n", ret);
 	printmessage(t6_head, NULL);
-	tcptotallength = t6_head->TotalLength - 32;
+	//tcptotallength = t6_head->TotalLength - 32;
 	if (t6_head->Tag != 1247106627) //JUVC
 	{
-		printf("Tag Error %d\n", t6_head->Tag);
+		printf("Tag Error = %d\n", t6_head->Tag);
 		printf("Re-receive Broadcast and check Tag !...........\n");
 		fclose(fp);
 		return -1;
 	}
-	if (tcptotallength > (15 * 1024 * 1024)) //JUVC
-	{
-		printf("File size overload %d\n", tcptotallength);
-		printf("Re-receive Broadcast and check File !...........\n");
-		fclose(fp);
-		return -1;
-	}
-	if (tcptotallength <= 0) //JUVC
-	{
-		printf("File size Error %d\n", tcptotallength);
-		printf("Re-receive Broadcast and check File !...........\n");
-		fclose(fp);
-		return -1;
-	}
-	bzero(buf, sizeof(buf));
 	if (t6_head->XactType == 6) // 6 ready
 	{
 		t6_head->Role = 1;
-		send(sd, t6_head, 32, 0);
+		ret = send(sd, t6_head, 32, 0);
 	}
 
-	/*=====Receive packet 、calculate current packet 、rest packet and write each packet=====*/
-	rom_buf = malloc(PACKET_LENGTH);
-	tcptotalget = 0;
-	calculate_file = tcptotallength;
-
-	while (tcptotallength)
+	bzero(buf, sizeof(buf));
+	printf("Receive head Error = %d \n", ret);
+	printf("Re-receive Broadcast !...........\n");
+	ret = recv(sd, buf, 32, 0);
+	if (ret <= 0) //  other side disconnected
 	{
-		bzero(rom_buf, PACKET_LENGTH);
-		ret = recv(sd, rom_buf, PACKET_LENGTH, 0);
-		if (ret <= 0) //disable = 0 ERROR = -1
+		printf("Receive head Error = %d \n", ret);
+		printf("Re-receive Broadcast !...........\n");
+		fclose(fp);
+		return -1;
+	}
+	if (t6_head->XactType == JUVC_TYPE_UPDATE_DATA) //need update
+	{
+		tcptotallength = t6_head->TotalLength - 32;
+		if (tcptotallength > (15 * 1024 * 1024) || tcptotallength <= 32) //JUVC
 		{
-			printf("Recvfrom  Error = %d \n", ret);
-			printf("Re-receive Broadcast !..........\n");
+			//printf("File size Error = %d\n", tcptotallength);
+			printf("Re-receive Broadcast and check File !...........\n");
+			fclose(fp);
+			return -1;
 		}
-		else
+		/*=====Receive packet 、calculate current packet 、rest packet and write each packet=====*/
+
+		rom_buf = malloc(PACKET_LENGTH);
+		tcptotalget = 0;
+		calculate_file = tcptotallength;
+		printf("Receive head Error = %d \n", ret);
+		printf("Re-receive Broadcast !...........\n");
+		while (tcptotallength)
 		{
+			bzero(rom_buf, PACKET_LENGTH);
+			ret = recv(sd, rom_buf, PACKET_LENGTH, 0);
+			if (ret <= 0) //disable = 0 ERROR = -1
+			{
+				printf("Recvfrom  Error = %d \n", ret);
+				printf("Re-receive Broadcast !..........\n");
+				break;
+			}
 			write_length = fwrite(rom_buf, 1, ret, fp);
 			printf("write_length = %d\n", write_length);
 			if (write_length < ret)
@@ -294,19 +307,18 @@ int Receive_data(int sd)
 			bzero(buf, sizeof(buf));
 			pJUVHdr = (PJUVCHDR)buf;
 			pJUVHdr->Tag = 1247106627;
-			pJUVHdr->XactType = 3; //XactType = 3 (status)
+			pJUVHdr->XactType = 7; //XactType = 7 (receive status)
 			pJUVHdr->HdrSize = 32;
 			pJUVHdr->TotalLength = 64;
 			memcpy(buf + 32, &percentage, sizeof(percentage));
 			send(sd, buf, 64, 0);
+			//usleep(50000);
 		}
 	}
-
 	if (write_length < ret || ret <= 0)
 	{
 		free(rom_buf);
 		fclose(fp);
-		close_socket(acceptfd, brdcfd, tcp_sd);
 		return -1;
 	}
 	free(rom_buf);
@@ -383,7 +395,6 @@ int Write_progress(int sd)
 {
 	/*============Write progress 、read Program process and send=================*/
 	int progress, fpeng;
-	unsigned int status;
 	unsigned char writebuf[4] = {0};
 	unsigned char cmd[512] = {0};
 	unsigned char buf[64] = {0};
@@ -392,15 +403,19 @@ int Write_progress(int sd)
 
 	printf("File_TotalLength:%d\n", tcptotalget);
 	snprintf(cmd, sizeof(cmd), "mtd_write -o %d -l %d write %s Kernel &", 0, tcptotalget, FILE_NAME); //FILE_NAME
-	status = system(cmd);
+	//snprintf(cmd, sizeof(cmd), "/home/ryan/samba/updater/mtd_write -o %d -l %d write %s Kernel &", 0, tcptotalget, "/home/ryan/samba/updater/RusbFW");
+	system(cmd);
 
 	system("rm /var/mtd_write.log");
 	system("touch /var/mtd_write.log");
+	//system("rm write_file.txt");
+	//system("touch write_file.txt");
+	usleep(10000);
 
 	progress = 0;
 	while (progress < 100)
 	{
-		fp_progress = fopen("/var/mtd_write.log", "r"); ///var/mtd_write.log
+		fp_progress = fopen("/var/mtd_write.log", "r"); // /var/mtd_write.log  /home/ryan/samba/updater/write_file.txt
 		if (fp_progress == NULL)
 		{
 			printf("File open fail, %d\n", errno);
@@ -409,11 +424,11 @@ int Write_progress(int sd)
 		bzero(writebuf, sizeof(writebuf));
 		fread(writebuf, 1, sizeof(writebuf), fp_progress);
 		sscanf(writebuf, "%d", &progress);
-		//printf("Font progress : %d\n", progress);
+		printf("Font progress : %d\n", progress);
 		bzero(buf, sizeof(buf));
 		pJUVHdr = (PJUVCHDR)buf;
 		pJUVHdr->Tag = 1247106627;
-		pJUVHdr->XactType = 3; //XactType = 3 (status)
+		pJUVHdr->XactType = 3; //XactType = 3 (write status)
 		pJUVHdr->HdrSize = 32;
 		pJUVHdr->TotalLength = 64;
 		memcpy(buf + 32, &progress, sizeof(progress));
@@ -421,25 +436,26 @@ int Write_progress(int sd)
 		fclose(fp_progress);
 		usleep(200000);
 	}
-
 	return 0;
 }
 int main(int argc, char *avg[])
 {
-	int recvbytes, sendBytes, fromlen, ret, CRCret;
+	int recvbytes, sendBytes, fromlen, ret, CRCret, acceptfd;
 	unsigned int sin_size, write_length, maxfd;
 	unsigned char buf[64] = {0};
 	PJUVCHDR t6_head;
 	PDEVICEINFO t6_info;
 	struct timeval tv;
-
 	struct sockaddr_in their_addr;
+
 	Broadcast_create();
 	TCP_create();
 	ret = 0;
 	printf("Waiting Receive BroadCast !.......  ret = %d\n", ret);
 	fd_set read_sd;
 	FD_ZERO(&read_sd);
+	signal(SIGPIPE, SIG_IGN);
+	system("killall apclient_chkconn.sh");
 
 	while (1)
 	{
@@ -450,7 +466,9 @@ int main(int argc, char *avg[])
 		maxfd = (tcp_sd > brdcfd) ? (tcp_sd + 1) : (brdcfd + 1); //which max+1
 		ret = select(maxfd + 1, &read_sd, 0, 0, &tv);
 
-		if (ret == -1)
+		if (ret == 0) //timeout
+			printf("Waiting Receive BroadCast !.......  ret = %d\n", ret);
+		else if (ret == -1)
 		{ //fail
 			printf("Select Error Re-receive Broadcast !...... ret = %d\n", ret);
 			Broadcast_create();
@@ -458,16 +476,16 @@ int main(int argc, char *avg[])
 			FD_ZERO(&read_sd);
 			ret = 0;
 		}
-		else if (ret == 0) //timeout
-			printf("Waiting Receive BroadCast !.......  ret = %d\n", ret);
+		// add tcp connect
 		else if (FD_ISSET(tcp_sd, &read_sd))
 		{
+			system("killall apclient_chkconn.sh");
 			sin_size = sizeof(struct sockaddr_in);
 			acceptfd = accept(tcp_sd, (struct sockaddr *)&their_addr, &sin_size);
 			if (acceptfd < 0)
 			{
 				printf("Server-accept() Error Re-receive Broadcast !......\n");
-				close_socket(acceptfd, tcp_sd, brdcfd);
+				Close_socket(acceptfd, tcp_sd, brdcfd);
 				acceptfd = 0;
 				break;
 			}
@@ -475,45 +493,13 @@ int main(int argc, char *avg[])
 			printf("Server-new socket, acceptfd is OK...\n");
 			printf("Got connection from the client: %s\n", inet_ntoa(their_addr.sin_addr)); // *client IP
 
-			FD_SET(acceptfd, &read_sd); // 新增到 master set
+			FD_SET(acceptfd, &read_sd); // add master set
 			if (acceptfd >= maxfd)
-			{ // 持續追蹤最大的 fd
+			{ // max fd
 				maxfd = acceptfd;
 			}
-
-			if (FD_ISSET(acceptfd, &read_sd))
-			{
-				if ((ret = Receive_data(acceptfd)) == -1)
-				{
-					close_socket(acceptfd, tcp_sd, brdcfd);
-					printf("Receive_data = %d\n", ret);
-					break;
-				}
-
-				//* CRC Checksum *//
-				if ((CRCret = CRC_checksum(acceptfd)) == -1)
-				{
-					close_socket(acceptfd, tcp_sd, brdcfd);
-					printf("CRC_checksum = %d\n", CRCret);
-					break;
-				}
-
-				if ((ret = Write_progress(acceptfd)) == -1)
-				{
-					close_socket(acceptfd, tcp_sd, brdcfd);
-					printf("Write_progress = %d\n", ret);
-					break;
-				}
-
-				close_socket(acceptfd, tcp_sd, brdcfd);
-				printf(KGRN "Update Complete!");
-				printf("\n" RESET);
-				sleep(1);
-				//system("reboot");
-				return;
-			}
-			/*Broadcast*/
 		}
+		// *Broadcast
 		else if (FD_ISSET(brdcfd, &read_sd))
 		{
 			fromlen = sizeof(struct sockaddr_in);
@@ -522,10 +508,7 @@ int main(int argc, char *avg[])
 			t6_head = (PJUVCHDR)buf;
 			if (t6_head->XactType == JUVC_TYPE_DISCOVER) //JUVC_TYPE_DISCOVER =5
 			{
-				if (CRCret == -1)
-					printf("CRCret = %d\n", CRCret);
-				else
-					printf("ret = %d\n", ret);
+				printf("ret = %d\n", ret);
 				bzero(buf, sizeof(buf));
 				t6_head = (PJUVCHDR)buf;
 				t6_info = (PDEVICEINFO)(buf + 32);
@@ -539,6 +522,38 @@ int main(int argc, char *avg[])
 				sendBytes = sendto(brdcfd, buf, sizeof(struct deviceinfo) + sizeof(struct juvc_hdr_packet), 0, (struct sockaddr *)&form, sizeof(struct sockaddr_in));
 				printmessage(t6_head, t6_info);
 			}
+		}
+		// tcp
+		else if (FD_ISSET(acceptfd, &read_sd))
+		{
+			printf("acceptfd = %d\n", acceptfd);
+			if ((ret = Receive_data(acceptfd)) == -1)
+			{
+				Close_socket(acceptfd, tcp_sd, brdcfd);
+				printf("Receive_data = %d\n", ret);
+				continue;
+			}
+
+			// CRC Checksum
+			if ((ret = CRC_checksum(acceptfd)) == -1)
+			{
+				Close_socket(acceptfd, tcp_sd, brdcfd);
+				printf("CRC_checksum = %d\n", ret);
+				continue;
+			}
+
+			if ((ret = Write_progress(acceptfd)) == -1)
+			{
+				Close_socket(acceptfd, tcp_sd, brdcfd);
+				printf("Write_progress = %d\n", ret);
+				continue;
+			}
+
+			Close_socket(acceptfd, tcp_sd, brdcfd);
+			printf(KGRN "Update Complete!");
+			printf("\n" RESET);
+			system("reboot");
+			return;
 		}
 	}
 }
