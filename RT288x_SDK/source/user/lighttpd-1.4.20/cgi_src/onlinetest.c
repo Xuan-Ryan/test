@@ -653,23 +653,23 @@ void do_burning(void)
 	char err_msg[256];
 	struct stat st;
 	UPDATEINFO info;
+	char type[10];
+
+	strcpy(type, nvram_get(RT2860_NVRAM, "Type"));
 
 	if (strlen(bootloader)) {
 		parse_info(bootloader_info, &info);
-		snprintf(cmd, sizeof(cmd), "/bin/mtd_write -o 0 -l %d write \"%s\" Bootloader", info.file_size, bootloader);
+		snprintf(cmd, sizeof(cmd), "/bin/mtd_write -o 0 -l %d write \"%s\" Bootloader", info.rxfile_size, bootloader);
 		system(cmd);
 		sleep(3);
 	}
 
 	if (strlen(sys_fw)) {
 		parse_info(sys_info, &info);
-		mtd_write_firmware(sys_fw, 0, info.file_size);
-	}
-
-	if (strlen(t6_fw)) {
-		parse_info(t6_info, &info);
-		snprintf(cmd, sizeof(cmd), "%s \"%s\" %s", "/usr/bin/t6usbupdate", t6_fw, STATUS_FILE);
-		system(cmd);
+		if (strcmp(type, "RX") == 0)
+			mtd_write_firmware(sys_fw, 0, info.rxfile_size);
+		else
+			mtd_write_firmware(sys_fw, 0, info.txfile_size);
 	}
 }
 
@@ -689,6 +689,7 @@ int check_fw_format()
 	char err_msg[256];
 	struct stat st;
 	UPDATEINFO info;
+	char type[10];
 
 	memset(&info, '\0', sizeof(UPDATEINFO));
 
@@ -699,7 +700,7 @@ int check_fw_format()
 		}
 		parse_info(bootloader_info, &info);
 		if (stat(bootloader, &st) == 0) {
-			if (st.st_size != info.file_size) {
+			if (st.st_size != info.rxfile_size) {
 				printf("FAILED:WRONG_BOOTLOADER");
 				return -1;
 			}
@@ -717,11 +718,20 @@ int check_fw_format()
 		parse_info(sys_info, &info);
 
 		if (stat(sys_fw, &st) == 0) {
-			if (!check(sys_fw, 0, info.file_size, err_msg)) {
-				printf("FAILED:WRONG_SYSFW");
-				//  if we got the invalid format fw, we have to remove all files
-				clear_update_files();
-				return -1;
+			if (strcmp(type, "RX") == 0) {
+				if (!check(sys_fw, 0, info.rxfile_size, err_msg)) {
+					printf("FAILED:WRONG_SYSFW");
+					//  if we got the invalid format fw, we have to remove all files
+					clear_update_files();
+					return -1;
+				}
+			} else {
+				if (!check(sys_fw, 0, info.txfile_size, err_msg)) {
+					printf("FAILED:WRONG_SYSFW");
+					//  if we got the invalid format fw, we have to remove all files
+					clear_update_files();
+					return -1;
+				}
 			}
 		} else {
 			printf("FAILED:NO_SYSFW");
@@ -729,25 +739,6 @@ int check_fw_format()
 		}
 	}
 
-	if (strlen(t6_fw)) {
-		if (stat(t6_info, &st) < 0) {
-			printf("FAILED:NO_T6INFO");
-			return -1;
-		}
-		parse_info(t6_info, &info);
-
-		if (stat(t6_fw, &st) == 0) {
-			if (!check_trigger(t6_fw, 0, info.file_size, err_msg)) {
-				printf("FAILED:WRONG_T6FW");
-				//  if we got the invalid format fw, we have to remove all files
-				clear_update_files();
-				return -1;
-			}
-		} else {
-			printf("FAILED:NO_T6FW");
-			return -1;
-		}
-	}
 	return 0;
 }
 
@@ -764,11 +755,19 @@ void find_fw_file(void)
 	char line_buf[256];
 	char * p = NULL;
 	int found = 0;
+	char type[10];
+	char field_name[16] = "RXPathName";
 
 	if (fp_mount == NULL) {
 		DBG_MSG("opne %s fail!", MOUNT_INFO);
 		return;
 	}
+
+	strcpy(type, nvram_get(RT2860_NVRAM, "Type"));
+	if (strcmp(type, "RX") == 0)
+		strcpy(field_name, "RXPathName");
+	else
+		strcpy(field_name, "TXPathName");
 
 	while(fscanf(fp_mount, "%30s %50s %*s %*s %*s %*s\n", part, path) != EOF) {
 		struct dirent *dirp;
@@ -778,19 +777,19 @@ void find_fw_file(void)
 			continue;
 		}
 
-		sprintf(full_name, "%s/online_update/system/updateinfo.txt", path);
+		sprintf(full_name, "%s/online_update/ipw611/updateinfo.txt", path);
 		if (lstat(full_name, &statbuf) == 0) {
 			fp_info = fopen(full_name, "r");
 			if (fp_info) {
 				while(fgets(line_buf, sizeof(line_buf), fp_info)) {
-					if (strncmp(line_buf, "PathName", 8) == 0) {
+					if (strncmp(line_buf, field_name, 10) == 0) {
 						p = strrchr(line_buf, '/');
 						if (p) {
 							//  keep it into the info buffer
 							strcpy(sys_info, full_name);
 							p++;
 							remove_carriage(p);
-							sprintf(full_name, "%s/online_update/system/%s", path, p);
+							sprintf(full_name, "%s/online_update/%s", path, p);
 							if (lstat(full_name, &statbuf) == 0) {
 								strcpy(sys_fw, full_name);
 								found = 1;
@@ -810,44 +809,12 @@ void find_fw_file(void)
 		} else {
 			DBG_MSG("cannot find %s", full_name);
 		}
-		sprintf(full_name, "%s/online_update/t6/updateinfo.txt", path);
+		sprintf(full_name, "%s/online_update/~bootloader/updateinfo.txt", path);
 		if (lstat(full_name, &statbuf) == 0) {
 			fp_info = fopen(full_name, "r");
 			if (fp_info) {
 				while(fgets(line_buf, sizeof(line_buf), fp_info)) {
-					if (strncmp(line_buf, "PathName", 8) == 0) {
-						p = strrchr(line_buf, '/');
-						if (p) {
-							//  keep it into the into buffer
-							strcpy(t6_info, full_name);
-							p++;
-							remove_carriage(p);
-							sprintf(full_name, "%s/online_update/t6/%s", path, p);
-							if (lstat(full_name, &statbuf) == 0) {
-								strcpy(t6_fw, full_name);
-								found = 1;
-							} else {
-								DBG_MSG("failed to stat %s", full_name);
-							}
-							break;
-						} else {
-							DBG_MSG("Wrong text format in updateinfo.txt");
-						}
-					}
-				}
-				fclose(fp_info);
-			} else {
-				DBG_MSG("failed to open %s", full_name);
-			}
-		} else {
-			DBG_MSG("cannot find %s", full_name);
-		}
-		sprintf(full_name, "%s/online_update/bootloader/updateinfo.txt", path);
-		if (lstat(full_name, &statbuf) == 0) {
-			fp_info = fopen(full_name, "r");
-			if (fp_info) {
-				while(fgets(line_buf, sizeof(line_buf), fp_info)) {
-					if (strncmp(line_buf, "PathName", 8) == 0) {
+					if (strncmp(line_buf, "RXPathName", 8) == 0) {
 						//  keep it into the into buffer
 						strcpy(bootloader_info, full_name);
 						p = strrchr(line_buf, '=');
@@ -888,7 +855,7 @@ void do_auto_burning(char * input)
 {
 	//  find the firmware file
 	find_fw_file();
-	if (strlen(sys_fw) == 0 && strlen(t6_fw) == 0 && strlen(bootloader) == 0) {
+	if (strlen(sys_fw) == 0 && strlen(bootloader) == 0) {
 		printf("NO_FILE");
 		return;
 	}
@@ -971,8 +938,9 @@ int main(int argc, char *argv[])
 	} else if (strcmp(item, "auto_update") == 0) {
 		do_auto_burning(input_buf);
 	} else if (strcmp(item, "stop_service") == 0) {
-		do_system("killall mct_gadget");
-		do_system("killall uvcclient");
+		//do_system("killall mct_gadget");
+		//do_system("killall uvcclient");
+		do_system("killall apclient_chkconn.sh");
 	} else if (strcmp(item, "onlinetest") == 0) {
 		/*  TBD  */
 	} else {
