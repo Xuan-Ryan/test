@@ -56,11 +56,14 @@ char videobuf[1048576];
 pthread_mutex_t usb_mutex = PTHREAD_MUTEX_INITIALIZER;
 int lost_frame = 0;
 
+int SendUvcStarStop(struct uvcdev* pudev);
+
 void mysignal(int signo)  
 {  
   printf("signeal = %d \n",signo);
   if(signo == SIGUSR1){
     printf("video start/stop \n");
+	SendUvcStarStop(&g_udev);
 	return;
   }
   g_exit_program = 1; 
@@ -1281,6 +1284,29 @@ void uvcframeset( int frameindex ,int *w ,int *h)
 	}
 
 }
+int SendUvcStarStop(struct uvcdev* pudev)
+{
+	char cmd[32];
+	int  ret = -1;
+	if(pudev->cmd_socket > 0){
+		PJUVCHDR juvchdr =(PJUVCHDR) cmd;
+		juvchdr->Tag = JUVC_TAG;
+		juvchdr->XactType = JUVC_TYPE_CONTROL;
+		juvchdr->HdrSize = sizeof(JUVCHDR);
+		juvchdr->XactId = 0;
+		juvchdr->XactOffset = 0;
+		juvchdr->Flags = JUVC_CONTROL_VC_STOP;
+		juvchdr->PayloadLength = 0;
+		juvchdr->TotalLength = 0;
+		ret = TcpWrite(pudev->cmd_socket,cmd,32);
+	    if(ret <= 0){
+	        printf("vc cmd write sokcet failed  \n ");
+			return -1;
+	    }
+	}
+	return ret;
+
+}
 
 int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uvc_ctrl_info* puci)
 {
@@ -2118,7 +2144,7 @@ void* uvc_audio_system(void *lp)
 		}
 		
 #ifndef WRITE_FILE	
-		pudev->socket=  TcpConnect("10.10.10.254",GADGET_MIC_PORT,3);//UdpInit();
+		pudev->socket= TcpConnect("10.10.10.254",GADGET_MIC_PORT,3);//UdpInit();
 		if(pudev->socket < 0){
 			printf("Tcp audio link failed\n");
 			closeSocket(pudev->cmd_socket);
@@ -2468,6 +2494,10 @@ int main(int argc, char **argv)
     pthread_t usb_paser;
     
     uint16_t vid , pid;  
+    pthread_attr_t attr1;
+	struct sched_param param;
+	pthread_attr_t attr2;
+	struct sched_param param2;
 	
 	int ret = 0;	
     initsignal();
@@ -2508,8 +2538,14 @@ int main(int argc, char **argv)
 */	
     PidfileCreate("/var/run/uvcclient.pid");
     system("date > /tmp/uvcclient_disconnect");
+	
+	pthread_attr_init(&attr1);
+    param.sched_priority = 1;
+    pthread_attr_setschedpolicy(&attr1,SCHED_RR);
+    pthread_attr_setschedparam(&attr1,&param);
+    pthread_attr_setinheritsched(&attr1,PTHREAD_EXPLICIT_SCHED);
 
-	if (pthread_create(&uvc_audio, NULL,uvc_audio_system,&g_udev) != 0) {
+	if (pthread_create(&uvc_audio, &attr1,uvc_audio_system,&g_udev) != 0) {
 			printf("Error creating uvc_audio_system\n");
 			return -1;
 	}
@@ -2521,7 +2557,13 @@ int main(int argc, char **argv)
 			return -1;
 	}
 
-	if (pthread_create(&uvc_cmd, NULL,uvc_cmd_system,&g_udev) != 0) {
+	pthread_attr_init(&attr2);
+    param2.sched_priority = 1;
+    pthread_attr_setschedpolicy(&attr2,SCHED_RR);
+    pthread_attr_setschedparam(&attr2,&param2);
+    pthread_attr_setinheritsched(&attr2,PTHREAD_EXPLICIT_SCHED);
+
+	if (pthread_create(&uvc_cmd, &attr2,uvc_cmd_system,&g_udev) != 0) {
 			printf("Error creating uvc_cmd_system\n");
 			return -1;
 	}
