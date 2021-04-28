@@ -2,7 +2,7 @@ KERNELZ = $(IMAGEDIR)/zImage
 RAMDISK  = $(IMAGEDIR)/ramdisk
 IMAGE = $(IMAGEDIR)/$(USER)_uImage
 __TYPE := $(shell [ -e $(ROOTDIR)/.type ] && cat $(ROOTDIR)/.type |awk 'NR==1')
-FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)-$(__COMPANY)-$(__TYPE)-$(__VERSION).bin
+FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)$(__TYPE)-$(__VERSION).bin
 ROMFS_DIR = $(ROOTDIR)/romfs
 
 RAMDISK_SIZE  := $(shell echo $(CONFIG_BLK_DEV_RAM_SIZE))
@@ -41,7 +41,7 @@ romfs:
 #	@if [ \! -d $(ROMFSDIR)/dev ];then mkdir -p $(ROMFSDIR)/dev;fi;
 #	./makedevlinks $(ROMFSDIR)
 #endif
-	if [ "$(__TYPE)" = "RX" ]; then \
+	if [ "$(__TYPE)" = "R" ]; then \
 		$(ROMFSINST) /etc_ro/rcS; \
 	else \
 		$(ROMFSINST) rcS.tx /etc_ro/rcS; \
@@ -64,7 +64,7 @@ else ifeq ($(CONFIG_EXTERNAL_PA_EXTERNAL_LNA),y)
 else
 	# no any config?! use iLAN+iPA as default.
 	#  Tiger
-	if [ "$(__TYPE)" = "RX" ]; then \
+	if [ "$(__TYPE)" = "R" ]; then \
 		ln -s "MT7620_AP_2T2R-4L_internal LNA_internal PA_V15.BIN" MT7620_AP_2T2R-4L_V15.BIN; \
 	else \
 		ln -s "MT7620_AP_2T2R-4L_internal LNA_internal PA_V15.BIN.tx" MT7620_AP_2T2R-4L_V15.BIN; \
@@ -84,7 +84,7 @@ ifeq    ($(CONFIG_CONFIG_SHRINK), y)
 	mv RT2860_default_vlan.tmp RT2860_default_vlan
 else
 	$(ROMFSINST) /etc_ro/Wireless/RT2860AP/RT2860_default_novlan
-	if [ "$(__TYPE)" = "RX" ]; then \
+	if [ "$(__TYPE)" = "R" ]; then \
 		$(ROMFSINST) /etc_ro/Wireless/RT2860AP/RT2860_default_vlan; \
 	else \
 		$(ROMFSINST) RT2860_default_vlan.tx /etc_ro/Wireless/RT2860AP/RT2860_default_vlan; \
@@ -94,7 +94,7 @@ else
 	sed -i "s/__MODEL__/$(__MODEL)/g" $(ROMFSDIR)/etc_ro/Wireless/RT2860AP/RT2860_default_vlan
 	sed -i "s/__VERSION__/$(__VERSION)/g" $(ROMFSDIR)/etc_ro/Wireless/RT2860AP/RT2860_default_vlan
 endif
-	if [ "$(__TYPE)" = "RX" ]; then \
+	if [ "$(__TYPE)" = "R" ]; then \
 		$(ROMFSINST) /etc_ro/Wireless/iNIC/RT2860AP.dat; \
 	else \
 		$(ROMFSINST) RT2860AP.dat.tx /etc_ro/Wireless/iNIC/RT2860AP.dat; \
@@ -110,7 +110,7 @@ ifneq	($(CONFIG_RT_SECOND_CARD),)
 ifeq	($(CONFIG_SECOND_CARD_EXTERNAL_PA),)
 ifeq	($(CONFIG_SECOND_CARD_EXTERNAL_LNA),)
 	# iPA/iLNA
-	if [ "$(__TYPE)" = "RX" ]; then \
+	if [ "$(__TYPE)" = "R" ]; then \
 		ln -s "MT$(shell echo $(CONFIG_RT_SECOND_CARD) | tr a-z A-Z)_EEPROM_layout_20131121_5G_iPAiLNAcoclock_wTSSI default slope offset.bin" \
 			MT$(shell echo $(CONFIG_RT_SECOND_CARD) | tr a-z A-Z)_EEPROM.bin; \
 	else \
@@ -261,7 +261,7 @@ ifeq	($(CONFIG_ROOTFS_IN_FLASH_NO_PADDING),y)
 	ENTRY=`readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}'` ; \
 	$(CUR_DIR)/mkimage -A mips -O linux -T kernel -C none -a 80000000 -e $$ENTRY -k $$KRN_SIZE -n "Linux Kernel Image" -d $(KERNELZ) $(IMAGE)
 else
-	@cd $(IMAGEDIR) ; $(CUR_DIR)/mkimage -A mips -O linux -T kernel -C none -a 80000000 -e $(shell readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}') -k `ls $(KERNELZ) -l | awk '{print $$5}'` -n '$(__MODEL):$(__TYPE):$(__VERSION)' -d $(KERNELZ) $(IMAGE);cp $(IMAGE) $(FINAL_IMAGE) ; \
-	echo 'Current Type is $(__TYPE)'
+	@cd $(IMAGEDIR) ; $(CUR_DIR)/mkimage -A mips -O linux -T kernel -C none -a 80000000 -e $(shell readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}') -k `ls $(KERNELZ) -l | awk '{print $$5}'` -n '$(__MODEL):$(__TYPE)X:$(__VERSION)' -d $(KERNELZ) $(IMAGE);cp $(IMAGE) $(FINAL_IMAGE) ; \
+	echo 'Current Type is $(__TYPE)X'
 endif
 
