@@ -3,7 +3,8 @@
 
 //#define SUPPORT_H264_FOR_TCP                    1
 //#define SUPPORT_RING_ELEMENT                    1
-//#define AUDIO_USES_TCP                          0
+#define AUDIO_USES_TCP                          1
+#define MIC_CB_SIZE                             8
 
 #define GADGET_BROADCAST_PORT                   42776
 #define GADGET_CONTROL_PORT                     42777

@@ -59,6 +59,7 @@ int tcp_spk_socket = -1;
 int udp_mic_socket = -1;
 int udp_spk_socket = -1;
 #endif
+sem_t mic_write_mutex;
 
 /*  thread  */
 pthread_t pthr_video_control;
@@ -73,6 +74,8 @@ pthread_t pthr_video_status;
 int video_status_go = 0;
 pthread_t pthr_mic;
 int mic_go = 0;
+pthread_t pthr_mic_write;
+int mic_write_go = 0;
 pthread_t pthr_spk;
 int spk_go = 0;
 #ifdef  SUPPORT_H264_FOR_TCP
@@ -1182,6 +1185,120 @@ void * video_thread(void * arg)
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
 }
 
+typedef struct circular_buffer {
+	char * buffer;
+	char * buffer_end;
+	pthread_mutex_t mutex;
+	size_t capacity;
+	size_t count;
+	size_t sz;
+	char * head;
+	char * tail;
+} circular_buffer;
+
+circular_buffer mic_cb;
+int init_audio_cb(circular_buffer * cb, size_t capacity, size_t sz)
+{
+	cb->buffer = malloc(capacity * sz);
+	if (!cb->buffer) {
+		cb->buffer_end = NULL;
+		cb->capacity = 0;
+		cb->count = 0;
+		cb->sz = 0;
+		cb->head = NULL;
+		cb->tail = NULL;
+		return -1;
+	}
+	pthread_mutex_init(&cb->mutex, NULL);
+	cb->buffer_end = cb->buffer + capacity * sz;
+	cb->capacity = capacity;
+	cb->count = 0;
+	cb->sz = sz;
+	cb->head = cb->buffer;
+	cb->tail = cb->buffer;
+	return 0;
+}
+
+void free_cb(circular_buffer * cb)
+{
+	pthread_mutex_lock(&cb->mutex);
+	if (cb->buffer) {
+		free(cb->buffer);
+	}
+	cb->buffer = NULL;
+	cb->buffer_end = NULL;
+	cb->capacity = 0;
+	cb->count = 0;
+	cb->sz = 0;
+	cb->head = NULL;
+	cb->tail = NULL;
+	pthread_mutex_unlock(&cb->mutex);
+	pthread_mutex_destroy(&cb->mutex);
+}
+
+int cb_push_back(circular_buffer * cb, char * buffer)
+{
+	pthread_mutex_lock(&cb->mutex);
+	if (cb->count == cb->capacity) {
+		//  circular buffer is full, just drop this buffer
+		pthread_mutex_unlock(&cb->mutex);
+		return -1;
+	}
+
+	memcpy(cb->head, buffer, cb->sz);
+	cb->head = cb->head + cb->sz;
+	if (cb->head == cb->buffer_end)
+		cb->head = cb->buffer;
+	cb->count++;
+	pthread_mutex_unlock(&cb->mutex);
+	return 0;
+}
+
+int cb_pop_front(circular_buffer * cb, char * buffer)
+{
+	pthread_mutex_lock(&cb->mutex);
+	if (cb->count == 0) {
+		//  circular buffer is embpy
+		pthread_mutex_unlock(&cb->mutex);
+		memset(buffer, '\0', cb->sz);
+		return -1;
+	}
+
+	memcpy(buffer, cb->tail, cb->sz);
+	cb->tail = cb->tail + cb->sz;
+	if (cb->tail == cb->buffer_end)
+		cb->tail = cb->buffer;
+	cb->count--;
+	pthread_mutex_unlock(&cb->mutex);
+	return 0;
+}
+
+void * mic_write_thread(void * arg)
+{
+	char buffer[I2S_PAGE_SIZE];
+	DBG_MSG("mct_gadget: %s go\n", __FUNCTION__);
+
+	while(exited == 0) {
+#ifdef AUDIO_USES_TCP
+		if (tcp_mic_socket <= -1) {
+#else
+		if (udp_mic_socket <= -1) {
+#endif
+			sleep(1);
+			continue;
+		}
+
+		sem_wait(&mic_write_mutex);
+
+		if (cb_pop_front(&mic_cb, buffer) == 0) {
+			if (i2s_stop == 0)
+				ioctl(i2s_fd, I2S_PUT_AUDIO, buffer);
+		}
+	}
+
+	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
+}
+
 //  for tcp
 #ifdef AUDIO_USES_TCP
 void * mic_thread(void * arg)
@@ -1249,10 +1366,11 @@ void * mic_thread(void * arg)
 
 				/*  write to i2s  */
 				if (i2s_fd > 0) {
-					if (i2s_stop == 0 && readbyte == I2S_PAGE_SIZE)
-						ioctl(i2s_fd, I2S_PUT_AUDIO, mic_buffer);
-				} else {
-					continue;
+					if (i2s_stop == 0 && readbyte == I2S_PAGE_SIZE) {
+						if (cb_push_back(&mic_cb, mic_buffer) == 0) {
+							sem_post(&mic_write_mutex);
+						}
+					}
 				}
 			}
 
@@ -1356,18 +1474,19 @@ void * mic_thread(void * arg)
 			/*  read form client  */
 			//DBG_MSG("read from client\n");
 			memset(&from, '\0', sizeof(struct sockaddr_in));
+
 			n = recvfrom(udp_mic_socket, mic_buffer, I2S_PAGE_SIZE, 0, (struct sockaddr*)&from, &len);
+
 			if (n <= 0) {
 				continue;
 			}
 
-			/*  write to i2s  */
 			if (i2s_fd > 0) {
-				if (i2s_stop == 0)
-					ioctl(i2s_fd, I2S_PUT_AUDIO, mic_buffer);
-			} else {
-				sleep(1);
-				continue;
+				if (i2s_stop == 0) {
+					if (cb_push_back(&mic_cb, mic_buffer) == 0) {
+						sem_post(&mic_write_mutex);
+					}
+				}
 			}
 		}
 	}
@@ -1378,10 +1497,6 @@ void * mic_thread(void * arg)
 	}
 
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
-}
-
-void * mct_write_thread(void * arg)
-{
 }
 
 void * spk_thread(void * arg)
@@ -1566,6 +1681,12 @@ static int create_thread()
 	}
 	mic_go = 1;
 
+	if (pthread_create(&pthr_mic_write, NULL, mic_write_thread, (void*)NULL) != 0) {
+		PRINT_MSG("mct_gadget: Error create microphone write thread\n");
+		return -1;
+	}
+	mic_write_go = 1;
+
 	if (pthread_create(&pthr_spk, NULL, spk_thread, (void*)NULL) != 0) {
 		PRINT_MSG("mct_gadget: Error create audio thread\n");
 		return -1;
@@ -1636,6 +1757,8 @@ static int initialize_procedure(int argc, char **argv)
 		return -1;
 	}
 #endif
+	sem_init(&mic_write_mutex, 0, 1);
+	init_audio_cb(&mic_cb, MIC_CB_SIZE, I2S_PAGE_SIZE);
 #ifdef  SUPPORT_H264_FOR_TCP
 	if ((tcp_h264_socket=init_tcp_socket((unsigned short)GADGET_H264_PORT)) < 0) {
 		close_socket();
@@ -1681,6 +1804,8 @@ static int main_loop(int argc, char **argv)
 		pthread_join(pthr_video_status, NULL);
 	if (mic_go)
 		pthread_join(pthr_mic, NULL);
+	if (mic_write_go)
+		pthread_join(pthr_mic_write, NULL);
 	if (spk_go)
 		pthread_join(pthr_spk, NULL);
 #ifdef  SUPPORT_H264_FOR_TCP
@@ -1707,6 +1832,8 @@ static void close_procedure(void)
 #endif
 
 	sem_destroy(&video_write_mutex);
+	sem_destroy(&mic_write_mutex);
+	free_cb(&mic_cb);
 }
 
 int main(int argc, char ** argv)
