@@ -328,7 +328,7 @@ int main (int argc, char *argv[])
 	memset(boundary, 0, boundary_len+1);
 	memcpy(boundary, line_begin, boundary_len);
 	//  shift to next section
-	//  ex: Content-Disposition: form-data; name="filename"; filename="UVC-j5-TX-0.0.0.4.bin"
+	//  ex: Content-Disposition: form-data; name="filename"; filename="IPW611T-1.0.0.210427.bin"
 	line_begin = line_end + 2;
 	if ((line_end = strstr(line_begin, "\r\n")) == 0) {
 		printf("%s(%d)", RFC_ERROR, 2);
