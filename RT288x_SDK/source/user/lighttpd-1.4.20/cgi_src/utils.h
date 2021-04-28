@@ -137,8 +137,10 @@ typedef struct _updateinfo {
 	char project_name[256];
 	char date[32];
 	char version[64];
-	char path_name[PATH_MAX];
-	unsigned int file_size;
+	char rxpath_name[PATH_MAX];
+	unsigned int rxfile_size;
+	char txpath_name[PATH_MAX];
+	unsigned int txfile_size;
 } UPDATEINFO;
 
 int convert_ver(const char * ver);

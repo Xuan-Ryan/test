@@ -1593,18 +1593,19 @@ void check_for_updates()
 	unsigned int cur_ver = 0;
 	unsigned int new_ver = 0;
 	UPDATEINFO fwinfo;
-	UPDATEINFO t6info;
 	char display_info[128];
 	char ver[10];
 	char modelname[32];
 	char cmdline[256];
 
 	memset(&fwinfo, '\0', sizeof(UPDATEINFO));
-	memset(&t6info, '\0', sizeof(UPDATEINFO));
 
 	strcpy(modelname, nvram_bufget(RT2860_NVRAM, "ModelName"));
-	if (!strcmp(modelname, "UVC")) {
-		sprintf(cmdline, "wget http://update.mct.com.tw/txrx/uvc/updateinfo.txt -O /var/updateinfo.txt -q");
+	//  here we need to use conditional compilation to check another online 
+	//  folder for the update checking.
+	//  now we only have MCT.
+	if (!strcmp(modelname, "IPW611")) {
+		sprintf(cmdline, "wget http://update.mct.com.tw/txrx/mct/ipw611/updateinfo.txt -O /var/updateinfo.txt -q");
 	}
 	//  get info
 	unlink("/var/updateinfo.txt");
@@ -1629,18 +1630,17 @@ void check_for_updates()
 	}
 
 	//  print result
-	if (fwinfo.result == 1) {
-		printf("%d>%d>%s>%s>%s>%s>%d", 
-		       fwinfo.result,
-		       fwinfo.need_update,
-		       fwinfo.project_name,
-		       fwinfo.date,
-		       fwinfo.version,
-		       fwinfo.path_name,
-		       fwinfo.file_size);
-	} else {
-		printf("0>>>>>>");
-	}
+	printf("{");
+	printf("\"result\" : \"%d\",", fwinfo.result);
+	printf("\"need_update\" : \"%d\",", fwinfo.need_update);
+	printf("\"project_name\" : \"%s\",", fwinfo.project_name);
+	printf("\"date\" : \"%s\",", fwinfo.date);
+	printf("\"version\" : \"%s\",", fwinfo.version);
+	printf("\"rxpath_name\" : \"%s\",", fwinfo.rxpath_name);
+	printf("\"rxfile_size\" : \"%d\",", fwinfo.rxfile_size);
+	printf("\"txpath_name\" : \"%s\",", fwinfo.txpath_name);
+	printf("\"txfile_size\" : \"%d\"", fwinfo.txfile_size);
+	printf("}");
 }
 
 void get_wget_st(void)
@@ -1855,7 +1855,7 @@ int main(int argc, char *argv[])
 		show_error_page();
 		goto leave;
 	}
-DBG_MSG("going = %s\n", going);
+
 	if (strcmp(going, "set_lang") == 0) {
 		set_lang(input_buf);
 	} else if (strcmp(going, "ack") == 0) {
@@ -1956,7 +1956,6 @@ DBG_MSG("going = %s\n", going);
 	} else if (!strcmp(going, "clear_all_update_files")) {
 		clear_update_files();
 	} else {
-DBG_MSG("");
 		show_error_page();
 	}
 

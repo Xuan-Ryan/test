@@ -1172,10 +1172,14 @@ void parse_info(char * file_name, UPDATEINFO * info)
 					strcpy(info->date, p);
 				} else if (strstr(buf, "Version")) {
 					strcpy(info->version, p);
-				} else if (strstr(buf, "PathName")) {
-					strcpy(info->path_name, p);
-				} else if (strstr(buf, "Size")) {
-					info->file_size = atoi(p);
+				} else if (strstr(buf, "RXPathName")) {
+					strcpy(info->rxpath_name, p);
+				} else if (strstr(buf, "RXSize")) {
+					info->rxfile_size = atoi(p);
+				} else if (strstr(buf, "TXPathName")) {
+					strcpy(info->txpath_name, p);
+				} else if (strstr(buf, "TXSize")) {
+					info->txfile_size = atoi(p);
 				}
 			}
 		}
@@ -1256,10 +1260,26 @@ int convert_ver(const char * ver)
 	int weight[4];
 	int total = 0;
 	char** tokens;
-	//  ex: 99.99.99.99
-	//  99*1,000,000+99*10,000+99*100+99 = 99,999,999
-	//  ex: 1.1.1.1
-	//  1*1,000,000+1*10,000+1*100+1 = 1,010,101
+	//          1  2   3
+	//  ex: 99.99.99.210427
+	//  first digit is vendor number, 1 = MCT, 2 = J5, 99 = TBD
+	//
+	//  1. 99*4,160,000 = 411,840,000 (max:415,999,999)
+	//  2. 99*41,600 = 4,118,400 (max:4,159,999)
+	//  3. 210427 = 21*416+04*32+27 = 8,891 (max:991231= 41,599)
+	//  ans: 415967291
+	//
+	//  ex: 1.1.1.010101 newer
+	//  1 = MCT, 1*4,199,600 + 1*41,600 + 01*416+01*32+01 = 4,241,648
+	//  ex: 1.1.0.991231
+	//  1 = MCT, 1*4,199,600 + 0*41,600 + 99*416+12*32+31 = 4,241,199
+	//
+	//  ex: 1.10.0.010101 newer
+	//  1 = MCT, 10*4,199,600 + 0*41,600 + 01*416+01*32+01 = 41,996,449
+	//  ex: 1.9.99.991231
+	//  1 = MCT, 9*4,199,600 + 99*41,600 + 99*416+12*32+31 = 41,956,399
+	//  
+	//  the max version is 419,920,399
 
 	tokens = str_split(ver, '.');
 
@@ -1272,7 +1292,8 @@ int convert_ver(const char * ver)
 		free(tokens);
 	}
 
-	total = weight[0]*1000000+weight[1]*10000+weight[2]*100+weight[3];
+	//  weight[0] = vendor number
+	total = weight[1]*4160000+weight[2]*41600+((weight[3]/10000)*416+((weight[3]%10000)/100)*32+(weight[3]%100));
 
 	return total;
 }
