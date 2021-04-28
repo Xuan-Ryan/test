@@ -935,7 +935,7 @@ function initValue()
 
 	init_model_name();
 
-	/*stop_service();*/
+	stop_service();
 
 	get_result();
 
@@ -1073,7 +1073,7 @@ function reboot_submit()
                       <tr>
                        <td width="80%" class="item_font" style="vertical-align:middle">
                         <select id="model_name" style="width:200px">
-                         <option value="UVC">UVC</option>
+                         <option value="IPW611">IPW611</option>
                         </select>
                        </td>
                        <td class="item_font" style="vertical-align:middle;text-align:center">
