@@ -84,6 +84,7 @@ int h264_go = 0;
 #endif
 
 static int is_yuv = 0;
+static int playing = 0;
 
 void *shtxbuf[MAX_I2S_PAGE];
 void *shrxbuf[MAX_I2S_PAGE];
@@ -362,6 +363,11 @@ static void signal_handler(int sig)
 	} else if (sig == SIGUSR1) {
 		DBG_MSG("mct_gadget: Stop/Start play(SIGUSR1)!\n");
 		send_command(JUVC_CONTROL_STOP_START, 0, 0, 0, 0);
+		playing = !playing;
+		if (playing)
+			PRINT_MSG("Start playing\n");
+		else
+			PRINT_MSG("Stop playing\n");
 	} else if (sig == SIGUSR2) {
 		DBG_MSG("mct_gadget: SIGUSR2!\n");
 	}
@@ -781,7 +787,7 @@ static void * video_control_thread(void * arg)
 
 		/*  maybe we don't need to wait for this, anyway, just check it out  */
 		if (!wait_setting_done()) {
-			PRINT_MSG("our device not ready yet\n");
+			PRINT_MSG("**** UVC device not ready yet ****\n");
 			close(tcp_control_clnsd);
 			tcp_control_clnsd = -1;
 			sleep(1);
@@ -832,9 +838,11 @@ static void * video_control_thread(void * arg)
 						LED_control(1);
 						connected_status(1);
 						client_connected = 1;
+						playing = 1;
 					} else if (juvchdr.Flags == JUVC_CONTROL_MOBILE_DEV) {
 						i2s_stop = 0;
 						client_connected = 1;
+						playing = 1;
 					} else if (juvchdr.Flags == JUVC_CONTROL_MANUFACTURER) {
 						char buffer[256];
 						read(tcp_control_clnsd, buffer, juvchdr.TotalLength);
@@ -864,6 +872,13 @@ static void * video_control_thread(void * arg)
 							/*  set UVC to STALL  */
 							ioctl_uvc(UVC_EP0_SET_HALT, NULL);
 						}
+					} else if (juvchdr.Flags == JUVC_CONTROL_STOP_START) {
+						playing = !playing;
+						if (playing)
+							PRINT_MSG("Start playing\n");
+						else
+							PRINT_MSG("Stop playing\n");
+						
 					}
 				}
 			}
@@ -872,6 +887,7 @@ static void * video_control_thread(void * arg)
 		PRINT_MSG("mct_gadget: client disconnected\n");
 		client_connected = 0;
 		i2s_stop = 1;
+		playing = 0;
 		ioctl_uvc(UVC_RESET_TO_DEFAULT, NULL);
 		usb_hub_reset(0);
 		LED_control(0);
@@ -948,6 +964,7 @@ void * video_write_thread(void * arg)
 		}
 		frame = (PVIDEO_FRAME)queue_remove(queue);
 #endif
+		if (playing == 1) {
 		if (is_yuv == 0) {
 #ifdef SUPPORT_RING_ELEMENT
 			write_uvc(video_buffer[done], total_size[done]);
@@ -962,6 +979,9 @@ void * video_write_thread(void * arg)
 			if (frame)
 				write_uvc4yuv(frame->buf, frame->length);
 #endif
+		}
+		} else {
+			write_uvc(video_buffer, total_size);
 		}
 #ifndef SUPPORT_RING_ELEMENT
 		if (frame) {
@@ -1291,7 +1311,7 @@ void * mic_write_thread(void * arg)
 		sem_wait(&mic_write_mutex);
 
 		if (cb_pop_front(&mic_cb, buffer) == 0) {
-			if (i2s_stop == 0)
+			if (i2s_stop == 0 && playing == 1)
 				ioctl(i2s_fd, I2S_PUT_AUDIO, buffer);
 		}
 	}
@@ -1359,6 +1379,7 @@ void * mic_thread(void * arg)
 					continue;
 				} else if (ret == 0) {
 					/*  close by the client side, we need to jump out this loop  */
+PRINT_MSG("read ret = 0\n");
 					close(tcp_mic_clnsd);
 					tcp_mic_clnsd = 0;
 					break;
