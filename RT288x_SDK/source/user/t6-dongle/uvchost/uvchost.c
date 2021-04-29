@@ -655,13 +655,13 @@ static int read_frame(struct uvcdev *udev )
 			if(buf.bytesused > 4096){
 				udev->video_id++;
 				udev->totalsize += buf.bytesused;
-				if(udev->totalsize < 5500000)
+				//if(udev->totalsize < 0x500000)
 					udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id,udev->buffers[buf.index].start, buf.bytesused);
 			}
 		}
 	}else{	
 			udev->totalsize += buf.bytesused;
-			if(udev->totalsize < 5500000)
+			//if(udev->totalsize < 0x500000)
 				udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused);
 	}
 	
