@@ -650,13 +650,19 @@ static int read_frame(struct uvcdev *udev )
 #else
 
 	if(udev->format == V4L2_PIX_FMT_MJPEG){
-		udev->video_id++;
+		
 		if(process_image(&udev->video_id,udev->buffers[buf.index].start, buf.bytesused) ==1){
-			if(buf.bytesused > 4096)
-				udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id,udev->buffers[buf.index].start, buf.bytesused);
+			if(buf.bytesused > 4096){
+				udev->video_id++;
+				udev->totalsize += buf.bytesused;
+				if(udev->totalsize < 5500000)
+					udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id,udev->buffers[buf.index].start, buf.bytesused);
+			}
 		}
 	}else{	
-			udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused);
+			udev->totalsize += buf.bytesused;
+			if(udev->totalsize < 5500000)
+				udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused);
 	}
 	
   
@@ -2078,7 +2084,7 @@ void* uvc_video_system(void *lp)
 		cmdAddrr = 0;
 #endif 	
 			
-		
+		pudev->totalsize = 0;
 		while(pudev->video_active){
 		  
 			if(pudev->video_id == 0){
@@ -2096,8 +2102,9 @@ void* uvc_video_system(void *lp)
 			gettimeofday(&end,NULL);
 			diff = 1000000 * (end.tv_sec-start.tv_sec)+ end.tv_usec-start.tv_usec;
 		    if(diff >= 1000000){
-				printf("sec = %d frame = %d  lost = %d \n",diff,pudev->video_id,lost_frame );
+				printf("sec = %d frame = %d  lost = %d size = %d \n",diff,pudev->video_id,lost_frame ,pudev->totalsize);
 				pudev->video_id =0;
+				pudev->totalsize = 0;
 				lost_frame = 0;
 		    }
 		
@@ -2512,17 +2519,7 @@ int main(int argc, char **argv)
 	g_udev.h = 0;
 	sem_init(&video_mutex, 0, 0);
 	sem_init(&audio_mutex, 0, 0);
-/*
-	g_udev.fd = open_device();
-	GetDevVidPid(g_udev.fd,&g_udev.vid,&g_udev.pid);
-	char buf[4096];
-	char vc[1024];
-	ret = GetDevConfigDesc(g_udev.fd ,buf);
-	if(ret > 0){
-		ret =uvc_prase_vc(buf ,ret,vc);
-		hex_dump(vc,ret,"vc desc");
-	}
-*/		
+		
 #if 1	
 /*
 
@@ -2568,11 +2565,11 @@ int main(int argc, char **argv)
 			return -1;
 	}
 
-	pthread_join(uvc_cmd,   NULL); // 等待子執行緒執行完成
-	pthread_join(uvc_video, NULL); // 等待子執行緒執行完成
-	pthread_join(uvc_audio, NULL); // 等待子執行緒執行完成
-	//pthread_join(uvc_audio_cap1,   NULL); // 等待子執行緒執行完成
-	//pthread_join(uvc_audio_cap2,   NULL); // 等待子執行緒執行完成  
+	pthread_join(uvc_cmd,   NULL); 
+	pthread_join(uvc_video, NULL); 
+	pthread_join(uvc_audio, NULL); 
+	//pthread_join(uvc_audio_cap1,   NULL); 
+	//pthread_join(uvc_audio_cap2,   NULL); 
 #endif	
     system("rm /var/run/uvcclient.pid");
     printf("Leave main \n");
