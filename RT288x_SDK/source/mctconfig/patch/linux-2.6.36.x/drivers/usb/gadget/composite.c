@@ -2927,8 +2927,8 @@ long device_ioctl(struct file *file, unsigned int cmd, unsigned long data)
 		g_uvc_processing_controlbit = 0x0;
 		myidVendor = cpu_to_le16(HIDG_VENDOR_NUM);
 		myidProduct = cpu_to_le16(HIDG_PRODUCT_NUM);
-		client_connected = 1;
 		uvc_change_desc_compatable();
+		break;
 	default :
 		printk("device_ioctl: command format error\n");
 	}
