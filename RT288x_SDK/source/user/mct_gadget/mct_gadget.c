@@ -965,21 +965,21 @@ void * video_write_thread(void * arg)
 		frame = (PVIDEO_FRAME)queue_remove(queue);
 #endif
 		if (playing == 1) {
-		if (is_yuv == 0) {
+			if (is_yuv == 0) {
 #ifdef SUPPORT_RING_ELEMENT
-			write_uvc(video_buffer[done], total_size[done]);
+				write_uvc(video_buffer[done], total_size[done]);
 #else
-			if (frame)
-				write_uvc(frame->buf, frame->length);
+				if (frame)
+					write_uvc(frame->buf, frame->length);
 #endif
-		} else {
+			} else {
 #ifdef SUPPORT_RING_ELEMENT
-			write_uvc4yuv(video_buffer[done], total_size[done]);
+				write_uvc4yuv(video_buffer[done], total_size[done]);
 #else
-			if (frame)
-				write_uvc4yuv(frame->buf, frame->length);
+				if (frame)
+					write_uvc4yuv(frame->buf, frame->length);
 #endif
-		}
+			}
 		} else {
 			write_uvc(video_buffer, total_size);
 		}
