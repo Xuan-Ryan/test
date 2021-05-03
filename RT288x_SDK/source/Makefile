@@ -128,12 +128,13 @@ DIRS    =  $(ROOTDIR)/vendors include $(NEW_CPP_LIB) user $(NEW_LIB) lib
 __COMPANY = $(shell cat ver |awk 'NR==1')
 __MODEL = $(shell cat ver |awk 'NR==2')
 __VERSION = $(shell cat ver |awk 'NR==3')
+__DATE = $(shell date +%y%m%d)
 __TYPE = $(shell [ -e .type ] && cat .type |awk 'NR==1')
 export __COMPANY __MODEL __VERSION __TYPE
 
-FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)$(__TYPE)-$(__VERSION).bin
-FINAL_KFS_IMAGE = $(KFSDIR)/$(__MODEL)$(__TYPE)-$(__VERSION).bin
-COMPLETE_IMAGE = $(KFSDIR)/factory/Factory-$(__MODEL)$(__TYPE)-$(__VERSION).bin
+FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)$(__TYPE)-$(__VERSION).$(__DATE).bin
+FINAL_KFS_IMAGE = $(KFSDIR)/$(__MODEL)$(__TYPE)-$(__VERSION).$(__DATE).bin
+COMPLETE_IMAGE = $(KFSDIR)/factory/Factory-$(__MODEL)$(__TYPE)-$(__VERSION).$(__DATE).bin
 
 export VENDOR PRODUCT ROOTDIR LINUXDIR HOSTCC CONFIG_SHELL
 export CONFIG_CONFIG BUSYBOX_CONFIG LINUX_CONFIG MODULES_CONFIG ROMFSDIR SCRIPTSDIR
