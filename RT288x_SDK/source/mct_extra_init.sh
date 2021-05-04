@@ -5,13 +5,13 @@ if [ ! -e .type ]; then
 	ans=`echo $ans|tr '[:lower:]' '[:upper:]'`
 	if [ -z $ans ]; then
 		echo 'You choice to compile as RX'
-		echo "RX" > .type
+		echo "R" > .type
 	elif [ $ans = 'YES' -o $ans = 'Y' ]; then
 		echo 'You choice to compile as RX'
-		echo "RX" > .type
+		echo "R" > .type
 	else
 		echo 'You choice to compile as TX'
-		echo "TX" > .type
+		echo "T" > .type
 	fi
 	echo "******************************************"
 	echo "Please execute 'make' again"
@@ -22,7 +22,7 @@ fi
 __TYPE=`cat .type`
 
 make oldconfig_config
-if [ $__TYPE = 'RX' ]; then
+if [ $__TYPE = 'R' ]; then
 	cp mctconfig/linux-config linux-2.6.36.x/.config
 	cp mctconfig/userconfig config/.config
 	cp mctconfig/busybox-config user/busybox/.config
