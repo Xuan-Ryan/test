@@ -802,6 +802,7 @@ static void * video_control_thread(void * arg)
 			ret = read(tcp_control_clnsd, &juvchdr, l);
 			if (ret == 0) {
 				/*  close by the client side, we need to jump out this loop  */
+				PRINT_MSG("%s, read ret = 0\n", __FUNCTION__);
 				close(tcp_control_clnsd);
 				tcp_control_clnsd = -1;
 				break;
@@ -1379,7 +1380,7 @@ void * mic_thread(void * arg)
 					continue;
 				} else if (ret == 0) {
 					/*  close by the client side, we need to jump out this loop  */
-PRINT_MSG("read ret = 0\n");
+					PRINT_MSG("%s, read ret = 0\n", __FUNCTION__);
 					close(tcp_mic_clnsd);
 					tcp_mic_clnsd = 0;
 					break;
