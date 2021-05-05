@@ -449,7 +449,7 @@ int main (int argc, char *argv[])
 	free(boundary);
 	free(inStr);
 	fclose(fp);
-	//  red LED
+	//  green LED
 	do_system("gpio l 14 0 4000 0 1 4000");
 	do_system("gpio l 52 4000 0 1 0 4000");
 	exit(0);
@@ -459,7 +459,7 @@ err:
 	free(boundary);
 	free(inStr);
 	fclose(fp);
-	//  green LED
+	//  red LED
 	do_system("gpio l 14 4000 0 1 0 4000");
 	do_system("gpio l 52 0 4000 0 1 4000");
 	exit(-1);
