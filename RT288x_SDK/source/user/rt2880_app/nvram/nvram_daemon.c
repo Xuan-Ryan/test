@@ -558,9 +558,45 @@ static void doWPSHandler(int signo)
 }
 #endif
 
+static int get_region(int nvram_id, char * key)
+{
+	int region = 0;
+	const char * buf = NULL;
+	nvram_init(nvram_id);
+	buf = nvram_bufget(nvram_id, key);
+	if (buf)
+		region = atoi(buf);
+	nvram_close(nvram_id);
+	return region;
+}
+
+static void set_region(int nvram_id, char * key, int region)
+{
+	char value[16];
+	nvram_init(nvram_id);
+	sprintf(value, "%d", region);
+	nvram_bufset(nvram_id, key, value);
+	nvram_commit(nvram_id);
+	nvram_close(nvram_id);
+}
+
 static void loadDefaultHandler(int signo)
 {
+	int region5g = 0;
+	char model_name[64];
+	char calibrated[4];
+
 	printf("load default and reboot..\n");
+	
+	nvram_init(RT2860_NVRAM);
+	strcpy(model_name, nvram_bufget(RT2860_NVRAM, "ModelName"));
+	strcpy(calibrated, nvram_bufget(RT2860_NVRAM, "Calibrated"));
+	nvram_close(RT2860_NVRAM);
+	
+	nvram_init(RTDEV_NVRAM);
+	region5g = get_region(RTDEV_NVRAM, "CountryRegionABand");
+	nvram_close(RTDEV_NVRAM);
+
 	loadDefault(2860);
 #if defined (CONFIG_RTDEV) || \
 	defined (CONFIG_RTDEV_PLC)
@@ -568,6 +604,15 @@ static void loadDefaultHandler(int signo)
 #elif defined (CONFIG_RT2561_AP) || defined (CONFIG_RT2561_AP_MODULE)
 	loadDefault(2561);
 #endif
+	nvram_init(RT2860_NVRAM);
+	nvram_bufset(RT2860_NVRAM, "ModelName", model_name);
+	nvram_bufset(RT2860_NVRAM, "Calibrated", calibrated);
+	nvram_close(RT2860_NVRAM);
+
+	nvram_init(RTDEV_NVRAM);
+	set_region(RTDEV_NVRAM, "CountryRegionABand", region5g);
+	nvram_close(RTDEV_NVRAM);
+
 	system("reboot");
 }
 
@@ -613,7 +658,7 @@ static void start_stop_play(int signo)
 static void signal_handler(void)
 {
 	signal(SIGPIPE, SIG_IGN);
-	//signal(SIGUSR2, loadDefaultHandler);
+	signal(SIGTTIN, loadDefaultHandler);
 	signal(SIGUSR1, start_stop_play);
 #if defined WSC_SUPPORT
 	signal(SIGUSR2, doWPSHandler);
@@ -625,7 +670,7 @@ static void signal_handler(void)
 	signal(SIGWINCH, triggerWPS);
 #endif
 #if (defined CONFIG_USB) || (defined CONFIG_MMC)
-	signal(SIGTTIN, hotPluglerHandler);
+	//signal(SIGTTIN, hotPluglerHandler);
 #endif
 	//signal(SIGXFSZ, doWPSSingleTriggerHandler);
 #endif
