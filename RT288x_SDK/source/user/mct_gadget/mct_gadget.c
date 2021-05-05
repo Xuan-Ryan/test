@@ -807,6 +807,7 @@ static void * video_control_thread(void * arg)
 				tcp_control_clnsd = -1;
 				break;
 			}
+
 			DBG_MSG("mct_gadget: %d, ret = %d\n" , __LINE__, ret);
 			DBG_MSG("mct_gadget: juvchdr.XactType = %x\n", juvchdr.XactType);
 			DBG_MSG("mct_gadget: juvchdr.Flags = %x\n", juvchdr.Flags);
@@ -1356,6 +1357,7 @@ void * mic_thread(void * arg)
 				continue;
 			}
 
+			retry = 0;
 			while(exited == 0) {
 				/*  read from socket;  */
 				ret = 0;
@@ -1385,6 +1387,7 @@ void * mic_thread(void * arg)
 					tcp_mic_clnsd = 0;
 					break;
 				}
+				retry = 0;
 
 				/*  write to i2s  */
 				if (i2s_fd > 0) {
