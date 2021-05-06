@@ -654,15 +654,13 @@ static int read_frame(struct uvcdev *udev )
 		if(process_image(&udev->video_id,udev->buffers[buf.index].start, buf.bytesused) ==1){
 			if(buf.bytesused > 4096){
 				udev->video_id++;
-				udev->totalsize += buf.bytesused;
-				//if(udev->totalsize < 0x500000)
-					udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id,udev->buffers[buf.index].start, buf.bytesused);
+				
+				udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id,udev->buffers[buf.index].start, buf.bytesused);
 			}
 		}
 	}else{	
-			udev->totalsize += buf.bytesused;
-			//if(udev->totalsize < 0x500000)
-				udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused);
+		
+			udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused);
 	}
 	
   
@@ -2535,6 +2533,11 @@ int main(int argc, char **argv)
 */	
     PidfileCreate("/var/run/uvcclient.pid");
     system("date > /tmp/uvcclient_disconnect");
+
+	if (pthread_create(&uvc_video, NULL,uvc_video_system,&g_udev) != 0) {
+			printf("Error creating uvc_video_system\n");
+			return -1;
+	}
 	
 	pthread_attr_init(&attr1);
     param.sched_priority = 1;
@@ -2544,13 +2547,6 @@ int main(int argc, char **argv)
 
 	if (pthread_create(&uvc_audio, &attr1,uvc_audio_system,&g_udev) != 0) {
 			printf("Error creating uvc_audio_system\n");
-			return -1;
-	}
-
-
-
-	if (pthread_create(&uvc_video, NULL,uvc_video_system,&g_udev) != 0) {
-			printf("Error creating uvc_video_system\n");
 			return -1;
 	}
 

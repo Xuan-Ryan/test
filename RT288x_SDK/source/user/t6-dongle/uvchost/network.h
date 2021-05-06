@@ -2,7 +2,7 @@
 #ifndef __NETWORK_H
 #define __NETWORK_H
 
-#define MNSP_MAX_MCAST_PACKET_SIZE              (32 * 1024)
+#define MNSP_MAX_MCAST_PACKET_SIZE              65507
 #define IMAGE_DIVIDED_UNIT          			(MNSP_MAX_MCAST_PACKET_SIZE - 32)
 
 
