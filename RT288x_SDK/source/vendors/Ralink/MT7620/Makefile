@@ -100,6 +100,7 @@ endif
 	else \
 		$(ROMFSINST) RT2860AP.dat.tx /etc_ro/Wireless/iNIC/RT2860AP.dat; \
 	fi
+	sed -i "s/__MODEL__/$(__MODEL)/g" $(ROMFSDIR)/etc_ro/Wireless/iNIC/RT2860AP.dat
 	#for sigma test
 	$(ROMFSINST) -e CONFIG_RALINKAPP_HOTSPOT /etc_ro/Wireless/iNIC/RT2860AP_hotspot.dat
 
