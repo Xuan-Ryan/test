@@ -754,7 +754,7 @@ static void * video_control_thread(void * arg)
 {
 	int ret = -1;
 	struct sockaddr_in from;
-	socklen_t len;
+	socklen_t len = sizeof(from);
 	JUVCHDR juvchdr;
 	int l = sizeof(JUVCHDR);
 	int optval = 1;
@@ -1346,49 +1346,47 @@ void * mic_thread(void * arg)
 			continue;
 		}
 
-		if (client_connected == 1) {
-			/*  waiting for client  */
-			DBG_MSG("waiting for client\n");
-			memset(&from, '\0', sizeof(struct sockaddr_in));
-			tcp_mic_clnsd = accept(tcp_mic_socket, (struct sockaddr*)&from, &len);
+		/*  waiting for client  */
+		DBG_MSG("waiting for client\n");
+		memset(&from, '\0', sizeof(struct sockaddr_in));
+		tcp_mic_clnsd = accept(tcp_mic_socket, (struct sockaddr*)&from, &len);
 
-			if (tcp_mic_clnsd < 0) {
+		if (tcp_mic_clnsd < 0) {
+			sleep(1);
+			continue;
+		}
+
+		while(exited == 0) {
+			/*  read from socket;  */
+			ret = 0;
+			offset = 0;
+			readbyte = 0;
+			do {
+				ret = read(tcp_mic_clnsd, mic_buffer+offset, I2S_PAGE_SIZE-offset);
+				if (ret <= 0)
+					break;
+				readbyte += ret;
+				offset += ret;
+			} while(readbyte < I2S_PAGE_SIZE);
+			if (ret < 0) {
 				sleep(1);
-				continue;
-			}
-
-			retry = 0;
-			while(exited == 0) {
-				/*  read from socket;  */
-				ret = 0;
-				offset = 0;
-				readbyte = 0;
-				do {
-					ret = read(tcp_mic_clnsd, mic_buffer+offset, I2S_PAGE_SIZE-offset);
-					if (ret <= 0)
-						break;
-					readbyte += ret;
-					offset += ret;
-				} while(readbyte < I2S_PAGE_SIZE);
-
-				if (ret < 0) {
-					sleep(1);
-					/*  is timeout maybe we need to read again  */
-					if (++retry > 10) {
-						/*  retry too many times  */
-						retry = 0;
-						break;
-					}
-					continue;
-				} else if (ret == 0) {
-					/*  close by the client side, we need to jump out this loop  */
-					PRINT_MSG("%s, read ret = 0\n", __FUNCTION__);
-					close(tcp_mic_clnsd);
-					tcp_mic_clnsd = 0;
+				/*  is timeout maybe we need to read again  */
+				if (++retry > 10) {
+					/*  retry too many times  */
+					retry = 0;
 					break;
 				}
-				retry = 0;
+				continue;
+			} else if (ret == 0) {
+				/*  close by the client side, we need to jump out this loop  */
+				PRINT_MSG("%s, read ret = 0\n", __FUNCTION__);
+				close(tcp_mic_clnsd);
+				tcp_mic_clnsd = 0;
+				break;
+			}
+			retry = 0;
 
+			if (client_connected == 1) {
 				/*  write to i2s  */
 				if (i2s_fd > 0) {
 					if (i2s_stop == 0 && readbyte == I2S_PAGE_SIZE) {
@@ -1398,11 +1396,11 @@ void * mic_thread(void * arg)
 					}
 				}
 			}
+		}
 
-			if (tcp_mic_clnsd > 0) {
-				close(tcp_mic_clnsd);
-				tcp_mic_clnsd = 0;
-			}
+		if (tcp_mic_clnsd > 0) {
+			close(tcp_mic_clnsd);
+			tcp_mic_clnsd = 0;
 		}
 	}
 	/*  NOTE
