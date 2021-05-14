@@ -259,7 +259,7 @@ static int init_tcp_socket(unsigned short port)
 	int optval = 1;
 	struct sockaddr_in serveraddr;
 	int tcp_socket = -1;
-	//struct timeval tv;
+	struct timeval tv;
 
 	/* create sockett */
 	tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -268,9 +268,9 @@ static int init_tcp_socket(unsigned short port)
 		return -1;
 	}
 
-	//memset(&tv, '\0', sizeof(tv));
-	//tv.tv_sec = TCP_TIME_OUT;
-	//setsockopt(tcp_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+	memset(&tv, '\0', sizeof(tv));
+	tv.tv_sec = TCP_TIME_OUT;
+	setsockopt(tcp_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 	setsockopt(tcp_socket, IPPROTO_TCP, TCP_NODELAY, (char *)&optval, sizeof(optval));
 	setsockopt(tcp_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&optval, sizeof(optval));
 	setsockopt(tcp_socket, SOL_SOCKET, SO_KEEPALIVE, (char *)&optval, sizeof(optval));
@@ -769,13 +769,36 @@ static void * video_control_thread(void * arg)
 			continue;
 		}
 
+		DBG_MSG("%s, waiting for client\n", __FUNCTION__);
+
 		memset(&from, '\0', sizeof(struct sockaddr_in));
 		tcp_control_clnsd = accept(tcp_ctrl_socket, (struct sockaddr*)&from, &len);
 
 		if (tcp_control_clnsd < 0) {
+			PRINT_MSG("%s: accept failed\n", __FUNCTION__);
+			if (client_connected == 1) {
+				ioctl_uvc(UVC_CLIENT_LOST, NULL);
+				PRINT_MSG("mct_gadget: client disconnected\n");
+				client_connected = 0;
+				i2s_stop = 1;
+				playing = 0;
+				ioctl_uvc(UVC_RESET_TO_DEFAULT, NULL);
+				usb_hub_reset(0);
+				LED_control(0);
+				connected_status(0);
+#ifndef SUPPORT_RING_ELEMENT
+				//  clear queue
+				releses_queue(queue);
+#else
+				memset(total_size, '\0', sizeof(total_size));
+				copying = 0;
+				done = 0;
+#endif
+			}
 			sleep(1);
 			continue;
 		}
+		DBG_MSG("%s, accept success\n", __FUNCTION__);
 		optval = 1;
 		setsockopt(tcp_control_clnsd, SOL_SOCKET, SO_KEEPALIVE, (char *)&optval, sizeof(optval));
 		optval = 3;
@@ -794,9 +817,13 @@ static void * video_control_thread(void * arg)
 			continue;
 		}
 
-		PRINT_MSG("mct_gadget: client connected\n");
-		sleep(1);
-		ret = send_command(JUVC_CONTROL_CAMERAINFO, mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3], 0, 0);
+		if (client_connected == 0) {
+			PRINT_MSG("mct_gadget: client connected\n");
+			sleep(1);
+			ret = send_command(JUVC_CONTROL_CAMERAINFO, mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3], 0, 0);
+		} else {
+			ret = send_command(JUVC_CONTROL_CAMERACTRL, mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3], 0, 0);
+		}
 
 		while(exited == 0) {
 			ret = read(tcp_control_clnsd, &juvchdr, l);
@@ -806,6 +833,8 @@ static void * video_control_thread(void * arg)
 				close(tcp_control_clnsd);
 				tcp_control_clnsd = -1;
 				break;
+			} if (ret == -1) {
+				continue;
 			}
 
 			DBG_MSG("mct_gadget: %d, ret = %d\n" , __LINE__, ret);
@@ -881,11 +910,30 @@ static void * video_control_thread(void * arg)
 						else
 							PRINT_MSG("Stop playing\n");
 						
+					} else if (juvchdr.Flags == JUVC_CAMERA_DISCONNECT) {
+						ioctl_uvc(UVC_CLIENT_LOST, NULL);
+						PRINT_MSG("mct_gadget: client disconnected\n");
+						client_connected = 0;
+						i2s_stop = 1;
+						playing = 0;
+						ioctl_uvc(UVC_RESET_TO_DEFAULT, NULL);
+						usb_hub_reset(0);
+						LED_control(0);
+						connected_status(0);
+#ifndef SUPPORT_RING_ELEMENT
+						//  clear queue
+						releses_queue(queue);
+#else
+						memset(total_size, '\0', sizeof(total_size));
+						copying = 0;
+						done = 0;
+#endif
+						break;
 					}
 				}
 			}
 		}
-		ioctl_uvc(UVC_CLIENT_LOST, NULL);
+		/*ioctl_uvc(UVC_CLIENT_LOST, NULL);
 		PRINT_MSG("mct_gadget: client disconnected\n");
 		client_connected = 0;
 		i2s_stop = 1;
@@ -901,7 +949,7 @@ static void * video_control_thread(void * arg)
 		memset(total_size, '\0', sizeof(total_size));
 		copying = 0;
 		done = 0;
-#endif
+#endif*/
 	}
 
 	DBG_MSG("mct_gadget: %s exit\n", __FUNCTION__);
@@ -1347,15 +1395,16 @@ void * mic_thread(void * arg)
 		}
 
 		/*  waiting for client  */
-		DBG_MSG("waiting for client\n");
+		DBG_MSG("%s, waiting for client\n", __FUNCTION__);
 		memset(&from, '\0', sizeof(struct sockaddr_in));
 		tcp_mic_clnsd = accept(tcp_mic_socket, (struct sockaddr*)&from, &len);
 
 		if (tcp_mic_clnsd < 0) {
+			PRINT_MSG("%s: accept failed\n", __FUNCTION__);
 			sleep(1);
 			continue;
 		}
-
+		DBG_MSG("%s, accept success\n", __FUNCTION__);
 		while(exited == 0) {
 			/*  read from socket;  */
 			ret = 0;
