@@ -229,12 +229,12 @@ END:
 
 
 
-void RunAudioCapture(struct audio_para *par)
+int RunAudioCapture(struct audio_para *par)
 {
 	int ret = 0 ;
 	int r = 0 ;
 	int len = 0 ;
-   
+    int usbsate = 0;
 
 
 	snd_pcm_t *capture_handle = NULL;
@@ -253,8 +253,10 @@ void RunAudioCapture(struct audio_para *par)
 	int  udpoffset = 0;
 	int  udpremain = 3072;
     printf("open_stream start \n"); 
-	if ((ret = open_stream(&capture_handle,"hw:1,0",SND_PCM_STREAM_CAPTURE,par) < 0))
+	if ((ret = open_stream(&capture_handle,"hw:1,0",SND_PCM_STREAM_CAPTURE,par) < 0)){
+		    usbsate = -1;
 			goto END;
+	}
 	
 	printf("open_stream sucessful \n"); 
 	while(*par->run){
@@ -265,6 +267,7 @@ void RunAudioCapture(struct audio_para *par)
 			snd_pcm_wait(capture_handle, 100);
 			continue;
 		}else if(r == -EPIPE){
+		    usbsate = -1;
 		    printf(" capture failed ret = -EPIPE \n");
 		    /*
 			r = snd_pcm_prepare(capture_handle);
@@ -287,6 +290,7 @@ void RunAudioCapture(struct audio_para *par)
 			printf(" sound i/o error r  =%d\n",r);
 			continue;
 		}else if(r <= 0){
+		    usbsate = -1;
 			printf(" sound error r  =%d\n",r);
 			break;
 		}
@@ -315,6 +319,7 @@ void RunAudioCapture(struct audio_para *par)
 			//ret = TcpWrite(par->socket,buf,len);
 #endif			
 		}
+		ret = 0;
 		ret = TcpWrite(par->socket,udpptr,len);
 		//ret = UdpWrite(par->socket,"10.10.10.254",GADGET_MIC_PORT,udpptr,len);
 /*
@@ -341,7 +346,7 @@ void RunAudioCapture(struct audio_para *par)
      
 */
 		
-	   // printf("audio socket write r = %d  \n",ret);
+	  //  printf("audio socket write ret len = %d  \n",ret,len);
 	
 		if(ret < 0){
 			printf("audio socket write failed \n");
@@ -355,6 +360,7 @@ END:
     	audio_resample_close((ReSampleContext*)par->resampleEngine);
 	if(capture_handle!= NULL)
 		snd_pcm_close(capture_handle);
+	return usbsate ;
 #ifdef WRITE_FILE	
     fclose(fp);
 #endif

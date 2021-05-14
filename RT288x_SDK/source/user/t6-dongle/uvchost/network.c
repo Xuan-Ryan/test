@@ -135,12 +135,12 @@ int TcpConnect(char* ipaddr ,int port ,int t)
     //socketªº³s½u
     struct sockaddr_in info;
     bzero(&info,sizeof(info));
-    info.sin_family = PF_INET;
+    info.sin_family = AF_INET;
     info.sin_addr.s_addr = inet_addr(ipaddr);
     info.sin_port = htons(port);
      
     int err = connect(sockfd,(struct sockaddr *)&info,sizeof(info));
-    if(err==-1){
+    if(err< 0){
         printf("Connection error \n");
 		close(sockfd);
 		return -1;

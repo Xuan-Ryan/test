@@ -1314,6 +1314,29 @@ int SendUvcStarStop(struct uvcdev* pudev)
 
 }
 
+int SendUVCClose(struct uvcdev* pudev)
+{
+	char cmd[32];
+	int ret = 0;
+    PJUVCHDR juvchdr =(PJUVCHDR) cmd;
+	juvchdr->Tag = JUVC_TAG;
+	juvchdr->XactType = JUVC_TYPE_CONTROL;
+	juvchdr->HdrSize = sizeof(JUVCHDR);
+	juvchdr->XactId = 0;
+	juvchdr->XactOffset = 0;
+	juvchdr->Flags = JUVC_CONTROL_USB_STOP;
+	juvchdr->PayloadLength = 0;
+	juvchdr->TotalLength = 0;
+	ret = TcpWrite(pudev->cmd_socket,cmd,32);
+    if(ret <= 0){
+        printf("SendUVCClose cmd write sokcet failed  \n ");
+		return -1;
+    }
+	printf("send uvc close ok \n");
+	return 0;	
+
+}
+
 int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uvc_ctrl_info* puci)
 {
 	int ret = 0;
@@ -1544,6 +1567,8 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
 
 }
 
+
+
 void *uvc_detect_system(void *lp)
 {
 	struct uvcdev* pudev = (struct uvcdev*) lp;
@@ -1556,6 +1581,8 @@ void *uvc_detect_system(void *lp)
 			sleep(2);
 			continue;
     	}
+		
+		SendUVCClose(pudev);
 	    closeSocket(pudev->cmd_socket);
 		break;
     }
@@ -1760,8 +1787,9 @@ void* uvc_cmd_system(void *lp)
 						pudev->w = sw ;
 						pudev->h = sh ;
 						pudev->video_active= 0;
+						Set_LED_Control(3); 
 						sem_post(&video_mutex);
-                         
+                        
 						break;
 					case JUVC_CONTROL_CAMERAINFO:
                         printf("JUVC_CONTROL_CAMERAINFO \n");
@@ -1773,7 +1801,7 @@ void* uvc_cmd_system(void *lp)
 						//system("gpio l 52 4000 0 1 0 4000");  
 						//system("gpio l 14 0 4000 0 1 4000");
 						//system("rm /tmp/uvcclient_disconnect");
-						Set_LED_Control(3);
+						//Set_LED_Control(3);
 						break;
 
 
@@ -1993,7 +2021,7 @@ void* uvc_video_system(void *lp)
 	pudev->video_thread_run = 1;
 	while(pudev->video_thread_run){
 
-
+      
 		sem_wait(&video_mutex);
 		
 		pudev->fd = open_device();
@@ -2033,6 +2061,7 @@ void* uvc_video_system(void *lp)
 		if(pudev->udpsocket <= 0){
 			printf("UdpInit faied \n");
 			close_device(pudev);
+			SendUVCClose(pudev);
 			closeSocket(pudev->cmd_socket);
 			continue;
 
@@ -2042,6 +2071,7 @@ void* uvc_video_system(void *lp)
 			printf("init_device faied \n");
 			close_device(pudev);
 			closeSocket(pudev->udpsocket);
+			SendUVCClose(pudev);
 			closeSocket(pudev->cmd_socket);
 			continue;
 		}
@@ -2050,6 +2080,7 @@ void* uvc_video_system(void *lp)
 			printf("init_mmap faied \n");
 			close_device(pudev);
 			closeSocket(pudev->udpsocket);
+			SendUVCClose(pudev);
 			closeSocket(pudev->cmd_socket);
 			continue;
 		}
@@ -2060,6 +2091,7 @@ void* uvc_video_system(void *lp)
 			uninit_mmap(pudev);
 			close_device(pudev);
 			closeSocket(pudev->udpsocket);
+			SendUVCClose(pudev);
 			closeSocket(pudev->cmd_socket);
 			continue;
 
@@ -2094,7 +2126,7 @@ void* uvc_video_system(void *lp)
 		  
 			if(readframe(pudev) < 0){
 		  		//printf("readframe  failed \n");
-		  		
+		  		SendUVCClose(pudev);
 				closeSocket(pudev->cmd_socket);
 		  	 	break;
 		  	}
@@ -2168,8 +2200,11 @@ void* uvc_audio_system(void *lp)
 		GetAudioStream(AUDIO_CARD1_STREAM,&ap,CAP);
 		DumpAudioParameter(&ap);
 		JudgeAudioResample(&ap);
+		
 		ap.run = &pudev->audio_active;
-		RunAudioCapture(&ap);
+		if(RunAudioCapture(&ap) < 0)
+           SendUVCClose(pudev);
+		
 		closeSocket(ap.socket);
 		closeSocket(pudev->cmd_socket);
 		printf("audio active stop \n");
