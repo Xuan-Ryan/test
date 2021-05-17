@@ -47,7 +47,7 @@ romfs:
 #	 $(ROMFSINST) aoamode /usr/bin 
 #	 $(ROMFSINST) displayserver /usr/bin 
 	 $(ROMFSINST) uvcclient /usr/bin 
-	 $(ROMFSINST) hdmiRx /usr/bin 
+#	 $(ROMFSINST) hdmiRx /usr/bin 
 #	 $(ROMFSINST) hid-example /usr/bin 
 clean:
 	$(MAKE) -C $(KDIR) ARCH=$(ARCH) SUBDIRS=$(PWD) clean
