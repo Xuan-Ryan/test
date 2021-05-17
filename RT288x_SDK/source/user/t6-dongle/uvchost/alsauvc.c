@@ -22,51 +22,43 @@ static int open_stream(snd_pcm_t **handle, const char *name, int dir,struct audi
     unsigned int format = SND_PCM_FORMAT_S16_LE;
 
 	if ((err = snd_pcm_open(handle, name, dir, 0)) < 0) {
-		fprintf(stderr, "%s (%s): cannot open audio device (%s)\n", 
-			name, dirname, snd_strerror(err));
-		return err;
+		printf("snd_pcm_open failed \n");
+		return -1;
 	}
 	   
 	if ((err = snd_pcm_hw_params_malloc(&hw_params)) < 0) {
-		fprintf(stderr, "%s (%s): cannot allocate hardware parameter structure(%s)\n",
-			name, dirname, snd_strerror(err));
-		return err;
+		printf("snd_pcm_hw_params_malloc failed \n");
+		return -1;
 	}
 			 
 	if ((err = snd_pcm_hw_params_any(*handle, hw_params)) < 0) {
-		fprintf(stderr, "%s (%s): cannot initialize hardware parameter structure(%s)\n",
-			name, dirname, snd_strerror(err));
-		return err;
+		printf("snd_pcm_hw_params_any failed \n");
+		return -1;
 	}
 
 	if ((err = snd_pcm_hw_params_set_access(*handle, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
-		fprintf(stderr, "%s (%s): cannot set access type(%s)\n",
-			name, dirname, snd_strerror(err));
-		return err;
+		printf("snd_pcm_hw_params_set_access failed \n");
+		return -1;
 	}
 
 	if ((err = snd_pcm_hw_params_set_format(*handle, hw_params, format)) < 0) {
-		fprintf(stderr, "%s (%s): cannot set sample format(%s)\n",
-			name, dirname, snd_strerror(err));
-		return err;
+		printf("snd_pcm_hw_params_set_format failed \n");
+		return -1;
 	}
 
 	if ((err = snd_pcm_hw_params_set_rate_near(*handle, hw_params, &rate, NULL)) < 0) {
-		fprintf(stderr, "%s (%s): cannot set sample rate(%s)\n",
-			name, dirname, snd_strerror(err));
-		return err;
+		printf("snd_pcm_hw_params_set_rate_near failed \n");
+		return -1;
 	}
 
 	if ((err = snd_pcm_hw_params_set_channels(*handle, hw_params, ch)) < 0) {
-		fprintf(stderr, "%s (%s): cannot set channel count(%s)\n",
-			name, dirname, snd_strerror(err));
-		return err;
+		printf("snd_pcm_hw_params_set_channels failed \n");
+		return -1;
 	}
 
 	if ((err = snd_pcm_hw_params(*handle, hw_params)) < 0) {
-		fprintf(stderr, "%s (%s): cannot set parameters(%s)\n",
-			name, dirname, snd_strerror(err));
-		return err;
+		printf("snd_pcm_hw_params failed \n");
+		return -1;
 	}
    
 	snd_pcm_hw_params_free(hw_params);
