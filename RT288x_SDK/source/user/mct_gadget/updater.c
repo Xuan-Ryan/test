@@ -19,8 +19,10 @@
 #include <sys/ioctl.h> /* ioctl */
 #include <signal.h>	/* SIGPIPE */
 #include <errno.h>
+#include <pthread.h>
 #include <net/if.h>
 
+#include "nvram.h"
 #include "updater.h"
 #include "CRC.h"
 
@@ -32,11 +34,46 @@
 #define BROADCAST_IP "255.255.255.255"
 #define BROADCAST_PORT 55550
 
-int tcp_sd, broadcastsd;
+int tcp_sd, broadcastsd, progress;
 unsigned int tcptotalget;
 struct sockaddr_in server; //br receform
 struct sockaddr_in form;   //br sendto
+void ledcolor(char *color)
+{
+	char led[8];
+	FILE *fp;
 
+	fp = fopen("/tmp/led", "r");
+	if (fp == NULL)
+	{
+		printf("open file error !......\n");
+		pthread_exit(NULL);
+	}
+	fread(led, 1, sizeof(led), fp);
+	printf("led = %s\n", led);
+	if (strcmp(color, "red") == 0)
+		if (strcmp(led, color))
+		{
+			system("gpio l 52 0 4000 0 1 4000");
+			system("gpio l 14 4000 0 1 0 4000");
+			system("echo 'red' > /tmp/led");
+		}
+	if (strcmp(color, "green") == 0)
+		if (strcmp(led, color))
+		{
+			system("gpio l 14 0 4000 0 1 3000");
+			system("gpio l 52 4000 0 1 0 4000");
+			system("echo 'green' > /tmp/led");
+		}
+	if (strcmp(color, "flash") == 0)
+		if (strcmp(led, color))
+		{
+			system("gpio l 52 0 4000 0 1 4000");
+			system("gpio l 14 1 1 1 1 4000");
+			system("echo 'flash' > /tmp/led");
+		}
+	fclose(fp);
+}
 char *get_macaddr(char *ifname)
 {
 	struct ifreq ifr;
@@ -75,12 +112,12 @@ char *get_macaddr(char *ifname)
 	close(skfd);
 	return if_hw;
 }
-void close_socket(int *acceptfd, int tcp_sd, int broadcastsd)
+void close_socket(int acceptfd, int tcp_sd, int broadcastsd)
 {
-	if (*acceptfd > 0)
+	if (acceptfd > 0)
 	{
-		close(*acceptfd);
-		*acceptfd = 0;
+		close(acceptfd);
+		acceptfd = 0;
 	}
 	if (tcp_sd > 0)
 	{
@@ -95,7 +132,7 @@ void close_socket(int *acceptfd, int tcp_sd, int broadcastsd)
 }
 void printmessage(PJUVCHDR t6_head, PDEVICEINFO t6_info) //print head message
 {
-	printf("\n");
+	printf("\n thread !!!!!!!!!!!!!!!!!\n");
 	if (t6_head != NULL)
 	{
 		printf("t6_head->Tag = %u\n", t6_head->Tag);
@@ -178,8 +215,8 @@ void tcp_create()
 		printf("TCP Socket Fail\n");
 		sleep(1);
 	} while (1);
-	printf("test cursor socket tcp_sd = %d ip = %s port = %d \n", tcp_sd, "INADDR_ANY", PORT);
 
+	printf("test cursor socket tcp_sd = %d ip = %s port = %d \n", tcp_sd, "INADDR_ANY", PORT);
 	flag = 1;
 	setsockopt(tcp_sd, SOL_SOCKET, SO_REUSEADDR, (const char *)&flag, sizeof(flag));
 	setsockopt(tcp_sd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
@@ -217,6 +254,7 @@ int receive_data(int sd, char *modelname, char *version, char *devicename)
 	unsigned char buf[128] = {0};
 	unsigned char *rom_buf;
 	unsigned int write_length, percentage, tcptotallength;
+
 	PJUVCHDR t6_head;
 	PDEVICEINFO t6_info;
 
@@ -250,9 +288,10 @@ int receive_data(int sd, char *modelname, char *version, char *devicename)
 		return -1;
 	}
 	t6_info = (PDEVICEINFO)(buf + 32);
-	if (t6_head->XactType == 6) // 6 ready
+	if (t6_head->XactType == JUVC_TYPE_READY) // 6 ready
 	{
-		t6_head->Role = 1;
+		t6_head->XactType == JUVC_TYPE_READY;
+		t6_head->Role = JUVC_DEVICE_TYPE_TX;
 		t6_head->TotalLength = 96;
 		strcpy(t6_info->DeviceName, devicename);
 		strcpy(t6_info->ModelName, modelname);
@@ -322,7 +361,6 @@ int receive_data(int sd, char *modelname, char *version, char *devicename)
 			memcpy(buf + 32, &percentage, sizeof(percentage));
 			ret = send(sd, buf, t6_head->TotalLength, 0);
 			printf("send ret = %d\n", ret);
-			usleep(10000);
 		}
 	}
 	else
@@ -404,109 +442,171 @@ int crc_checksum(int sd)
 		printf("calculation CRC32 = %u\n", calculate_CRC);
 		printf("Recive t6_head->DeviceInfo.crc32 = %u\n", receiveCRC);
 		printf("Accept Content is Complete !.........\n");
-		memcpy(buf + 32, "Content is Complete", 20);
+		//memcpy(buf + 32, "Content is Complete", 20);
+		memcpy(buf + 32, "Waiting to Burn in", 19);
 		ret = send(sd, buf, sizeof(buf), 0);
 		printf("send ret = %d\n", ret);
 	}
-	sleep(1);
+	sleep(2);
 	free(file_buffer);
 	return 0;
 }
-int write_progress(int sd)
+int write_progress(int sd, int kill_rc)
 {
 	/*============Write progress 、read Program process and send=================*/
-	int progress, fpeng;
+	int fpeng;
 	unsigned char writebuf[4] = {0};
 	unsigned char cmd[512] = {0};
 	unsigned char buf[64] = {0};
 	PJUVCHDR t6_head;
 	FILE *fp_progress;
+	int ret = 0;
 
 	printf("File_TotalLength:%d\n", tcptotalget);
-	snprintf(cmd, sizeof(cmd), "mtd_write -o %d -l %d write %s Kernel &", 0, tcptotalget, FILE_NAME); //FILE_NAME
-	//snprintf(cmd, sizeof(cmd), "/home/ryan/samba/updater/mtd_write -o %d -l %d write %s Kernel &", 0, tcptotalget, "/home/ryan/samba/updater/RusbFW");
-	system(cmd);
+	printf("kill_rc = %d\n", kill_rc);
+	if (kill_rc != 3)
+	{
+		snprintf(cmd, sizeof(cmd), "mtd_write -o %d -l %d write %s Kernel &", 0, tcptotalget, FILE_NAME); //FILE_NAME
+		//snprintf(cmd, sizeof(cmd), "/home/ryan/samba/updater/mtd_write -o %d -l %d write %s Kernel &", 0, tcptotalget, "/home/ryan/samba/updater/RusbFW");
+		system(cmd);
+		progress = 0;
+	}
 
-	system("rm /var/mtd_write.log");
-	system("touch /var/mtd_write.log");
-	//system("rm write_file.txt");
-	//system("touch write_file.txt");
-	usleep(10000);
-
-	progress = 0;
 	while (progress < 100)
 	{
 		fp_progress = fopen("/var/mtd_write.log", "r"); // /var/mtd_write.log  /home/ryan/samba/updater/write_file.txt
 		if (fp_progress == NULL)
 		{
 			printf("File open fail, %d\n", errno);
-			return -1;
+			sleep(1);
+			continue;
 		}
 		fread(writebuf, 1, sizeof(writebuf), fp_progress);
 		sscanf(writebuf, "%d", &progress);
 		printf("progress : %d\n", progress);
 		t6_head = (PJUVCHDR)buf;
 		t6_head->Tag = 1247106627;
-		t6_head->XactType = 3; //XactType = 3 (write status)
+		t6_head->XactType = JUVC_TYPE_UPDATE_STATUS; //XactType = 3 (write status)
 		t6_head->HdrSize = 32;
 		t6_head->TotalLength = 64;
+		printf("progress : %d   %d\n", progress, __LINE__);
 		memcpy(buf + 32, &progress, sizeof(progress));
-		send(sd, buf, t6_head->TotalLength, 0);
+		ret = send(sd, buf, t6_head->TotalLength, 0);
+		printf("ret = %d\n", ret);
 		fclose(fp_progress);
-		usleep(200000);
+		usleep(500000);
+		if (ret == -1)
+		{
+			return -1;
+		}
 	}
+
 	return 0;
+}
+void *thread_fun(void *data)
+{ // tcp acceptfd program
+	PJUVCHDR t6_head;
+	PDEVICEINFO t6_info;
+	PTHREADINFO t6_thread;
+	int ret;
+	char buf[128] = {0};
+	char led[6] = {0};
+	FILE *fp;
+	t6_thread = *(PTHREADINFO *)data;
+	t6_head = (PJUVCHDR)buf;
+	t6_info = (PDEVICEINFO)(buf + 32);
+	printf("t6_thread->sd = %d\n", t6_thread->sd);
+	printf("t6_thread->flag = %d\n", t6_thread->flag);
+	printf("t6_thread->kill_rc = %d\n", t6_thread->kill_rc);
+	printf("t6_thread->Version = %s\n", t6_thread->Version);
+	printf("t6_thread->ModelName = %s\n", t6_thread->ModelName);
+	printf("t6_thread->DeviceName = %s\n", t6_thread->DeviceName);
+	if (t6_thread->flag == 0)
+	{
+		if ((ret = receive_data(t6_thread->sd, t6_thread->ModelName, t6_thread->Version, t6_thread->DeviceName)) == -1)
+		{
+
+			t6_head->XactType = 4; //XactType = 4 (CRC status)
+			memcpy(buf + 32, "receive_data Error !", 21);
+			send(t6_thread->sd, buf, 53, 0);
+			ledcolor("red");
+			close_socket(t6_thread->sd, tcp_sd, broadcastsd);
+			printf("receive_data = %d\n", ret);
+			sleep(1);
+			pthread_exit(NULL);
+		}
+		t6_thread->flag++;
+	}
+	if (t6_thread->flag == 1)
+	{
+		if ((ret = crc_checksum(t6_thread->sd)) == -1)
+		{
+			t6_head->XactType = 4; //XactType = 4 (CRC)
+			memcpy(buf + 32, "File Content is Error !", 24);
+			send(t6_thread->sd, buf, 56, 0);
+			bzero(led, sizeof(led));
+			ledcolor("red");
+			sleep(1);
+			close_socket(t6_thread->sd, tcp_sd, broadcastsd);
+			printf("crc_checksum = %d\n", ret);
+			pthread_exit(NULL);
+		}
+		t6_thread->flag++;
+	}
+	if (t6_thread->flag == 2)
+	{
+		if ((ret = write_progress(t6_thread->sd, t6_thread->kill_rc)) == -1)
+		{
+			t6_head->XactType = 4; //XactType = 4 (CRC)
+			memcpy(buf + 32, "Write_progress Error !", 23);
+			send(t6_thread->sd, buf, 55, 0);
+			bzero(led, sizeof(led));
+			ledcolor("red");
+			printf("write_progress = %d\n", ret);
+			sleep(1);
+			pthread_exit(NULL);
+		}
+	}
+	close_socket(t6_thread->sd, tcp_sd, broadcastsd);
+	printf(KGRN "Update Complete!");
+	printf("\n" RESET);
+	ledcolor("green");
+	system("rm /var/mtd_write.log");
+	system("killall -SIGTTIN nvram_daemon");
+	//system("reboot");
+	pthread_detach(pthread_self());
+	pthread_exit(NULL);
 }
 int main(int argc, char *avg[])
 {
-	int recvbytes, sendBytes, fromlen, ret, acceptfd;
+	int recvbytes, sendBytes, fromlen, ret, acceptfd, kill_rc;
 	unsigned int sin_size, write_length, maxfd;
 	unsigned char buf[128] = {0};
+	char thread_data[64] = {0};
 	char macaddr[7] = {0};
-	char *modelname, *version, *devicename, *led;
-	/*TEST
-	modelname = malloc(strlen("IPW611T"));
-	version = malloc(strlen("1.0.0.210428"));
-	devicename = malloc(strlen("DEVICENAME"));
-	strcpy(modelname, "IPW611T");
-	strcpy(version, "1.0.0.210428");
-	strcpy(devicename, "DEVICE_NAME");
-	memcpy(macaddr, get_macaddr("eth0"), 6);
-	*/
+	char led[7] = {0};
+	char modelname[32], version[32], devicename[32];
+
+	unsigned char writebuf[4] = {0};
+	pthread_t thread_1, thread_2;
 	PJUVCHDR t6_head;
 	PDEVICEINFO t6_info;
+	PTHREADINFO t6_thread;
 	struct timeval tv;
 	struct sockaddr_in their_addr;
-	FILE *fp;
-
-	broadcast_create();
-	tcp_create();
-
+	FILE *fp, *fp_progress;
 	ret = 0;
-	printf("Waiting Receive BroadCast !.......  ret = %d\n", ret);
+	kill_rc = 1;
+	acceptfd = 0;
+	tcp_create();
+	broadcast_create();
 	fd_set read_sd;
 	FD_ZERO(&read_sd);
 	signal(SIGPIPE, SIG_IGN);
 	memcpy(macaddr, get_macaddr("rai0"), 6);
-
-	bzero(buf, sizeof(buf));
-	fp = popen("nvram_get ModelName", "r");
-	fgets(buf, sizeof(buf), fp);
-	modelname = malloc(strlen(buf));
-	strncpy(modelname, buf, strlen(buf));
-	pclose(fp);
-
-	fp = popen("nvram_get Version", "r");
-	fgets(buf, sizeof(buf), fp);
-	version = malloc(strlen(buf));
-	strncpy(version, buf, strlen(buf));
-	pclose(fp);
-
-	fp = popen("nvram_get HostName", "r");
-	fgets(buf, sizeof(buf), fp);
-	devicename = malloc(strlen(buf));
-	strncpy(devicename, buf, strlen(buf));
-	pclose(fp);
+	strcpy(modelname, nvram_get(RT2860_NVRAM, "ModelName"));
+	strcpy(version, nvram_get(RT2860_NVRAM, "Version"));
+	strcpy(devicename, nvram_get(RT2860_NVRAM, "HostName"));
 
 	while (1)
 	{
@@ -518,27 +618,37 @@ int main(int argc, char *avg[])
 		ret = select(maxfd + 1, &read_sd, 0, 0, &tv);
 
 		if (ret == 0) //timeout
+		{
 			printf("Waiting Receive BroadCast !.......  ret = %d\n", ret);
+		}
 		else if (ret == -1)
 		{ //fail
 			printf("Select Error Re-receive Broadcast !...... ret = %d\n", ret);
 			broadcast_create();
-			tcp_create();
+			if (acceptfd > 0)
+			{
+				kill_rc = pthread_kill(thread_1, 0);
+				printf("kill_rc = %d\n", kill_rc);
+			}
+			if (kill_rc != 0) // = 0 alive
+			{
+				tcp_create();
+			}
 			FD_ZERO(&read_sd);
+			kill_rc = 1;
 			ret = 0;
 		}
 		// add tcp connect
 		else if (FD_ISSET(tcp_sd, &read_sd))
 		{
-			system("killall apclient_chkconn.sh");
 			sin_size = sizeof(struct sockaddr_in);
 			acceptfd = accept(tcp_sd, (struct sockaddr *)&their_addr, &sin_size);
 			if (acceptfd < 0)
 			{
 				printf("Server-accept() Error Re-receive Broadcast !......\n");
-				close_socket(&acceptfd, tcp_sd, broadcastsd);
+				close_socket(0, tcp_sd, 0);
 				acceptfd = 0;
-				break;
+				continue;
 			}
 			printf("Server-accept() is OK\n");
 			printf("Server-new socket, acceptfd is OK...\n");
@@ -549,24 +659,42 @@ int main(int argc, char *avg[])
 			{ // max fd
 				maxfd = acceptfd;
 			}
-			bzero(buf, sizeof(buf));
-			fp = popen("cat /tmp/led", "r");
-			fgets(buf, sizeof(buf), fp);
-			led = malloc(strlen(buf));
-			strncpy(led, buf, strlen(buf));
-			pclose(fp);
-			printf("led = %s\n", led);
-			if (led != "flash")
+
+			ledcolor("flash");
+
+			bzero(thread_data, sizeof(thread_data));
+			t6_thread = (PTHREADINFO)thread_data;
+			t6_thread->sd = acceptfd;
+			t6_thread->flag = 2;
+			strncpy(t6_thread->DeviceName, devicename, strlen(devicename) - 1);
+			strncpy(t6_thread->ModelName, modelname, strlen(modelname) - 1);
+			strncpy(t6_thread->Version, version, strlen(version) - 1);
+
+			fp = fopen("/var/mtd_write.log", "r"); // /var/mtd_write.log  /home/ryan/samba/updater/write_file.txt
+
+			kill_rc = pthread_kill(thread_1, 0);
+			printf("kill_rc = %d    %d\n", kill_rc, __LINE__);
+
+			if (fp == NULL)
 			{
-				system("gpio l 52 0 4000 0 1 4000");
-				system("gpio l 14 1 1 1 1 4000");
-				system("echo 'flash' > /tmp/led");
+				t6_thread->flag = 0;
+				t6_thread->kill_rc = 1;
+				printf("kill_rc = %d    %d\n", kill_rc, __LINE__);
 			}
+			else
+			{
+				t6_thread->flag = 2;
+				t6_thread->kill_rc = 3;
+				fclose(fp);
+			}
+			ret = pthread_create(&thread_1, NULL, thread_fun, &t6_thread);
+			printf("ret = %d\n", ret);
+			kill_rc = pthread_kill(thread_1, 0);
+			printf("kill_rc = %d    %d\n", kill_rc, __LINE__);
 		}
 		// *Broadcast
 		else if (FD_ISSET(broadcastsd, &read_sd))
 		{
-			//broadcast
 			fromlen = sizeof(struct sockaddr_in);
 			bzero(buf, sizeof(buf));
 			recvfrom(broadcastsd, buf, 32, 0, (struct sockaddr *)&server, &fromlen);
@@ -574,114 +702,24 @@ int main(int argc, char *avg[])
 
 			if (t6_head->XactType == JUVC_TYPE_DISCOVER) //JUVC_TYPE_DISCOVER =5
 			{
-
+				system("killall apclient_chkconn.sh");
 				t6_head = (PJUVCHDR)buf;
 				t6_info = (PDEVICEINFO)(buf + 32);
 				t6_head->Tag = 1247106627;
-				t6_head->XactType = 1;
+				t6_head->XactType = JUVC_TYPE_INFO;
 				t6_head->Role = JUVC_DEVICE_TYPE_TX; //TX or RX select
 				t6_head->XactId = 204;
 				t6_head->HdrSize = 32;
 				t6_head->TotalLength = 96;
 				t6_info->Port = 55551;
-				t6_info->Manufacture = 1;				 //MCT
-				memcpy(t6_info->MacAddress, macaddr, 6); //memcpy >>>> because not string
+				t6_info->Manufacture = 1; //MCT
+				memcpy(t6_info->MacAddress, macaddr, 6);
 				strncpy(t6_info->ModelName, modelname, strlen(modelname) - 1);
 				strncpy(t6_info->Version, version, strlen(version) - 1);
 				strncpy(t6_info->DeviceName, devicename, strlen(devicename) - 1);
-				//strcpy(t6_info->Version, "1.0.0.210428");
-				//strcpy(t6_info->ModelName, "IPW611T");
-				//strcpy(t6_info->DeviceName, "DEVICE_NAME");
 				sendBytes = sendto(broadcastsd, buf, t6_head->TotalLength, 0, (struct sockaddr *)&form, fromlen);
 				printmessage(t6_head, t6_info);
 			}
-		}
-		// tcp acceptfd program
-		else if (FD_ISSET(acceptfd, &read_sd))
-		{
-			printf("acceptfd = %d\n", acceptfd);
-			if ((ret = receive_data(acceptfd, modelname, version, devicename)) == -1)
-			{
-				t6_head->XactType = 4; //XactType = 4 (CRC status)
-				memcpy(buf + 32, "receive_data Error !", 21);
-				send(acceptfd, buf, 53, 0);
-
-				bzero(buf, sizeof(buf));
-				fp = popen("cat /tmp/led", "r");
-				fgets(buf, sizeof(buf), fp);
-				led = malloc(strlen(buf));
-				strncpy(led, buf, strlen(buf));
-				pclose(fp);
-				printf("led = %s\n", led);
-				if (led != "red")
-				{
-					system("gpio l 52 0 4000 0 1 4000");
-					system("gpio l 14 4000 0 1 0 4000");
-					system("echo 'red' > /tmp/led");
-				}
-
-				close_socket(&acceptfd, tcp_sd, broadcastsd);
-				printf("receive_data = %d\n", ret);
-				continue;
-			}
-			// CRC Checksum
-			if ((ret = crc_checksum(acceptfd)) == -1)
-			{
-				t6_head->XactType = 4; //XactType = 4 (CRC)
-				memcpy(buf + 32, "File Content is Error !", 24);
-				send(acceptfd, buf, 56, 0);
-				bzero(buf, sizeof(buf));
-				fp = popen("cat /tmp/led", "r");
-				fgets(buf, sizeof(buf), fp);
-				led = malloc(strlen(buf));
-				strncpy(led, buf, strlen(buf));
-				pclose(fp);
-				printf("led = %s\n", led);
-				if (led != "red")
-				{
-					system("gpio l 52 0 4000 0 1 4000");
-					system("gpio l 14 4000 0 1 0 4000");
-					system("echo 'red' > /tmp/led");
-				}
-				close_socket(&acceptfd, tcp_sd, broadcastsd);
-				printf("crc_checksum = %d\n", ret);
-				continue;
-			}
-
-			if ((ret = write_progress(acceptfd)) == -1)
-			{
-				t6_head->XactType = 4; //XactType = 4 (CRC)
-				memcpy(buf + 32, "write_progress Error !", 23);
-				send(acceptfd, buf, 55, 0);
-				bzero(buf, sizeof(buf));
-				fp = popen("cat /tmp/led", "r");
-				fgets(buf, sizeof(buf), fp);
-				led = malloc(strlen(buf));
-				strncpy(led, buf, strlen(buf));
-				pclose(fp);
-				printf("led = %s\n", led);
-				if (led != "red")
-				{
-					system("gpio l 52 0 4000 0 1 4000");
-					system("gpio l 14 4000 0 1 0 4000");
-					system("echo 'red' > /tmp/led");
-				}
-				close_socket(&acceptfd, tcp_sd, broadcastsd);
-				printf("write_progress = %d\n", ret);
-				continue;
-			}
-
-			close_socket(&acceptfd, tcp_sd, broadcastsd);
-			free(modelname);
-			free(devicename);
-			free(version);
-			printf(KGRN "Update Complete!");
-			printf("\n" RESET);
-			system("gpio l 14 0 4000 0 1 3000");
-			system("gpio l 52 4000 0 1 0 4000");
-			system("killall -SIGTTIN nvram_daemon");
-			system("reboot");
-			return;
 		}
 	}
 }

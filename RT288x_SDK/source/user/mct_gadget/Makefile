@@ -25,7 +25,7 @@ $(EXEC_TOOL):$(OBJS_TOOL)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS_TOOL)
 
 $(UPDATE_TOOL): $(OBJS_UPDATE)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS_UPDATE)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS_UPDATE) -lnvram
 
 $(LOADBG_TOOL): $(OBJ_LOADBG)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LOADBG) -lnvram
