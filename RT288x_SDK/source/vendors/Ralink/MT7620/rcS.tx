@@ -41,3 +41,5 @@ apclient_chkconn.sh &
 
 #  UVC
 uvcclient &
+sleep 1
+/home/ds_detect.sh &
