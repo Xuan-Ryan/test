@@ -32,13 +32,13 @@ all:
 #	$(CC) -o T6-utility T6-utility.c t6libusb.c parse_edid.c t6usbdongle.c $(INC) $(LIBA)
 #	$(CC) -o hid-example hid-example.c  -lc -lpthread -lm
 #	$(CC) -o aoamode aoasw/aoasw.c -lusb -L$(ROOTDIR)/lib/libusb-0.1.12 -I$(ROOTDIR)/lib/libusb-0.1.12 
-#	$(CC) -o uvcclient uvcmain.c v4l2uvc.c alsauvc.c $(LIBS) $(CFLAGS)
-	$(CC) -o uvcclient uvchost/uvchost.c uvchost/alsauvc.c uvchost/network.c uvchost/uvcdescription.c uvchost/t6usbdongle.c $(LIBS) $(CFLAGS)	
+	$(CC) -o hdmiRx hdmi_t6/hdmi_t6.c hdmi_t6/network.c hdmi_t6/t6usbdongle.c hdmi_t6/queue.c $(LIBS) $(CFLAGS)
+	$(CC) -o uvcclient uvchost/uvchost.c uvchost/alsauvc.c uvchost/network.c uvchost/uvcdescription.c uvchost/t6usbdongle.c uvchost/queue.c $(LIBS) $(CFLAGS)	
 #	$(CC) -o uvcserver uvcserver.c $(LIBS) $(CFLAGS)  
 romfs:
 #	 cp -af usbdongledrv.ko $(ROOTDIR)/romfs/lib/modules
 #	 cp -af aoadrv.ko $(ROOTDIR)/romfs/lib/modules
-#	 cp -af ds_detect.sh $(ROOTDIR)/romfs/home
+	 cp -af uvchost/ds_detect.sh $(ROOTDIR)/romfs/home
 #	 cp -af network_detect.sh $(ROOTDIR)/romfs/home 
 #	 $(ROMFSINST) Lantousb /usr/bin 
 #	 $(ROMFSINST) mctousb /usr/bin 
@@ -47,7 +47,7 @@ romfs:
 #	 $(ROMFSINST) aoamode /usr/bin 
 #	 $(ROMFSINST) displayserver /usr/bin 
 	 $(ROMFSINST) uvcclient /usr/bin 
-#	 $(ROMFSINST) uvcserver /usr/bin 
+	 $(ROMFSINST) hdmiRx /usr/bin 
 #	 $(ROMFSINST) hid-example /usr/bin 
 clean:
 	$(MAKE) -C $(KDIR) ARCH=$(ARCH) SUBDIRS=$(PWD) clean
@@ -55,6 +55,8 @@ clean:
 	rm -f Lantousb *.o *.bak
 	rm -f mctousb *.o *.bak
 	rm -f aoatousb *.o *.bak
+	rm -f uvcclient *.o *.bak
+	rm -f hdmiRx *.o *.bak
 
 
 
