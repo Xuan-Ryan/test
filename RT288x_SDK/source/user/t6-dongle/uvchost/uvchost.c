@@ -2022,7 +2022,7 @@ void* uvc_video_system(void *lp)
 	while(pudev->video_thread_run){
 
       
-		sem_wait(&video_mutex);
+		//sem_wait(&video_mutex);
 		
 		pudev->fd = open_device();
 	    if(pudev->fd <= 0 ){
@@ -2061,8 +2061,8 @@ void* uvc_video_system(void *lp)
 		if(pudev->udpsocket <= 0){
 			printf("UdpInit faied \n");
 			close_device(pudev);
-			SendUVCClose(pudev);
-			closeSocket(pudev->cmd_socket);
+			//SendUVCClose(pudev);
+			//closeSocket(pudev->cmd_socket);
 			continue;
 
 		}
@@ -2071,8 +2071,8 @@ void* uvc_video_system(void *lp)
 			printf("init_device faied \n");
 			close_device(pudev);
 			closeSocket(pudev->udpsocket);
-			SendUVCClose(pudev);
-			closeSocket(pudev->cmd_socket);
+			//SendUVCClose(pudev);
+			//closeSocket(pudev->cmd_socket);
 			continue;
 		}
 		
@@ -2080,8 +2080,8 @@ void* uvc_video_system(void *lp)
 			printf("init_mmap faied \n");
 			close_device(pudev);
 			closeSocket(pudev->udpsocket);
-			SendUVCClose(pudev);
-			closeSocket(pudev->cmd_socket);
+			//SendUVCClose(pudev);
+			//closeSocket(pudev->cmd_socket);
 			continue;
 		}
 
@@ -2091,8 +2091,8 @@ void* uvc_video_system(void *lp)
 			uninit_mmap(pudev);
 			close_device(pudev);
 			closeSocket(pudev->udpsocket);
-			SendUVCClose(pudev);
-			closeSocket(pudev->cmd_socket);
+			//SendUVCClose(pudev);
+			//closeSocket(pudev->cmd_socket);
 			continue;
 
         }
@@ -2126,8 +2126,8 @@ void* uvc_video_system(void *lp)
 		  
 			if(readframe(pudev) < 0){
 		  		//printf("readframe  failed \n");
-		  		SendUVCClose(pudev);
-				closeSocket(pudev->cmd_socket);
+		  		//SendUVCClose(pudev);
+				//closeSocket(pudev->cmd_socket);
 		  	 	break;
 		  	}
 		
@@ -2174,19 +2174,22 @@ void* uvc_audio_system(void *lp)
 	
 	pudev->audio_thread_run = 1;
 	while(pudev->audio_thread_run){
-        sem_wait(&audio_mutex);
-
-		 
+		
+    
 		if(0 != access("/proc/asound/card1/stream0", 0)){
 			sleep(3);
 			continue;
 		}
+
+	
+			//sem_wait(&audio_mutex);
+
 		
 #ifndef WRITE_FILE	
 		pudev->socket= TcpConnect("10.10.10.254",GADGET_MIC_PORT,3);//UdpInit();
 		if(pudev->socket < 0){
 			printf("Tcp audio link failed\n");
-			closeSocket(pudev->cmd_socket);
+			//closeSocket(pudev->cmd_socket);
 			sleep(3);
 			continue;
 		}
@@ -2202,11 +2205,11 @@ void* uvc_audio_system(void *lp)
 		JudgeAudioResample(&ap);
 		
 		ap.run = &pudev->audio_active;
-		if(RunAudioCapture(&ap) < 0)
-           SendUVCClose(pudev);
+		RunAudioCapture(&ap) ;
+          // SendUVCClose(pudev);
 		
 		closeSocket(ap.socket);
-		closeSocket(pudev->cmd_socket);
+		//closeSocket(pudev->cmd_socket);
 		printf("audio active stop \n");
         sleep(1); // wait  access  stream0
 	    
@@ -2550,8 +2553,8 @@ int main(int argc, char **argv)
 	g_udev.fd = 0;
 	g_udev.force_format = 1;
 	g_udev.format = V4L2_PIX_FMT_MJPEG;
-	g_udev.w = 0;
-	g_udev.h = 0;
+	g_udev.w = 1280;
+	g_udev.h = 720;
 	sem_init(&video_mutex, 0, 0);
 	sem_init(&audio_mutex, 0, 0);
 		
