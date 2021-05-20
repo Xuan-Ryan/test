@@ -46,8 +46,8 @@ int g_exit_program = 0;
 struct uvcdev g_udev;
 struct  timeval start;
 struct  timeval end;
-sem_t video_mutex;		  
-sem_t audio_mutex; 
+//sem_t video_mutex;		  
+//sem_t audio_mutex; 
 int cmdAddrr = 0;
 int fbAddr =0;
 int fbAddr1=  (58 - 8) * 1024 * 1024;
@@ -79,10 +79,10 @@ void mysignal(int signo)
   g_udev.cmd_active= 0;
   g_udev.uvc_detcet_run = 0;
   g_udev.tcp_detcet_run = 0;
-  sem_post(&video_mutex);
-  sem_post(&audio_mutex);
-  sem_destroy(&video_mutex);
-  sem_destroy(&audio_mutex);
+  //sem_post(&video_mutex);
+ // sem_post(&audio_mutex);
+ // sem_destroy(&video_mutex);
+  //sem_destroy(&audio_mutex);
 }  
 
 
@@ -1745,7 +1745,7 @@ void* uvc_cmd_system(void *lp)
 			continue;
 		}
 */       
-		sem_post(&audio_mutex);  
+		//sem_post(&audio_mutex);  
 		pudev->cmd_active = 1;
 		while(pudev->cmd_active){
 	        ret = TcpRead(pudev->cmd_socket,cmd,32);
@@ -1756,11 +1756,12 @@ void* uvc_cmd_system(void *lp)
 				Set_LED_Control(1);
 				close(cmd_fd);
 				cmd_fd = 0;
+				uvc_default_setting(pudev);
 				pudev->video_active = 0;
 				pudev->audio_active= 0;
 				pudev->uvc_detcet_run = 0;
 				pudev->tcp_detcet_run = 0;
-				uvc_default_setting(pudev);
+				
 				break;
 	        }
             PJUVCHDR pjuvchdr = (PJUVCHDR)cmd;
@@ -1788,7 +1789,7 @@ void* uvc_cmd_system(void *lp)
 						pudev->h = sh ;
 						pudev->video_active= 0;
 						Set_LED_Control(3); 
-						sem_post(&video_mutex);
+						//sem_post(&video_mutex);
                         
 						break;
 					case JUVC_CONTROL_CAMERAINFO:
@@ -2023,6 +2024,10 @@ void* uvc_video_system(void *lp)
 
       
 		//sem_wait(&video_mutex);
+		if(pudev->w == 0 || pudev->h ==0  ){
+			sleep(1);
+			continue;
+		}
 		
 		pudev->fd = open_device();
 	    if(pudev->fd <= 0 ){
@@ -2175,11 +2180,14 @@ void* uvc_audio_system(void *lp)
 	pudev->audio_thread_run = 1;
 	while(pudev->audio_thread_run){
 		
-    
-		if(0 != access("/proc/asound/card1/stream0", 0)){
-			sleep(3);
+        
+		if(0 != access("/proc/asound/card1/stream0", 0) ||
+			pudev->w == 0 || pudev->h ==0  ){
+			sleep(1);
 			continue;
 		}
+
+		
 
 	
 			//sem_wait(&audio_mutex);
@@ -2553,10 +2561,10 @@ int main(int argc, char **argv)
 	g_udev.fd = 0;
 	g_udev.force_format = 1;
 	g_udev.format = V4L2_PIX_FMT_MJPEG;
-	g_udev.w = 1280;
-	g_udev.h = 720;
-	sem_init(&video_mutex, 0, 0);
-	sem_init(&audio_mutex, 0, 0);
+	g_udev.w = 0;
+	g_udev.h = 0;
+	//sem_init(&video_mutex, 0, 0);
+	//sem_init(&audio_mutex, 0, 0);
 		
 #if 1	
 /*
