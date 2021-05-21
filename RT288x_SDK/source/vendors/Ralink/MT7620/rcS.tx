@@ -32,10 +32,6 @@ fi
 #for syslogd
 mkdir -p /var/log
 
-#for cpe_app
-ln -s /etc_ro/init.d /etc/init.d
-ln -s /etc_ro/cron /etc/cron
-
 #  for ap client check
 apclient_chkconn.sh &
 

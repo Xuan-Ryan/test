@@ -3,7 +3,12 @@ RAMDISK  = $(IMAGEDIR)/ramdisk
 IMAGE = $(IMAGEDIR)/$(USER)_uImage
 __TYPE := $(shell [ -e $(ROOTDIR)/.type ] && cat $(ROOTDIR)/.type |awk 'NR==1')
 __DATE := $(shell date +%y%m%d)
-FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)$(__TYPE)-$(__VERSION).$(__DATE).bin
+ifeq ($(__COMPANY),j5)
+__COMPANY_NUM := 2
+else
+__COMPANY_NUM := 1
+endif
+FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)$(__TYPE)-$(__COMPANY_NUM).$(__VERSION).$(__DATE).bin
 ROMFS_DIR = $(ROOTDIR)/romfs
 
 RAMDISK_SIZE  := $(shell echo $(CONFIG_BLK_DEV_RAM_SIZE))
@@ -92,8 +97,9 @@ else
 	fi
 	$(ROMFSINST) -e CONFIG_EXTEND_NVRAM /etc_ro/tr069_voip_default_settings
 	$(ROMFSINST) -e CONFIG_MTK_VOIP /etc_ro/voip_default_settings
+	sed -i "s/__COMPANY__/$(__COMPANY_NUM)/g" $(ROMFSDIR)/etc_ro/Wireless/RT2860AP/RT2860_default_vlan
 	sed -i "s/__MODEL__/$(__MODEL)/g" $(ROMFSDIR)/etc_ro/Wireless/RT2860AP/RT2860_default_vlan
-	sed -i "s/__VERSION__/$(__VERSION).$(__DATE)/g" $(ROMFSDIR)/etc_ro/Wireless/RT2860AP/RT2860_default_vlan
+	sed -i "s/__VERSION__/$(__COMPANY_NUM).$(__VERSION).$(__DATE)/g" $(ROMFSDIR)/etc_ro/Wireless/RT2860AP/RT2860_default_vlan
 endif
 	if [ "$(__TYPE)" = "R" ]; then \
 		$(ROMFSINST) /etc_ro/Wireless/iNIC/RT2860AP.dat; \
@@ -263,7 +269,7 @@ ifeq	($(CONFIG_ROOTFS_IN_FLASH_NO_PADDING),y)
 	ENTRY=`readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}'` ; \
 	$(CUR_DIR)/mkimage -A mips -O linux -T kernel -C none -a 80000000 -e $$ENTRY -k $$KRN_SIZE -n "Linux Kernel Image" -d $(KERNELZ) $(IMAGE)
 else
-	@cd $(IMAGEDIR) ; $(CUR_DIR)/mkimage -A mips -O linux -T kernel -C none -a 80000000 -e $(shell readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}') -k `ls $(KERNELZ) -l | awk '{print $$5}'` -n '$(__MODEL):$(__TYPE)X:$(__VERSION).$(__DATE)' -d $(KERNELZ) $(IMAGE);cp $(IMAGE) $(FINAL_IMAGE) ; \
+	@cd $(IMAGEDIR) ; $(CUR_DIR)/mkimage -A mips -O linux -T kernel -C none -a 80000000 -e $(shell readelf -h $(ROOTDIR)/$(LINUXDIR)/vmlinux | grep "Entry" | awk '{print $$4}') -k `ls $(KERNELZ) -l | awk '{print $$5}'` -n '$(__MODEL):$(__TYPE)X:$(__COMPANY_NUM).$(__VERSION).$(__DATE)' -d $(KERNELZ) $(IMAGE);cp $(IMAGE) $(FINAL_IMAGE) ; \
 	echo 'Current Type is $(__TYPE)X'
 endif
 

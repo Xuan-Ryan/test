@@ -24,7 +24,7 @@ if [ ! -d 'kfs/factory' ]; then
 fi
 
 if [ ! -e .type ]; then
-	echo 'RX' > .type
+	echo 'R' > .type
 fi
 
 export __RELEASE

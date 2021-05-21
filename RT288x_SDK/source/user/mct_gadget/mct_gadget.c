@@ -712,18 +712,63 @@ void usb_hub_reset(int plugin)
 }
 #endif
 
+enum {
+	RED_LED,
+	GREEN_LED,
+	ORANGE_LED,
+	FLASH_LED
+};
+
+int get_led_state()
+{
+	FILE * fp = NULL;
+	char buf[16];
+	int ret = 0;
+
+	fp = fopen("/tmp/led", "r");
+	if (fp) {
+		fread(buf, 1, sizeof(buf), fp);
+		if (strcmp(buf, "red") == 0)
+			ret = RED_LED;
+		else if (strcmp(buf, "green") == 0)
+			ret = GREEN_LED;
+		else if (strcmp(buf, "orange") == 0)
+			ret = ORANGE_LED;
+		else if (strcmp(buf, "flash") == 0)
+			ret = FLASH_LED;
+		fclose(fp);
+	}
+	return ret;
+}
+
+void keep_led_state(char * color)
+{
+	FILE * fp = fopen("/tmp/led", "w");
+
+	if (fp) {
+		fwrite(color, 1, strlen(color), fp);
+		fclose(fp);
+	}
+}
+
 void LED_control(int type)
 {
 	switch(type) {
 	case 0:
-		//  show green and red
-		system("gpio l 14 4000 0 1 0 4000");
-		system("gpio l 52 4000 0 1 0 4000");
+		//  show orange
+		if (get_led_state() != ORANGE_LED) {
+			system("gpio l 14 4000 0 1 0 4000");
+			system("gpio l 52 4000 0 1 0 4000");
+			keep_led_state("orange");
+		}
 		break;
 	case 1:
-		//  show green only
-		system("gpio l 14 0 4000 0 1 4000");
-		system("gpio l 52 4000 0 1 0 4000");
+		//  show green
+		if (get_led_state() != GREEN_LED) {
+			system("gpio l 14 0 4000 0 1 4000");
+			system("gpio l 52 4000 0 1 0 4000");
+			keep_led_state("green");
+		}
 		break;
 	}
 }

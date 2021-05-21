@@ -236,14 +236,16 @@ inline void webFoot(void)
 	printf("</body></html>\n");
 }
 
-char *getType(void)
+char *getvalue(char * key)
 {
 	static char buf[64];
+	char cmd[128];
 	char *nl;
 	FILE *fp;
 
 	memset(buf, 0, sizeof(buf));
-	if( (fp = popen("nvram_get 2860 Type", "r")) == NULL )
+	sprintf(cmd, "nvram_get 2860 %s", key);
+	if( (fp = popen(cmd, "r")) == NULL )
 		goto error;
 
 	if(!fgets(buf, sizeof(buf), fp)){
@@ -266,6 +268,37 @@ error:
 	return "..";
 }
 
+int check_OEM(char * ih_name, char * oem)
+{
+	int ret = 0;
+	char * p = NULL;
+	
+	//  IPW611:RX:1.0.1.210519
+	p = strrchr(ih_name, ':');
+	if (p) {
+		p += 1;
+		*(p+1) = '\0';
+		if (strcmp(p, oem) == 0)
+			ret = 1;
+	}
+	return ret;
+}
+
+int check_model(char * ih_name, char * model)
+{
+	int ret = 0;
+	char * p = NULL;
+	
+	//  IPW611:RX:1.0.1.210519
+	p = strchr(ih_name, ':');
+	if (p) {
+		*p = '\0';
+		if (strcmp(ih_name, model) == 0)
+			ret = 1;
+	}
+	return ret;
+}
+	
 #define	MAX_BUFFER_SIZE		1024*1024
 void read_remainder(char * buffer, int totalsize, int receive_size)
 {
@@ -294,6 +327,8 @@ int main (int argc, char *argv[])
 	long write_remainder = 0;
 	long real_file_size = 0;
 	image_header_t * header;
+	char buf[32];
+	char * p = NULL;
 
 	//  red LED quickly flash
 	do_system("gpio l 52 0 4000 0 1 4000");
@@ -381,7 +416,20 @@ int main (int argc, char *argv[])
 		goto err;
 	}
 
-	if (strstr(header->ih_name, getType()) == NULL) {
+	strcpy(buf, header->ih_name);
+	//  IPW611:RX:1.0.1.210519
+	if (check_OEM(buf, getvalue("ManufactureCode")) == 0) {
+		printf("Wrong OEM Code!");
+		goto err;
+	}
+
+	strcpy(buf, header->ih_name);
+	if (check_model(buf, getvalue("ModelName")) == 0) {
+		printf("Wrong Model!");
+		goto err;
+	}
+
+	if (strstr(header->ih_name, getvalue("Type")) == NULL) {
 		printf("Wrong TX/RX type!");
 		goto err;
 	}

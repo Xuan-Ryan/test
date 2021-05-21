@@ -479,7 +479,11 @@ function confirm_update()
 				if (data == 'FAILED-WRITE')
 					show_error('錯誤', '韌體更新有問題, 別斷電! 快，再燒一次，免得開不了機');
 				else {
-					if (data == 'Wrong TX/RX type!') {
+					if (data == 'Wrong OEM Code!') {
+						show_error('錯誤', '錯誤的公司代碼');
+					} else if (data == 'Wrong Model!') {
+						show_error('錯誤', '錯誤的型號');
+					} else if (data == 'Wrong TX/RX type!') {
 						if (Type == 'RX')
 							show_error('錯誤', '你上傳了TX的firmware了');
 						else
@@ -540,11 +544,15 @@ function confirm_update()
 				if (data == 'FAILED-WRITE')
 					show_error('錯誤', '韌體更新有問題, 別斷電! 快，再燒一次，免得開不了機');
 				else {
-					if (data == 'Wrong TX/RX type!') {
+					if (data == 'Wrong OEM Code!') {
+						show_error('錯誤', '錯誤的公司代碼');
+					} else if (data == 'Wrong Model!') {
+						show_error('錯誤', '錯誤的型號');
+					} else if (data == 'Wrong TX/RX type!') {
 						if (Type == 'RX')
-							show_error('錯誤', '你上傳了 TX 的firmware');
+							show_error('錯誤', '你上傳了TX的firmware了');
 						else
-							show_error('錯誤', '你上傳了 RX 的firmware');
+							show_error('錯誤', '你上傳了RX的firmware了');
 					} else if (data == 'Size not correct!') {
 						show_error('錯誤', '上傳的檔案大小有誤，再確認一下是不是上傳錯了');
 					} else {

@@ -132,9 +132,14 @@ __DATE = $(shell date +%y%m%d)
 __TYPE = $(shell [ -e .type ] && cat .type |awk 'NR==1')
 export __COMPANY __MODEL __VERSION __TYPE
 
-FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)$(__TYPE)-$(__VERSION).$(__DATE).bin
-FINAL_KFS_IMAGE = $(KFSDIR)/$(__MODEL)$(__TYPE)-$(__VERSION).$(__DATE).bin
-COMPLETE_IMAGE = $(KFSDIR)/factory/Factory-$(__MODEL)$(__TYPE)-$(__VERSION).$(__DATE).bin
+ifeq ($(__COMPANY),j5)
+__COMPANY_NUM := 2
+else
+__COMPANY_NUM := 1
+endif
+FINAL_IMAGE = $(IMAGEDIR)/$(__MODEL)$(__TYPE)-$(__COMPANY_NUM).$(__VERSION).$(__DATE).bin
+FINAL_KFS_IMAGE = $(KFSDIR)/$(__MODEL)$(__TYPE)-$(__COMPANY_NUM).$(__VERSION).$(__DATE).bin
+COMPLETE_IMAGE = $(KFSDIR)/factory/Factory-$(__MODEL)$(__TYPE)-$(__COMPANY_NUM).$(__VERSION).$(__DATE).bin
 
 export VENDOR PRODUCT ROOTDIR LINUXDIR HOSTCC CONFIG_SHELL
 export CONFIG_CONFIG BUSYBOX_CONFIG LINUX_CONFIG MODULES_CONFIG ROMFSDIR SCRIPTSDIR
