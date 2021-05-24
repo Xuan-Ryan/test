@@ -216,7 +216,7 @@ int TcpRead(int clientSocket,char *buffer, int size)
 }
 
 
-int udpImageWrite(int sockfd ,char *ipaddr ,int port,char id ,char* image_data , int total_size)
+int udpImageWrite(int sockfd ,char *ipaddr ,int port,char id ,char* image_data , int total_size ,int res_index)
 {
 
 		
@@ -236,7 +236,7 @@ int udpImageWrite(int sockfd ,char *ipaddr ,int port,char id ,char* image_data ,
 	while(page > 0)
 	{
 		mnsp->Tag = JUVC_TAG;
-		mnsp->HdrSize = 32;
+		mnsp->HdrSize = res_index;
 		mnsp->PayloadLength = IMAGE_DIVIDED_UNIT;
 		mnsp->TotalLength = total_size;
 		mnsp->XactOffset = offset;
@@ -253,7 +253,7 @@ int udpImageWrite(int sockfd ,char *ipaddr ,int port,char id ,char* image_data ,
 
 	if(page_num > 0){
 		mnsp->Tag = JUVC_TAG;
-		mnsp->HdrSize = 32;
+		mnsp->HdrSize = res_index;
 		mnsp->PayloadLength = page_num;
 		mnsp->TotalLength = total_size;
 		mnsp->XactOffset = offset;

@@ -37,7 +37,7 @@ int  GetAudioStream(char* filename, struct audio_para *par ,int mode);
 void SendAudioCapture(struct audio_para *par,int card);
 void PlayAudio(struct audio_para *par ,int card);
 
-int RunAudioCapture(struct audio_para *par);
+void RunAudioCapture(struct audio_para *par);
 int     GetAudioUsbid(char* filename,uint16_t *vid,uint16_t *pid);
 uint8_t GetAudioDevices();
 

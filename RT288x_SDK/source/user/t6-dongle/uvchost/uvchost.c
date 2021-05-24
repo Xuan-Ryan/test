@@ -606,49 +606,6 @@ static int read_frame(struct uvcdev *udev )
     }
  */   
 
-#if T6_EN
-		
-	    // hex_dump(udev->buffers[buf.index].start,1024,"formate");
-	if(udev->format == V4L2_PIX_FMT_MJPEG){
-		if(fbAddr == fbAddr1)
-		 	fbAddr = fbAddr2;
-		else
-			fbAddr = fbAddr1;
-
-		len= buf.bytesused + 1024 +48;
-
-		if(len < 0x100000 )
-			cmdoffset = 0x100000;
-		else if(len < 0x200000)
-		 	cmdoffset = 0x200000;
-		else
-		 	cmdoffset = 0x300000;
-		 
-		if(cmdAddrr + cmdoffset > fbAddr1){
-		 	cmdAddrr = 0;
-			resetflag = 0x80;
-		}else{
-		 	resetflag = 0;  
-		}
-		
-		if(process_image(&udev->video_id,udev->buffers[buf.index].start, buf.bytesused) ==1){
-			//printf(" image size = %d \n",buf.bytesused);
-			if(buf.bytesused > 4096){
-				//printf(" image size = %d \n",buf.bytesused);
-				ret = t6_libusb_FilpJpegFrame422(udev->buffers[buf.index].start,buf.bytesused,resetflag,cmdAddrr,fbAddr,udev->w,udev->h);
-				udev->video_id++;
-				}
-			if(ret < 0)
-				return -1;
-		}
-		cmdAddrr = cmdAddrr +cmdoffset;
-       
-	} 
-		
-		 
-		
-#else
-
 	if(udev->format == V4L2_PIX_FMT_MJPEG){
 		
 		if(process_image(&udev->video_id,udev->buffers[buf.index].start, buf.bytesused) ==1){
@@ -656,17 +613,17 @@ static int read_frame(struct uvcdev *udev )
 				udev->totalsize += buf.bytesused;
 				udev->video_id++;
 				if(udev->totalsize < 0x5500000)
-					udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id,udev->buffers[buf.index].start, buf.bytesused);
+					udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id,udev->buffers[buf.index].start, buf.bytesused,udev->resolution_index);
 			}
 		}
 	}else{	
 		udev->totalsize += buf.bytesused;
 		if(udev->totalsize < 0x5500000)
-			udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused);
+			udpImageWrite(udev->udpsocket,"10.10.10.254",GADGET_CAMERA_PORT,udev->video_id++,udev->buffers[buf.index].start, buf.bytesused,udev->resolution_index);
 	}
 	
   
-#endif
+
 
    
 	
@@ -1253,6 +1210,45 @@ void uvcformatset( int formatindex ,int *format)
 			break;
 
 	}
+
+}
+
+char uvcformatindex(int format , int w , int h)
+{	
+	
+	switch(format)
+	{
+		case V4L2_PIX_FMT_MJPEG :
+			if(w == 1920 && h == 1080)
+				return 4;
+			if(w == 1280 && h == 720)
+				return 3;
+			if(w == 640 && h == 480)
+				return 2;
+			if(w == 320 && h == 240)
+				return 1;
+			break;
+		case V4L2_PIX_FMT_H264:
+			if(w == 3840 && h == 2160)
+				return 9;
+            if(w == 1920 && h == 1080)
+				return 8;
+			if(w == 1280 && h == 720)
+				return 7;
+			if(w == 640 && h == 480)
+				return 6;
+			if(w == 320 && h == 240)
+				return 5;
+			break;
+		case V4L2_PIX_FMT_YUYV:
+			if(w == 320 && h == 240)
+				return 10;
+			break;
+
+	}
+
+	return 0;
+
 
 }
 
@@ -2001,12 +1997,6 @@ void* uvc_cmd_system(void *lp)
     }
     printf("leave uvc_cmd_system \n");
 
-
-	
-
-	
-	
-
 }
 
 
@@ -2022,8 +2012,7 @@ void* uvc_video_system(void *lp)
 	pudev->video_thread_run = 1;
 	while(pudev->video_thread_run){
 
-      
-		//sem_wait(&video_mutex);
+  
 		if(pudev->w == 0 || pudev->h ==0  ){
 			sleep(1);
 			continue;
@@ -2035,39 +2024,10 @@ void* uvc_video_system(void *lp)
 			continue;
 	    }
      
-		
-	/*
-		if(pudev->format ==V4L2_PIX_FMT_H264 )
-		{
-		    printf("h264 tcp link \n");
-			pudev->hsocket = TcpConnect("10.10.10.254",GADGET_H264_PORT);
-			if(pudev->hsocket <= 0){
-				printf("TcpInit faied \n");
-				close_device(pudev);
-				sleep(1);
-				continue;
-
-			}
-			printf("h264 tcp link suncessful\n");
-
-		}else if(pudev->format == V4L2_PIX_FMT_MJPEG ){ 
-			pudev->udpsocket = UdpInit();
-			if(pudev->udpsocket <= 0){
-				printf("UdpInit faied \n");
-				close_device(pudev);
-				sleep(1);
-				continue;
-
-			}
-		}
-		*/
-
 	    pudev->udpsocket = UdpInit();
 		if(pudev->udpsocket <= 0){
 			printf("UdpInit faied \n");
 			close_device(pudev);
-			//SendUVCClose(pudev);
-			//closeSocket(pudev->cmd_socket);
 			continue;
 
 		}
@@ -2076,8 +2036,6 @@ void* uvc_video_system(void *lp)
 			printf("init_device faied \n");
 			close_device(pudev);
 			closeSocket(pudev->udpsocket);
-			//SendUVCClose(pudev);
-			//closeSocket(pudev->cmd_socket);
 			continue;
 		}
 		
@@ -2085,43 +2043,21 @@ void* uvc_video_system(void *lp)
 			printf("init_mmap faied \n");
 			close_device(pudev);
 			closeSocket(pudev->udpsocket);
-			//SendUVCClose(pudev);
-			//closeSocket(pudev->cmd_socket);
 			continue;
 		}
-
 
         if(start_capturing(pudev) < 0){
 			printf("start_capturing  failed \n");
 			uninit_mmap(pudev);
 			close_device(pudev);
 			closeSocket(pudev->udpsocket);
-			//SendUVCClose(pudev);
-			//closeSocket(pudev->cmd_socket);
 			continue;
-
         }
-    
-	    
+ 
 		pudev->video_id = 0;
-				
+		pudev->totalsize = 0;		
 		pudev->video_active= 1;	
-#if T6_EN	
-		ret = openT6dev();
-		if(ret <= 0)
-			printf("T6 open faild \n");
-		pthread_mutex_lock(&usb_mutex);
-		ret = t6_libusb_set_resolution(pudev->w,pudev->h);
-		if(ret <0)
-			printf("t6_libusb_set_resolution faild \n");
-		ret =t6_libusb_set_monitor_power(1);
-		if(ret <0)
-			printf("t6_libusb_set_monitor_power \n");
-		pthread_mutex_unlock(&usb_mutex);
-		cmdAddrr = 0;
-#endif 	
-			
-		pudev->totalsize = 0;
+	    pudev->resolution_index = uvcformatindex(pudev->format,pudev->w,pudev->h);
 		while(pudev->video_active){
 		  
 			if(pudev->video_id == 0){
@@ -2130,37 +2066,25 @@ void* uvc_video_system(void *lp)
 			}	
 		  
 			if(readframe(pudev) < 0){
-		  		//printf("readframe  failed \n");
-		  		//SendUVCClose(pudev);
-				//closeSocket(pudev->cmd_socket);
 		  	 	break;
 		  	}
 		
 			gettimeofday(&end,NULL);
 			diff = 1000000 * (end.tv_sec-start.tv_sec)+ end.tv_usec-start.tv_usec;
 		    if(diff >= 1000000){
-				printf("sec = %d frame = %d  lost = %d size = %d \n",diff,pudev->video_id,lost_frame ,pudev->totalsize);
+				printf("sec = %d frame = %d  lost = %d size = %d res_index = %d \n",diff,pudev->video_id,lost_frame ,pudev->totalsize,pudev->resolution_index);
 				pudev->video_id =0;
 				pudev->totalsize = 0;
 				lost_frame = 0;
 		    }
-		
 		   
 		}
-#if T6_EN		
-		pthread_mutex_lock(&usb_mutex);
-		t6_libusb_set_monitor_power(0);
-		pthread_mutex_unlock(&usb_mutex);
-		closeT6evd();
-#endif		
-        stop_capturing(pudev);
-		
-        uninit_mmap(pudev);
 	
+        stop_capturing(pudev);
+        uninit_mmap(pudev);
         close_device(pudev);
 		closeSocket(pudev->udpsocket);
 		printf("video active stop \n");
-		//closeSocket(pudev->hsocket);
         sleep(1);
 
 	}
@@ -2187,25 +2111,17 @@ void* uvc_audio_system(void *lp)
 			continue;
 		}
 
-		
-
 	
-			//sem_wait(&audio_mutex);
-
-		
-#ifndef WRITE_FILE	
 		pudev->socket= TcpConnect("10.10.10.254",GADGET_MIC_PORT,3);//UdpInit();
 		if(pudev->socket < 0){
 			printf("Tcp audio link failed\n");
-			//closeSocket(pudev->cmd_socket);
-			sleep(3);
+			sleep(1);
 			continue;
 		}
 
-		
 		ap.socket = pudev->socket;
 		printf("tcp audio link suncessful \n");
-#endif
+
 
 	    pudev->audio_active = 1; 
 		GetAudioStream(AUDIO_CARD1_STREAM,&ap,CAP);
@@ -2214,10 +2130,7 @@ void* uvc_audio_system(void *lp)
 		
 		ap.run = &pudev->audio_active;
 		RunAudioCapture(&ap) ;
-          // SendUVCClose(pudev);
-		
 		closeSocket(ap.socket);
-		//closeSocket(pudev->cmd_socket);
 		printf("audio active stop \n");
         sleep(1); // wait  access  stream0
 	    

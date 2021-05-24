@@ -81,6 +81,7 @@ struct uvcdev{
 	int tcp_detcet_run ;
 	char video_id;
 	int totalsize;
+	int resolution_index;
 	unsigned short vid;
 	unsigned short pid;
 	unsigned short uvcver;

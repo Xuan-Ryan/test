@@ -110,7 +110,8 @@ int  UdpInit();
 int  UdpWrite(int sockfd ,char *ipaddr ,int port, char* buf,int size);
 int UdpRead(int sockfd ,char *ipaddr ,int port, char* buf,int size);
 
-int  udpImageWrite(int sockfd ,char *ipaddr ,int port,char id ,char* image_data , int total_size);
+int udpImageWrite(int sockfd ,char *ipaddr ,int port,char id ,char* image_data , int total_size ,int res_index);
+
 void closeSocket(int clientSocket);
 void hex_dump(char *data, int size, char *caption);
 
