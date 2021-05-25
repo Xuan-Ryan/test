@@ -86,6 +86,8 @@ int h264_go = 0;
 static int is_yuv = 0;
 static int playing = 0;
 
+static int cur_formatidx = FORMAT_MJPG_1080;
+
 void *shtxbuf[MAX_I2S_PAGE];
 void *shrxbuf[MAX_I2S_PAGE];
 unsigned char* sbuf;
@@ -556,6 +558,36 @@ int send_command(unsigned char cmd, unsigned char format, unsigned char frame, u
 	return ret;
 }
 
+int counvert_formatidx(char format, char frame)
+{
+	int idx = 0;
+	switch(format) {
+	case 1:
+		switch(frame) {
+		case 1: idx = FORMAT_MJPG_320; break;
+		case 2: idx = FORMAT_MJPG_480; break;
+		case 3: idx = FORMAT_MJPG_720; break;
+		case 4: idx = FORMAT_MJPG_1080; break;
+		}
+		break;
+	case 2:
+		switch(frame) {
+		case 1: idx = FORMAT_H264_320; break;
+		case 2: idx = FORMAT_H264_480; break;
+		case 3: idx = FORMAT_H264_720; break;
+		case 4: idx = FORMAT_H264_1080; break;
+		case 5: idx = FORMAT_H264_4K; break;
+		}
+		break;
+	case 3:
+		switch(frame) {
+		case 1: idx = FORMAT_YUV_320; break;
+		}
+		break;
+	}
+	return idx;
+}
+
 extern int cnt;
 void * video_status_thread(void * arg)
 {
@@ -578,6 +610,7 @@ void * video_status_thread(void * arg)
 						is_yuv = 1;
 					else
 						is_yuv = 0;
+					cur_formatidx = counvert_formatidx(mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3]);
 					send_command(JUVC_CONTROL_CAMERACTRL, mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3], 0, 0);
 					i2s_stop = 0;
 				} else if (mct_uvc_data.status == 2) {
@@ -865,8 +898,10 @@ static void * video_control_thread(void * arg)
 		if (client_connected == 0) {
 			PRINT_MSG("mct_gadget: client connected\n");
 			sleep(1);
+			cur_formatidx = counvert_formatidx(mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3]);
 			ret = send_command(JUVC_CONTROL_CAMERAINFO, mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3], 0, 0);
 		} else {
+			cur_formatidx = counvert_formatidx(mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3]);
 			ret = send_command(JUVC_CONTROL_CAMERACTRL, mct_uvc_data.prob_ctrl[2], mct_uvc_data.prob_ctrl[3], 0, 0);
 		}
 
@@ -1140,6 +1175,15 @@ void * video_thread(void * arg)
 			data_size += n;
 #endif
 			header = (PJUVCHDR)buffer;
+			if (cur_formatidx != header->formatidx) {
+#ifndef SUPPORT_RING_ELEMENT
+				if (frame) {
+					free_video_frame(frame);
+					frame = NULL;
+				}
+#endif
+				continue;
+			}
 			if (first_time == 1) {
 				if (header->XactOffset != 0) {
 #ifndef SUPPORT_RING_ELEMENT

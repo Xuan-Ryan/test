@@ -91,7 +91,11 @@
 typedef struct juvc_hdr_packet {
 	unsigned int                    Tag;           /*  JUVC  */
 	unsigned char                   XactType;      /*  JUVC_TYPE_XXX  */
-	unsigned char                   HdrSize;       /*  should be 32 always  */
+	union {
+		unsigned char                   HdrSize;
+		unsigned char                   formatidx;
+	};
+
 	unsigned char                   XactId;        
 	unsigned char                   Flags;         /*  JUVC_FLAGS_XXX or JUVC_CONTROL_XXX  */
 	unsigned int                    PayloadLength;
@@ -122,6 +126,33 @@ typedef struct juvc_hdr_packet {
 		char Rsvd[12];
 	};
 } __attribute__ ((packed)) JUVCHDR, *PJUVCHDR;
+
+enum {
+	FORMAT_MJPG = 1,
+	FORMAT_H264,
+	FORMAT_YUV
+};
+
+enum {
+	FRAME_320 = 1,
+	FRAME_480,
+	FRAME_720,
+	FRAME_1080,
+	FRAME_4K
+};
+
+enum {
+	 FORMAT_MJPG_320 = 1,
+	 FORMAT_MJPG_480,
+	 FORMAT_MJPG_720,
+	 FORMAT_MJPG_1080,
+	 FORMAT_H264_320,
+	 FORMAT_H264_480,
+	 FORMAT_H264_720,
+	 FORMAT_H264_1080,
+	 FORMAT_H264_4K,
+	 FORMAT_YUV_320
+};
 
 /*  JUVC_CONTROL_XXX  */
 #define JUVC_CONTROL_NONE                       0
