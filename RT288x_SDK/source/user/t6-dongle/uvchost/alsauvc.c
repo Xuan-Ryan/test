@@ -77,6 +77,78 @@ void stereoize(short *outbuf, short *inbuf, int num_samples)
     }
 	
 }
+
+void PlaybackAudio(struct audio_para *par )
+{
+	
+	int ret = 0 ;
+	int r = 0 ;
+	int len = 0 ;
+   
+
+	snd_pcm_t *playback_handle = NULL;
+	char buf[3072]; 
+	char outbuf[4096]; 
+	int buffe_size = par->page_size ;
+    
+
+	if ((ret = open_stream(&playback_handle,"hw:1,0",SND_PCM_STREAM_PLAYBACK,par) < 0))
+			goto END;
+	
+	
+	while(*par->run){
+		
+		
+
+		ret = TcpRead(par->socket,buf,3072);
+		if(ret != 3072){
+			printf("playback socket failed = %d \n",ret);
+            break;
+		}
+        //printf("tcp audio speak data = %d \n",ret);
+       // ret = 3072;
+      
+		if(par->resampleEngine != NULL){
+			r = ret /4;
+			r = audio_resample((ReSampleContext*)par->resampleEngine,(short *)outbuf,(short *)buf, r);
+			//len = r * 4;
+			if (ret = snd_pcm_writei(playback_handle, outbuf, r) == -EPIPE) {
+				printf("XRUN.\n");
+				snd_pcm_prepare(playback_handle);
+			} else if (ret < 0) {
+				printf("ERROR. Can't write to PCM device. %s\n", snd_strerror(ret));
+				break;
+			}
+	
+		
+		}else{
+			r = ret /4;
+			if (ret = snd_pcm_writei(playback_handle, buf, r) == -EPIPE) {
+				printf("XRUN.\n");
+				snd_pcm_prepare(playback_handle);
+			} else if (ret < 0) {
+				printf("ERROR. Can't write to PCM device. %s\n", snd_strerror(ret));
+				break;
+			}
+		}
+		
+		
+		
+		
+  
+	}
+END:	
+	if(par->resampleEngine != NULL)
+		audio_resample_close((ReSampleContext*)par->resampleEngine);
+	
+	if(playback_handle!= NULL){
+		snd_pcm_drain(playback_handle);
+		snd_pcm_close(playback_handle);
+	}
+
+
+}
+
 void PlayAudio(struct audio_para *par ,int card)
 {
 	

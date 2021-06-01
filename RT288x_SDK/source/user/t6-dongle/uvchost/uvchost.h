@@ -60,6 +60,7 @@ struct uvcdev{
     unsigned int     n_buffers;
 	enum io_method   io;
 	int socket;
+	int socket_p;
 	int hsocket;
 	int cmd_socket;
 	int udpsocket;
@@ -73,6 +74,8 @@ struct uvcdev{
 	int audio_dev_play_active;
 	int audio_thread_run;
 	int audio_active;
+	int audio_ply_thread_run;
+	int audio_ply_active;
 	int video_thread_run;
 	int video_active;
 	int cmd_thread_run;

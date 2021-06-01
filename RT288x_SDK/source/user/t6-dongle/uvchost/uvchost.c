@@ -73,8 +73,11 @@ void mysignal(int signo)
   g_udev.audio_dev_cap_run= 0;
   g_udev.audio_thread_run = 0;
   g_udev.audio_active = 0;
-  g_udev.video_thread_run = 0;
+  g_udev.audio_thread_run = 0;
+  g_udev.audio_ply_thread_run = 0;
+  g_udev.audio_ply_active = 0;
   g_udev.video_active = 0;
+  g_udev.video_thread_run = 0;
   g_udev.cmd_thread_run = 0;
   g_udev.cmd_active= 0;
   g_udev.uvc_detcet_run = 0;
@@ -654,7 +657,7 @@ static int readframe(struct uvcdev *udev)
 	FD_SET(udev->fd, &fds);
 
 	/* Timeout. */
-	tv.tv_sec = 2;
+	tv.tv_sec = 5;
 	tv.tv_usec = 0;
 
 	r = select(udev->fd + 1, &fds, NULL, NULL, &tv);
@@ -1755,6 +1758,7 @@ void* uvc_cmd_system(void *lp)
 				uvc_default_setting(pudev);
 				pudev->video_active = 0;
 				pudev->audio_active= 0;
+				pudev->audio_ply_active = 0;
 				pudev->uvc_detcet_run = 0;
 				pudev->tcp_detcet_run = 0;
 				
@@ -2105,7 +2109,7 @@ void* uvc_audio_system(void *lp)
 	while(pudev->audio_thread_run){
 		
         
-		if(0 != access("/proc/asound/card1/stream0", 0) ||
+		if(0 != access(AUDIO_CARD1_CAPTURE, 0) ||
 			pudev->w == 0 || pudev->h ==0  ){
 			sleep(1);
 			continue;
@@ -2137,6 +2141,52 @@ void* uvc_audio_system(void *lp)
 	}
     printf("Leave uvc_audio_system \n");
 }
+
+void* uvc_audio_system_playback(void *lp)
+{
+	printf("Into uvc_audio_system_playback \n");
+	struct uvcdev* pudev = (struct uvcdev*) lp;
+	struct audio_para ap;
+	memset(&ap,0,sizeof(ap));
+
+	
+	pudev->audio_ply_thread_run = 1;
+	while(pudev->audio_ply_thread_run){
+		
+        
+		if(0 != access(AUDIO_CARD1_PLAYBACK, 0) ||
+			pudev->w == 0 || pudev->h ==0  ){
+			sleep(1);
+			continue;
+		}
+
+
+		pudev->socket_p= TcpConnect("10.10.10.254",GADGET_SPK_PORT,0);//UdpInit();
+		if(pudev->socket < 0){
+			printf("Tcp audio speak link failed\n");
+			sleep(1);
+			continue;
+		}
+
+		ap.socket = pudev->socket_p;
+		printf("tcp audio speak link suncessful \n");
+    
+
+	    pudev->audio_ply_active = 1; 
+		GetAudioStream(AUDIO_CARD1_STREAM,&ap,PLK);
+		DumpAudioParameter(&ap);
+		JudgeAudioResample(&ap);
+		
+		ap.run = &pudev->audio_ply_active;
+		PlaybackAudio(&ap);
+		closeSocket(ap.socket);
+		printf("audio palyback active stop \n");
+        sleep(1); // wait  access  stream0
+	    
+	}
+    printf("Leave uvc_audio_system_playback \n");
+}
+
 
 void* uvc_audio_webcam_capture(void *lp) 
 {
@@ -2454,6 +2504,7 @@ int main(int argc, char **argv)
 
 	pthread_t uvc_audio_cap1;
 	pthread_t uvc_audio_cap2;
+	pthread_t uvc_audio_playback;
 	pthread_t uvc_audio;
     pthread_t uvc_video;
 	pthread_t uvc_cmd;
@@ -2511,6 +2562,11 @@ int main(int argc, char **argv)
 			return -1;
 	}
 
+	if (pthread_create(&uvc_audio_playback, &attr1,uvc_audio_system_playback,&g_udev) != 0) {
+			printf("Error creating uvc_audio_system\n");
+			return -1;
+	}
+
 	pthread_attr_init(&attr2);
     param2.sched_priority = 1;
     pthread_attr_setschedpolicy(&attr2,SCHED_RR);
@@ -2518,13 +2574,14 @@ int main(int argc, char **argv)
     pthread_attr_setinheritsched(&attr2,PTHREAD_EXPLICIT_SCHED);
 
 	if (pthread_create(&uvc_cmd, &attr2,uvc_cmd_system,&g_udev) != 0) {
-			printf("Error creating uvc_cmd_system\n");
-			return -1;
+		printf("Error creating uvc_cmd_system\n");
+		return -1;
 	}
 
 	pthread_join(uvc_cmd,   NULL); 
 	pthread_join(uvc_video, NULL); 
 	pthread_join(uvc_audio, NULL); 
+	pthread_join(uvc_audio_playback, NULL); 
 	//pthread_join(uvc_audio_cap1,   NULL); 
 	//pthread_join(uvc_audio_cap2,   NULL); 
 #endif	
