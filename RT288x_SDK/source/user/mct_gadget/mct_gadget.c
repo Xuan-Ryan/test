@@ -853,7 +853,7 @@ static void * video_control_thread(void * arg)
 		tcp_control_clnsd = accept(tcp_ctrl_socket, (struct sockaddr*)&from, &len);
 
 		if (tcp_control_clnsd < 0) {
-			PRINT_MSG("%s: accept failed\n", __FUNCTION__);
+			DBG_MSG("%s: accept failed\n", __FUNCTION__);
 			if (client_connected == 1) {
 				ioctl_uvc(UVC_CLIENT_LOST, NULL);
 				PRINT_MSG("mct_gadget: client disconnected\n");
@@ -1489,7 +1489,7 @@ void * mic_thread(void * arg)
 		tcp_mic_clnsd = accept(tcp_mic_socket, (struct sockaddr*)&from, &len);
 
 		if (tcp_mic_clnsd < 0) {
-			PRINT_MSG("%s: accept failed\n", __FUNCTION__);
+			DBG_MSG("%s: accept failed\n", __FUNCTION__);
 			sleep(1);
 			continue;
 		}
@@ -1518,8 +1518,6 @@ void * mic_thread(void * arg)
 			} else if (ret == 0) {
 				/*  close by the client side, we need to jump out this loop  */
 				PRINT_MSG("%s, read ret = 0\n", __FUNCTION__);
-				close(tcp_mic_clnsd);
-				tcp_mic_clnsd = 0;
 				break;
 			}
 			retry = 0;
@@ -1553,10 +1551,11 @@ void * mic_thread(void * arg)
 void * spk_thread(void * arg)
 {
 	int ret = 0;
-	struct sockaddr_in client_addr;
-	int addrlen = sizeof(client_addr);
+	struct sockaddr_in from;
+	int len = sizeof(from);
 	int tcp_spk_clnsd = 0;
 	char spk_buffer[I2S_PAGE_SIZE];
+	int retry = 0;
 
 	DBG_MSG("mct_gadget: %s go\n", __FUNCTION__);
 
@@ -1570,37 +1569,47 @@ void * spk_thread(void * arg)
 			continue;
 		}
 
-		if (client_connected == 1) {
-			/*  waiting for client  */
-			//DBG_MSG("waiting for client\n");
-			tcp_spk_clnsd = accept(tcp_spk_socket, (struct sockaddr*)&client_addr, &addrlen);
+		/*  waiting for client  */
+		DBG_MSG("%s: waiting for client\n", __FUNCTION__);
+		memset(&from, '\0', sizeof(struct sockaddr_in));
+		tcp_spk_clnsd = accept(tcp_spk_socket, (struct sockaddr*)&from, &len);
 
-			if (tcp_spk_clnsd < 0) {
+		if (tcp_spk_clnsd < 0) {
+			DBG_MSG("%s: accept failed\n", __FUNCTION__);
+			sleep(1);
+			continue;
+		}
+		DBG_MSG("%s, accept success\n", __FUNCTION__);
+		while(exited == 0) {
+			/*  read from i2s  */
+			if (i2s_fd > 0) {
+				ioctl(i2s_fd, I2S_GET_AUDIO, spk_buffer);
+			} else {
 				sleep(1);
 				continue;
 			}
 
-			while(exited == 0) {
-				/*  read from i2s  */
-				if (i2s_fd > 0) {
-					ioctl(i2s_fd, I2S_GET_AUDIO, spk_buffer);
-				} else {
-					sleep(1);
-					continue;
-				}
-
-				/*  write to socket;  */
-				ret = write(tcp_spk_clnsd, spk_buffer, I2S_PAGE_SIZE);
-				if (ret <= 0) {
-					sleep(1);
-					continue;
+			if (client_connected == 1) {
+				if (i2s_stop == 0 && playing == 1) {
+					/*  write to socket;  */
+					ret = write(tcp_spk_clnsd, spk_buffer, I2S_PAGE_SIZE);
+					if (ret <= 0) {
+						sleep(1);
+						if (++retry > 10) {
+							retry = 0;
+							break;
+						}
+						continue;
+					} else {
+						retry = 0;
+					}
 				}
 			}
+		}
 
-			if (tcp_spk_clnsd > 0) {
-				close(tcp_spk_clnsd);
-				tcp_spk_clnsd = 0;
-			}
+		if (tcp_spk_clnsd > 0) {
+			close(tcp_spk_clnsd);
+			tcp_spk_clnsd = 0;
 		}
 	}
 	/*  NOTE
@@ -1618,6 +1627,7 @@ void * mic_thread(void * arg)
 	struct sockaddr_in from;
 	int len = sizeof(from);
 	char mic_buffer[I2S_PAGE_SIZE];
+	int retry = 0;
 
 	DBG_MSG("mct_gadget: %s go\n", __FUNCTION__);
 
@@ -1639,7 +1649,14 @@ void * mic_thread(void * arg)
 			n = recvfrom(udp_mic_socket, mic_buffer, I2S_PAGE_SIZE, 0, (struct sockaddr*)&from, &len);
 
 			if (n <= 0) {
+				sleep(1);
+				if (++retry > 10) {
+					retry = 0;
+					break;
+				}
 				continue;
+			} else {
+				retry = 0;
 			}
 
 			if (i2s_fd > 0) {
@@ -1663,10 +1680,11 @@ void * mic_thread(void * arg)
 void * spk_thread(void * arg)
 {
 	int n = 0;
-	struct sockaddr_in addr;
-	int addrlen = sizeof(addr);
+	struct sockaddr_in from;
+	int len = sizeof(from);
 	int tcp_spk_clnsd = 0;
 	char spk_buffer[I2S_PAGE_SIZE];
+	int retry = 0;
 
 	DBG_MSG("mct_gadget: %s go\n", __FUNCTION__);
 
@@ -1688,11 +1706,19 @@ void * spk_thread(void * arg)
 				continue;
 			}
 
-			/*  write to socket;  */
-			n = sendto(udp_spk_socket, spk_buffer, 0, I2S_PAGE_SIZE, (struct sockaddr *)&addr, addrlen);
-			if (n <= 0) {
-				sleep(1);
-				continue;
+			if (i2s_stop == 0 && playing == 1) {
+				/*  write to socket;  */
+				n = sendto(udp_spk_socket, spk_buffer, I2S_PAGE_SIZE, 0, (struct sockaddr *)&from, len);
+				if (n <= 0) {
+					sleep(1);
+					if (+++retry > 10) {
+						retry = 0;
+						break;
+					}
+					continue;
+				} else {
+					retry = 0;
+				}
 			}
 		}
 	}
