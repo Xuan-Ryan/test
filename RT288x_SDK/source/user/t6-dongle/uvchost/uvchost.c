@@ -1159,12 +1159,17 @@ int dect_device(void)
 
 }
 
-int open_device(void)
+int open_device(int sel)
 {
     int fd = 0; 
 	struct stat st;
-    char dev_name[256]="/dev/video0";
-
+    char dev_name[256];
+	
+	if(sel == 0)
+		strcpy(dev_name,UVC_DEV1);
+	else
+        strcpy(dev_name,UVC_DEV2);
+	
     if (-1 == stat(dev_name, &st)) {
             fprintf(stderr, "Cannot identify '%s': %d, %s\n",
                      dev_name, errno, strerror(errno));
@@ -1498,6 +1503,8 @@ int SendUvcInfo(int fd ,struct uvcdev* pudev , struct format_list* pfl,struct uv
 				 	 h264_res_bitfield |= 0x01 ;
 		   }else if(pfl->res_list[i].format == 3){	
        	 		//printf("FMT_YUY2 \n");
+       	 		if(pfl->res_list[i].res[j].Width == 640 && pfl->res_list[i].res[j].Hight == 480)
+				 	 yuv_res_bitfield |= 0x02 ;
 				if(pfl->res_list[i].res[j].Width == 320 && pfl->res_list[i].res[j].Hight == 240)
 				 	 yuv_res_bitfield |= 0x01 ;
 		   }else if(pfl->res_list[i].format == 4){	
@@ -1572,9 +1579,17 @@ void *uvc_detect_system(void *lp)
 {
 	struct uvcdev* pudev = (struct uvcdev*) lp;
 	pudev->uvc_detcet_run = 1;
-	char dev_name[256]="/dev/video0";
+	char dev_name[256];
+	
     struct stat st;
     printf("uvc_detect_system \n");
+	
+	
+	if(pudev->uvc_select == 0)
+		strcpy(dev_name,UVC_DEV1);
+	else
+        strcpy(dev_name,UVC_DEV2);
+	
     while(pudev->uvc_detcet_run){
 		if(0 == access(dev_name, 0)){
 			sleep(2);
@@ -1712,7 +1727,7 @@ void* uvc_cmd_system(void *lp)
         pudev->uvcver = 0;
         pudev->w = 0;
 		pudev->h = 0;
-		cmd_fd = open_device();
+		cmd_fd = open_device(pudev->uvc_select);
         if(cmd_fd <= 0){
 			sleep(1);
 			continue;
@@ -2022,7 +2037,7 @@ void* uvc_video_system(void *lp)
 			continue;
 		}
 		
-		pudev->fd = open_device();
+		pudev->fd = open_device(pudev->uvc_select);
 	    if(pudev->fd <= 0 ){
 			sleep(1);
 			continue;
@@ -2100,16 +2115,33 @@ void* uvc_video_system(void *lp)
 void* uvc_audio_system(void *lp)
 {
 	printf("Into uvc_audio_system \n");
+	
+	char audio_dev[256];
+	char audio_info[256];
+	
 	struct uvcdev* pudev = (struct uvcdev*) lp;
 	struct audio_para ap;
-	memset(&ap,0,sizeof(ap));
+	//memset(&ap,0,sizeof(ap));
 
 	
 	pudev->audio_thread_run = 1;
 	while(pudev->audio_thread_run){
+		memset(audio_dev,'\0',256);
+		memset(audio_info,'\0',256);
+		memset(ap.dev,'\0',256);
+		if(pudev->uvc_select == 0){
+			strcpy(audio_dev,AUDIO_CARD1_CAPTURE);
+			strcpy(audio_info,AUDIO_CARD1_STREAM);
+			strcpy(ap.dev,AUDIO_CARD1_DEV);
+		}else{
+			strcpy(audio_dev,AUDIO_CARD2_CAPTURE);
+			strcpy(audio_info,AUDIO_CARD2_STREAM);
+			strcpy(ap.dev,AUDIO_CARD2_DEV);
+		}
 		
-        
-		if(0 != access(AUDIO_CARD1_CAPTURE, 0) ||
+		
+      //  printf("audio dev name = %s \n",audio_dev);
+		if(0 != access(audio_dev, 0) ||
 			pudev->w == 0 || pudev->h ==0  ){
 			sleep(1);
 			continue;
@@ -2128,7 +2160,8 @@ void* uvc_audio_system(void *lp)
 
 
 	    pudev->audio_active = 1; 
-		GetAudioStream(AUDIO_CARD1_STREAM,&ap,CAP);
+		printf("audio stream name = %s \n",audio_info);
+		GetAudioStream(audio_info,&ap,CAP);
 		DumpAudioParameter(&ap);
 		JudgeAudioResample(&ap);
 		
@@ -2147,14 +2180,29 @@ void* uvc_audio_system_playback(void *lp)
 	printf("Into uvc_audio_system_playback \n");
 	struct uvcdev* pudev = (struct uvcdev*) lp;
 	struct audio_para ap;
-	memset(&ap,0,sizeof(ap));
+	char audio_dev[256];
+	char audio_info[256];
 
 	
 	pudev->audio_ply_thread_run = 1;
 	while(pudev->audio_ply_thread_run){
 		
-        
-		if(0 != access(AUDIO_CARD1_PLAYBACK, 0) ||
+        memset(audio_dev,'\0',256);
+		memset(audio_info,'\0',256);
+		memset(ap.dev,'\0',256);
+		
+		if(pudev->uvc_select == 0){
+			strcpy(audio_dev,AUDIO_CARD1_PLAYBACK);
+			strcpy(audio_info,AUDIO_CARD1_STREAM);
+			strcpy(ap.dev,AUDIO_CARD1_DEV);
+		}else{
+			strcpy(audio_dev,AUDIO_CARD2_PLAYBACK);
+			strcpy(audio_info,AUDIO_CARD2_STREAM);
+			strcpy(ap.dev,AUDIO_CARD2_DEV);
+		}
+
+		 //printf("audio dev name = %s \n",audio_dev);
+		if(0 != access(audio_dev, 0) ||
 			pudev->w == 0 || pudev->h ==0  ){
 			sleep(1);
 			continue;
@@ -2173,7 +2221,8 @@ void* uvc_audio_system_playback(void *lp)
     
 
 	    pudev->audio_ply_active = 1; 
-		GetAudioStream(AUDIO_CARD1_STREAM,&ap,PLK);
+		printf("audio stream name = %s \n",audio_info);
+		GetAudioStream(audio_info,&ap,PLK);
 		DumpAudioParameter(&ap);
 		JudgeAudioResample(&ap);
 		
@@ -2527,6 +2576,7 @@ int main(int argc, char **argv)
 	g_udev.format = V4L2_PIX_FMT_MJPEG;
 	g_udev.w = 0;
 	g_udev.h = 0;
+	g_udev.uvc_select = 0;
 	//sem_init(&video_mutex, 0, 0);
 	//sem_init(&audio_mutex, 0, 0);
 		

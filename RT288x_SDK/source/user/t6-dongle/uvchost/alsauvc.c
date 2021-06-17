@@ -91,8 +91,8 @@ void PlaybackAudio(struct audio_para *par )
 	char outbuf[4096]; 
 	int buffe_size = par->page_size ;
     
-
-	if ((ret = open_stream(&playback_handle,"hw:1,0",SND_PCM_STREAM_PLAYBACK,par) < 0))
+     printf("open_stream start PlaybackAudio %s \n",par->dev); 
+	if ((ret = open_stream(&playback_handle,par->dev,SND_PCM_STREAM_PLAYBACK,par) < 0))
 			goto END;
 	
 	
@@ -312,8 +312,8 @@ void RunAudioCapture(struct audio_para *par)
     int  udpindex = 0;
 	int  udpoffset = 0;
 	int  udpremain = 3072;
-    printf("open_stream start \n"); 
-	if ((ret = open_stream(&capture_handle,"hw:1,0",SND_PCM_STREAM_CAPTURE,par) < 0)){
+    printf("open_stream start %s \n",par->dev); 
+	if ((ret = open_stream(&capture_handle,par->dev,SND_PCM_STREAM_CAPTURE,par) < 0)){
 			goto END;
 	}
 	
@@ -484,6 +484,7 @@ static void split_data(char *s ,int mode ,struct audio_para *par)
 void DumpAudioParameter(struct audio_para *par)
 {
     int i = 0;
+	printf("dev = %s \n", par->dev);
 	printf("mode = %d \n", par->mode);
 	printf("channel = %d \n", par->ch);
 	printf("format = %d \n", par->format);

@@ -5,6 +5,9 @@
 #define CAP   1
 #define PLK   0
 
+#define UVC_DEV1         "/dev/video0"   
+#define UVC_DEV2         "/dev/video1"
+
 #define AUDIO_CARD1_DEV  "hw:1,0"
 #define AUDIO_CARD2_DEV  "hw:2,0"
 

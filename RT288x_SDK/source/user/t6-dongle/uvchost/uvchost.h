@@ -85,6 +85,7 @@ struct uvcdev{
 	char video_id;
 	int totalsize;
 	int resolution_index;
+	int uvc_select;
 	unsigned short vid;
 	unsigned short pid;
 	unsigned short uvcver;
